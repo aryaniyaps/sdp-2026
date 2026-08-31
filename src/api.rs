@@ -1,6 +1,7 @@
 use crate::{
     AppError, AppState,
     domain::{ExtractedMemory, MemoryKind, ResolveOutcome, VersionView},
+    observability::{OperationTrace, TraceBuilder},
     search,
 };
 use axum::{
@@ -11,6 +12,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{sync::Arc, time::Instant};
 use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
@@ -25,6 +27,8 @@ use uuid::Uuid;
         search_memories,
         list_memories,
         memory_chain,
+        list_traces,
+        get_trace,
         reset_demo
     ),
     components(schemas(
@@ -38,6 +42,8 @@ use uuid::Uuid;
         MemoriesQuery,
         VersionView,
         ResolveOutcome,
+        OperationTrace,
+        crate::observability::OperationStep,
         crate::search::RankedCandidate
     ))
 )]
@@ -52,6 +58,9 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/v1/search", post(search_memories))
         .route("/api/v1/memories", get(list_memories))
         .route("/api/v1/memories/{id}", get(memory_chain))
+        .route("/api/v1/traces", get(list_traces))
+        .route("/api/v1/traces/{id}", get(get_trace))
+        .route("/metrics", get(metrics))
         .route("/api/v1/demo/reset", post(reset_demo))
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .with_state(state)
@@ -92,6 +101,7 @@ pub struct EventRequest {
 }
 #[derive(Serialize, ToSchema)]
 pub struct EventResponse {
+    pub trace_id: Uuid,
     pub event_id: Uuid,
     pub outcomes: Vec<ResolveOutcome>,
     pub degraded_mode: bool,
@@ -116,20 +126,50 @@ async fn ingest(
             .fetch_optional(&s.store.pool)
             .await?;
     let namespace = namespace.ok_or(AppError::NotFound)?;
+    let mut trace = TraceBuilder::new(
+        "ingest",
+        &namespace,
+        Some(r.session_id),
+        json!({"role":r.role,"content_characters":r.content.chars().count(),"occurred_at":at,"deterministic_fixture":r.deterministic_fixture}),
+    );
+    trace.step(
+        "validate_request",
+        "ok",
+        started.elapsed(),
+        json!({"namespace":namespace,"role":r.role,"content_characters":r.content.chars().count()}),
+    );
+    let evidence_started = Instant::now();
     let (event, chunk) = s
         .store
         .begin_event(r.session_id, &r.role, &r.content, at)
         .await?;
+    trace.set_event(event);
+    trace.step(
+        "persist_immutable_evidence",
+        "ok",
+        evidence_started.elapsed(),
+        json!({"event_id":event,"chunk_id":chunk,"processing_state":"pending"}),
+    );
+    let extraction_started = Instant::now();
     let memories = if r.deterministic_fixture {
         if !s.demo_mode {
             return Err(AppError::Forbidden);
         }
-        fixture_extract(&r.content)
+        let items = fixture_extract(&r.content);
+        trace.step("extract_typed_memories", "ok", extraction_started.elapsed(), json!({"provider":"deterministic_fixture","model":s.extractor.version(),"temperature":0,"memory_count":items.len(),"memories":items}));
+        items
     } else {
         match s.extractor.extract(&r.content).await {
-            Ok(m) => m,
+            Ok(m) => {
+                trace.step("extract_typed_memories", "ok", extraction_started.elapsed(), json!({"provider":"ollama","model":s.extractor.version(),"temperature":0,"schema_constrained":true,"memory_count":m.len(),"memories":m}));
+                m
+            }
             Err(e) => {
+                trace.step("extract_typed_memories", "error", extraction_started.elapsed(), json!({"provider":"ollama","model":s.extractor.version(),"error":e.to_string()}));
                 s.store.fail_event(event, &e.to_string()).await?;
+                let completed = trace.finish("failed", false, None, Some(e.to_string()));
+                s.metrics.inc(&s.metrics.failures, 1);
+                let _ = s.store.record_trace(&completed).await;
                 return Err(e);
             }
         }
@@ -137,31 +177,83 @@ async fn ingest(
     let mut outcomes = Vec::new();
     let mut degraded = false;
     for m in memories {
+        let embedding_started = Instant::now();
         let embedding = match s.embedder.embed(&m.statement).await {
-            Ok(v) => Some(v),
-            Err(_) => {
+            Ok(v) => {
+                trace.step("embed_memory", "ok", embedding_started.elapsed(), json!({"model":s.embedder.version(),"dimensions":v.len(),"canonical_key":crate::domain::canonical_key(&m.subject,&m.predicate)}));
+                Some(v)
+            }
+            Err(e) => {
                 degraded = true;
+                trace.step("embed_memory", "degraded", embedding_started.elapsed(), json!({"model":s.embedder.version(),"fallback":"store_without_vector","error":e.to_string()}));
                 None
             }
         };
+        let resolution_started = Instant::now();
         match s
             .store
             .resolve(&namespace, &m, chunk, at, s.extractor.version(), embedding)
             .await
         {
-            Ok(x) => outcomes.push(x),
+            Ok(x) => {
+                trace.step("resolve_version_transaction", "ok", resolution_started.elapsed(), json!({"canonical_key":crate::domain::canonical_key(&m.subject,&m.predicate),"normalized_value":crate::domain::normalize_component(&m.value),"decision":x.action,"memory_id":x.memory_id,"version_id":x.version_id,"version":x.version}));
+                outcomes.push(x)
+            }
             Err(e) => {
+                trace.step(
+                    "resolve_version_transaction",
+                    "error",
+                    resolution_started.elapsed(),
+                    json!({"error":e.to_string()}),
+                );
                 s.store.fail_event(event, &e.to_string()).await?;
+                let completed = trace.finish("failed", degraded, None, Some(e.to_string()));
+                s.metrics.inc(&s.metrics.failures, 1);
+                let _ = s.store.record_trace(&completed).await;
                 return Err(e);
             }
         }
     }
+    let finalize_started = Instant::now();
     s.store.complete_event(event).await?;
+    trace.step(
+        "finalize_event",
+        "ok",
+        finalize_started.elapsed(),
+        json!({"processing_state":"processed"}),
+    );
+    let elapsed = started.elapsed().as_millis();
+    let trace_id = trace.id();
+    let result = json!({"event_id":event,"outcomes":outcomes,"degraded_mode":degraded});
+    let completed = trace.finish(
+        if degraded { "degraded" } else { "succeeded" },
+        degraded,
+        Some(result),
+        None,
+    );
+    s.store.record_trace(&completed).await?;
+    s.metrics.inc(&s.metrics.ingestions, 1);
+    s.metrics
+        .inc(&s.metrics.extracted_memories, outcomes.len() as u64);
+    s.metrics.inc(&s.metrics.ingestion_ms, elapsed as u64);
+    if degraded {
+        s.metrics.inc(&s.metrics.degraded, 1)
+    }
+    for o in &outcomes {
+        match o.action.as_str() {
+            "created" => s.metrics.inc(&s.metrics.versions_created, 1),
+            "reinforced" => s.metrics.inc(&s.metrics.versions_reinforced, 1),
+            "superseded" => s.metrics.inc(&s.metrics.versions_superseded, 1),
+            _ => {}
+        }
+    }
+    tracing::info!(operation_id=%trace_id,event_id=%event,namespace=%namespace,elapsed_ms=elapsed,degraded,memories=outcomes.len(),"ingestion completed");
     Ok(Json(EventResponse {
+        trace_id,
         event_id: event,
         outcomes,
         degraded_mode: degraded,
-        elapsed_ms: started.elapsed().as_millis(),
+        elapsed_ms: elapsed,
     }))
 }
 fn fixture_extract(text: &str) -> Vec<ExtractedMemory> {
@@ -194,6 +286,7 @@ pub struct SearchRequest {
 }
 #[derive(Serialize, ToSchema)]
 pub struct SearchResponse {
+    pub trace_id: Uuid,
     pub results: Vec<crate::search::RankedCandidate>,
     pub context: String,
     pub estimated_tokens: usize,
@@ -210,27 +303,75 @@ async fn search_memories(
     let started = Instant::now();
     let top = r.top_k.unwrap_or(5).clamp(1, 20);
     let budget = r.max_tokens.unwrap_or(256).clamp(1, 8192);
+    let mut trace = TraceBuilder::new(
+        "search",
+        &r.namespace,
+        r.session_id,
+        json!({"query":r.query,"top_k":top,"max_tokens":budget,"include_history":r.include_history,"session_id":r.session_id}),
+    );
+    trace.step("validate_and_plan", "ok", started.elapsed(), json!({"lexical_limit":20,"semantic_limit":20,"rrf_k":60,"top_k":top,"token_budget":budget,"active_only":!r.include_history}));
+    let lexical_started = Instant::now();
     let lexical = s
         .store
         .lexical(&r.namespace, &r.query, r.session_id, r.include_history)
         .await?;
+    trace.step("lexical_retrieval", "ok", lexical_started.elapsed(), json!({"engine":"PostgreSQL websearch_to_tsquery + GIN","candidate_count":lexical.len(),"candidates":lexical.iter().enumerate().map(|(i,(id,statement))|json!({"rank":i+1,"version_id":id,"statement":statement})).collect::<Vec<_>>()}));
+    let embed_started = Instant::now();
     let (semantic, degraded) = match s.embedder.embed(&r.query).await {
-        Ok(e) => (
-            s.store
+        Ok(e) => {
+            trace.step(
+                "embed_query",
+                "ok",
+                embed_started.elapsed(),
+                json!({"model":s.embedder.version(),"dimensions":e.len()}),
+            );
+            let semantic_started = Instant::now();
+            let rows = s
+                .store
                 .semantic(&r.namespace, e, r.session_id, r.include_history)
-                .await?,
-            false,
-        ),
-        Err(_) => (vec![], true),
+                .await?;
+            trace.step("semantic_retrieval", "ok", semantic_started.elapsed(), json!({"engine":"pgvector HNSW cosine distance","candidate_count":rows.len(),"candidates":rows.iter().enumerate().map(|(i,(id,statement))|json!({"rank":i+1,"version_id":id,"statement":statement})).collect::<Vec<_>>()}));
+            (rows, false)
+        }
+        Err(e) => {
+            trace.step("embed_query", "degraded", embed_started.elapsed(), json!({"model":s.embedder.version(),"fallback":"lexical_only","error":e.to_string()}));
+            trace.step(
+                "semantic_retrieval",
+                "skipped",
+                std::time::Duration::ZERO,
+                json!({"reason":"query embedding unavailable"}),
+            );
+            (vec![], true)
+        }
     };
+    let fusion_started = Instant::now();
     let fused = search::reciprocal_rank_fusion(&lexical, &semantic, 60.0);
+    trace.step(
+        "reciprocal_rank_fusion",
+        "ok",
+        fusion_started.elapsed(),
+        json!({"formula":"score += 1 / (60 + rank)","candidate_count":fused.len(),"ranking":fused}),
+    );
+    let packing_started = Instant::now();
     let (results, context, estimated_tokens) = search::pack(&fused, budget, top);
+    trace.step("token_budget_packing", "ok", packing_started.elapsed(), json!({"estimator":"ceil(Unicode characters / 4)","budget":budget,"estimated_tokens":estimated_tokens,"included_version_ids":results.iter().map(|x|x.version_id).collect::<Vec<_>>(),"context":context}));
+    let elapsed = started.elapsed().as_millis();
+    let trace_id = trace.id();
+    let completed=trace.finish(if degraded{"degraded"}else{"succeeded"},degraded,Some(json!({"result_count":results.len(),"estimated_tokens":estimated_tokens,"degraded_mode":degraded})),None);
+    s.store.record_trace(&completed).await?;
+    s.metrics.inc(&s.metrics.searches, 1);
+    s.metrics.inc(&s.metrics.search_ms, elapsed as u64);
+    if degraded {
+        s.metrics.inc(&s.metrics.degraded, 1)
+    }
+    tracing::info!(operation_id=%trace_id,namespace=%r.namespace,elapsed_ms=elapsed,degraded,results=results.len(),estimated_tokens,"search completed");
     Ok(Json(SearchResponse {
+        trace_id,
         results,
         context,
         estimated_tokens,
         degraded_mode: degraded,
-        elapsed_ms: started.elapsed().as_millis(),
+        elapsed_ms: elapsed,
     }))
 }
 
@@ -253,6 +394,35 @@ async fn memory_chain(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<VersionView>>, AppError> {
     Ok(Json(s.store.chain(id).await?))
+}
+
+#[derive(Deserialize)]
+struct TracesQuery {
+    namespace: String,
+    limit: Option<i64>,
+}
+#[utoipa::path(get,path="/api/v1/traces",params(("namespace"=String,Query),("limit"=Option<i64>,Query)),responses((status=200,body=[OperationTrace])))]
+async fn list_traces(
+    State(s): State<Arc<AppState>>,
+    Query(q): Query<TracesQuery>,
+) -> Result<Json<Vec<OperationTrace>>, AppError> {
+    required(&q.namespace, "namespace")?;
+    Ok(Json(
+        s.store.traces(&q.namespace, q.limit.unwrap_or(20)).await?,
+    ))
+}
+#[utoipa::path(get,path="/api/v1/traces/{id}",params(("id"=Uuid,Path)),responses((status=200,body=OperationTrace),(status=404)))]
+async fn get_trace(
+    State(s): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<OperationTrace>, AppError> {
+    Ok(Json(s.store.trace(id).await?))
+}
+async fn metrics(State(s): State<Arc<AppState>>) -> impl IntoResponse {
+    (
+        [("content-type", "text/plain; version=0.0.4")],
+        s.metrics.prometheus(),
+    )
 }
 
 #[derive(Serialize, ToSchema)]
@@ -292,5 +462,18 @@ fn required(v: &str, name: &str) -> Result<(), AppError> {
         Err(AppError::Validation(format!("{name} is required")))
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn embedded_ui_has_one_observatory_and_one_ledger() {
+        let ui = include_str!("ui.html");
+        assert_eq!(ui.matches("Operation observatory").count(), 1);
+        assert_eq!(ui.matches("Memory ledger and provenance").count(), 1);
+        assert_eq!(ui.matches("id=\"memories\"").count(), 1);
+        assert_eq!(ui.matches("<script>").count(), 1);
+        assert_eq!(ui.matches("</main>").count(), 1);
     }
 }

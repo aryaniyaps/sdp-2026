@@ -9,12 +9,18 @@ use tower_http::trace::TraceLayer;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "memory_engine=info,tower_http=info".into()),
-        )
-        .init();
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| "memory_engine=info,tower_http=info".into());
+    if env::var("LOG_FORMAT").as_deref() == Ok("pretty") {
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+    } else {
+        tracing_subscriber::fmt()
+            .json()
+            .with_current_span(true)
+            .with_span_list(true)
+            .with_env_filter(filter)
+            .init();
+    }
     let db = env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://memory:memory@127.0.0.1:55432/memory".into());
     let base = env::var("OLLAMA_URL").unwrap_or_else(|_| "http://127.0.0.1:11434".into());
@@ -32,8 +38,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         extractor: Arc::new(OllamaExtractor::new(base.clone(), extraction)),
         embedder: Arc::new(OllamaEmbedder::new(base, embedding)),
         demo_mode: env::var("DEMO_MODE").map(|v| v == "true").unwrap_or(false),
+        metrics: Arc::new(memory_engine::observability::Metrics::default()),
     });
-    let app = api::router(state).layer(TraceLayer::new_for_http());
+    let app = api::router(state).layer(TraceLayer::new_for_http().make_span_with(|request:&axum::http::Request<_>|tracing::info_span!("http_request",method=%request.method(),uri=%request.uri())).on_response(|response:&axum::http::Response<_>,latency:std::time::Duration,_span:&tracing::Span|tracing::info!(status=%response.status(),latency_ms=latency.as_millis(),"response completed")));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
     tracing::info!("UI http://127.0.0.1:8080 — Swagger http://127.0.0.1:8080/swagger-ui/");
     axum::serve(listener, app)

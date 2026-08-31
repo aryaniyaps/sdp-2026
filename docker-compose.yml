@@ -24,9 +24,9 @@ services:
       EXTRACTION_MODEL: qwen2.5:14b-instruct-q4_K_M
       EMBEDDING_MODEL: qwen3-embedding:0.6b
       DEMO_MODE: "true"
+      LOG_FORMAT: json
     depends_on:
       postgres:
         condition: service_healthy
 volumes:
   memory_pgdata:
-

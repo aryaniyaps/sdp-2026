@@ -60,6 +60,9 @@ impl Embedder for FakeEmbedder {
     async fn ready(&self) -> bool {
         !self.fail
     }
+    fn version(&self) -> &str {
+        "fake-embedding-v1"
+    }
 }
 
 async fn call(app: &axum::Router, method: &str, path: &str, body: Value) -> (StatusCode, Value) {
@@ -105,6 +108,7 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
         extractor: Arc::new(FakeExtractor),
         embedder: Arc::new(FakeEmbedder { fail: false }),
         demo_mode: true,
+        metrics: Arc::new(memory_engine::observability::Metrics::default()),
     });
     let app = api::router(state);
     let (_, session) = call(
@@ -125,6 +129,7 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(first["outcomes"][0]["action"], "created");
+    assert!(first["trace_id"].as_str().is_some());
     let(_,repeat)=call(&app,"POST","/api/v1/events",json!({"session_id":sid,"role":"user","content":"Python again","occurred_at":t+Duration::seconds(1)})).await;
     assert_eq!(repeat["outcomes"][0]["action"], "reinforced");
     let(_,corrected)=call(&app,"POST","/api/v1/events",json!({"session_id":sid,"role":"user","content":"Rust","occurred_at":t+Duration::seconds(2)})).await;
@@ -141,6 +146,25 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
     assert_eq!(status, StatusCode::OK);
     assert!(search["context"].as_str().unwrap().contains("Rust"));
     assert!(!search["context"].as_str().unwrap().contains("Python"));
+    let trace_id = search["trace_id"].as_str().unwrap();
+    let (status, trace) = call(
+        &app,
+        "GET",
+        &format!("/api/v1/traces/{trace_id}"),
+        Value::Null,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(trace["operation_type"], "search");
+    let stages = trace["steps"].as_array().unwrap();
+    assert!(stages.iter().any(|s| s["stage"] == "lexical_retrieval"));
+    assert!(stages.iter().any(|s| s["stage"] == "semantic_retrieval"));
+    assert!(
+        stages
+            .iter()
+            .any(|s| s["stage"] == "reciprocal_rank_fusion")
+    );
+    assert!(stages.iter().any(|s| s["stage"] == "token_budget_packing"));
     let rows = store.list("n1", true).await.unwrap();
     assert_eq!(rows.len(), 2);
     assert_eq!(rows.iter().filter(|x| x.status == "active").count(), 1);
@@ -183,6 +207,7 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
         extractor: Arc::new(FakeExtractor),
         embedder: Arc::new(FakeEmbedder { fail: true }),
         demo_mode: true,
+        metrics: Arc::new(memory_engine::observability::Metrics::default()),
     }));
     let (status, result) = call(
         &degraded,

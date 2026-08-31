@@ -1,5 +1,6 @@
 pub mod api;
 pub mod domain;
+pub mod observability;
 pub mod providers;
 pub mod search;
 pub mod store;
@@ -17,6 +18,7 @@ pub struct AppState {
     pub extractor: DynExtractor,
     pub embedder: DynEmbedder,
     pub demo_mode: bool,
+    pub metrics: std::sync::Arc<observability::Metrics>,
 }
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {

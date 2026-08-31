@@ -15,6 +15,7 @@ pub trait Extractor: Send + Sync {
 pub trait Embedder: Send + Sync {
     async fn embed(&self, text: &str) -> Result<Vec<f32>, AppError>;
     async fn ready(&self) -> bool;
+    fn version(&self) -> &str;
 }
 pub type DynExtractor = Arc<dyn Extractor>;
 pub type DynEmbedder = Arc<dyn Embedder>;
@@ -172,6 +173,9 @@ impl Embedder for OllamaEmbedder {
     }
     async fn ready(&self) -> bool {
         self.embed("ready").await.is_ok()
+    }
+    fn version(&self) -> &str {
+        &self.model
     }
 }
 

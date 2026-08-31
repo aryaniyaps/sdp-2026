@@ -18,3 +18,5 @@ docker compose --profile full up -d --build api
 echo "UI:      http://127.0.0.1:8080"
 echo "Swagger: http://127.0.0.1:8080/swagger-ui/"
 echo "Health:  http://127.0.0.1:8080/healthz"
+echo "Metrics: http://127.0.0.1:8080/metrics"
+echo "Logs:    docker compose logs -f api"
