@@ -98,3 +98,23 @@ mod tests {
         );
     }
 }
+
+/// One page of canonical memories, each with its full version chain.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct BrowsePage {
+    pub total: i64,
+    pub memories: Vec<Vec<VersionView>>,
+}
+
+/// Corpus-level counts for the console header.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct CorpusStats {
+    pub memories: i64,
+    pub versions: i64,
+    pub superseded: i64,
+    pub chains: i64,
+    pub relations: i64,
+    pub sessions: i64,
+    pub events: i64,
+    pub chunks: i64,
+}
