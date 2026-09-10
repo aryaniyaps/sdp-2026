@@ -230,7 +230,7 @@ impl Store {
         session: Option<Uuid>,
         history: bool,
     ) -> Result<Vec<(Uuid, String)>, AppError> {
-        let rows=sqlx::query("SELECT DISTINCT mv.id,mv.statement,ts_rank_cd(mv.search_vector,websearch_to_tsquery('english',$2)) score FROM memory_versions mv JOIN memories m ON m.id=mv.memory_id JOIN memory_version_sources mvs ON mvs.memory_version_id=mv.id JOIN chunks c ON c.id=mvs.chunk_id JOIN raw_events e ON e.id=c.raw_event_id WHERE m.namespace=$1 AND ($3 OR mv.status='active') AND ($4::uuid IS NULL OR e.session_id=$4) AND mv.search_vector @@ websearch_to_tsquery('english',$2) ORDER BY score DESC,mv.id LIMIT 20").bind(namespace).bind(query).bind(history).bind(session).fetch_all(&self.pool).await?;
+        let rows=sqlx::query("SELECT DISTINCT mv.id,mv.statement,ts_rank_cd(mv.search_vector,nullif(replace(plainto_tsquery('english',$2)::text,'&','|'),'')::tsquery) score FROM memory_versions mv JOIN memories m ON m.id=mv.memory_id JOIN memory_version_sources mvs ON mvs.memory_version_id=mv.id JOIN chunks c ON c.id=mvs.chunk_id JOIN raw_events e ON e.id=c.raw_event_id WHERE m.namespace=$1 AND ($3 OR mv.status='active') AND ($4::uuid IS NULL OR e.session_id=$4) AND mv.search_vector @@ nullif(replace(plainto_tsquery('english',$2)::text,'&','|'),'')::tsquery ORDER BY score DESC,mv.id LIMIT 20").bind(namespace).bind(query).bind(history).bind(session).fetch_all(&self.pool).await?;
         Ok(rows
             .into_iter()
             .map(|r| (r.get("id"), r.get("statement")))
@@ -258,6 +258,85 @@ impl Store {
         }
         Ok(out)
     }
+    /// Paged browse for the console. `list` fans out one query per version, which
+    /// is fine for a handful of review memories but not for a seeded corpus; this
+    /// bounds the fan-out to one page and filters in SQL.
+    pub async fn browse(
+        &self,
+        namespace: &str,
+        only_chains: bool,
+        search: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<BrowsePage, AppError> {
+        let pattern = search
+            .map(|q| format!("%{}%", q.trim()))
+            .filter(|q| q.len() > 2);
+        let sql = "WITH scoped AS (
+             SELECT m.id, m.canonical_key, count(mv.id) AS versions,
+                    max(mv.valid_from) AS latest
+             FROM memories m JOIN memory_versions mv ON mv.memory_id = m.id
+             WHERE m.namespace = $1
+               AND ($2::text IS NULL OR m.canonical_key ILIKE $2 OR mv.statement ILIKE $2)
+             GROUP BY m.id, m.canonical_key
+           ), filtered AS (
+             SELECT * FROM scoped WHERE NOT $3 OR versions > 1
+           )
+           SELECT id, (SELECT count(*) FROM filtered) AS total
+           FROM filtered ORDER BY versions DESC, latest DESC, canonical_key
+           LIMIT $4 OFFSET $5";
+        let rows = sqlx::query(sql)
+            .bind(namespace)
+            .bind(pattern.as_deref())
+            .bind(only_chains)
+            .bind(limit.clamp(1, 100))
+            .bind(offset.max(0))
+            .fetch_all(&self.pool)
+            .await?;
+        let total: i64 = rows.first().map(|r| r.get("total")).unwrap_or(0);
+        let mut memories = Vec::new();
+        for r in &rows {
+            memories.push(self.chain(r.get("id")).await?);
+        }
+        Ok(BrowsePage { total, memories })
+    }
+
+    /// Corpus-level counts for the console header. One round trip.
+    pub async fn stats(&self, namespace: &str) -> Result<CorpusStats, AppError> {
+        let r = sqlx::query(
+            "SELECT
+               (SELECT count(*) FROM memories WHERE namespace=$1) AS memories,
+               (SELECT count(*) FROM memory_versions mv JOIN memories m ON m.id=mv.memory_id
+                  WHERE m.namespace=$1) AS versions,
+               (SELECT count(*) FROM memory_versions mv JOIN memories m ON m.id=mv.memory_id
+                  WHERE m.namespace=$1 AND mv.status='superseded') AS superseded,
+               (SELECT count(*) FROM (SELECT mv.memory_id FROM memory_versions mv
+                  JOIN memories m ON m.id=mv.memory_id WHERE m.namespace=$1
+                  GROUP BY mv.memory_id HAVING count(*)>1) c) AS chains,
+               (SELECT count(*) FROM memory_relations r JOIN memory_versions mv
+                  ON mv.id=r.from_version_id JOIN memories m ON m.id=mv.memory_id
+                  WHERE m.namespace=$1) AS relations,
+               (SELECT count(*) FROM sessions WHERE namespace=$1) AS sessions,
+               (SELECT count(*) FROM raw_events e JOIN sessions s ON s.id=e.session_id
+                  WHERE s.namespace=$1) AS events,
+               (SELECT count(*) FROM chunks c JOIN raw_events e ON e.id=c.raw_event_id
+                  JOIN sessions s ON s.id=e.session_id WHERE s.namespace=$1) AS chunks",
+        )
+        .bind(namespace)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(CorpusStats {
+            memories: r.get("memories"),
+            versions: r.get("versions"),
+            superseded: r.get("superseded"),
+            chains: r.get("chains"),
+            relations: r.get("relations"),
+            sessions: r.get("sessions"),
+            events: r.get("events"),
+            chunks: r.get("chunks"),
+        })
+    }
+
     pub async fn chain(&self, memory_id: Uuid) -> Result<Vec<VersionView>, AppError> {
         let ids = sqlx::query_scalar::<_, Uuid>(
             "SELECT id FROM memory_versions WHERE memory_id=$1 ORDER BY version DESC",

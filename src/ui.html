@@ -1,9 +1,626 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Review 1 · Memory Engine</title><style>
-:root{color-scheme:dark;--bg:#0a0d12;--panel:#121823;--line:#263244;--text:#eef4ff;--muted:#91a0b8;--accent:#76e6b5;--warn:#ffc875;--blue:#72b7ff}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#18253a 0,var(--bg) 35%);font:15px/1.5 system-ui;color:var(--text)}main{max-width:1280px;margin:auto;padding:28px}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}h1{font-size:26px;margin:0}h2{font-size:16px;margin:0 0 13px}.tag,.badge{border:1px solid var(--line);border-radius:99px;padding:4px 9px;color:var(--muted);font-size:12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 14px 40px #0004}.wide{grid-column:1/-1}label{display:block;color:var(--muted);font-size:12px;margin:9px 0 5px}input,textarea{width:100%;background:#090d14;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px}textarea{min-height:92px;resize:vertical}.row{display:flex;gap:8px;align-items:center;margin-top:10px}.row>*{flex:1}button{border:0;border-radius:8px;padding:10px 13px;background:var(--accent);color:#062317;font-weight:700;cursor:pointer}button.secondary{background:#273348;color:var(--text)}button.danger{background:#4a2930;color:#ffdce1}.output{white-space:pre-wrap;background:#080c12;border:1px solid var(--line);border-radius:8px;padding:12px;min-height:54px;color:#cbd6e8;overflow:auto}.memory{border-left:3px solid var(--accent);padding:8px 12px;margin:8px 0;background:#0c111a}.superseded{border-color:var(--warn);opacity:.76}.meta{font-size:12px;color:var(--muted)}.badges{display:flex;gap:6px;margin-top:5px}.trace-layout{display:grid;grid-template-columns:280px 1fr;gap:14px}.trace-list{max-height:560px;overflow:auto}.trace-item{padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:7px;cursor:pointer}.trace-item:hover{border-color:var(--blue)}.step{display:grid;grid-template-columns:28px 210px 70px 1fr;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}.step-num{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#24483a;color:var(--accent);font-size:11px}.step pre{white-space:pre-wrap;margin:5px 0 0;font-size:11px;color:#9eb0c9;max-height:160px;overflow:auto}.ok{color:var(--accent)}.degraded,.skipped{color:var(--warn)}.error{color:#ff8d99}@media(max-width:760px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.row{flex-wrap:wrap}.row>*{min-width:45%}.trace-layout{grid-template-columns:1fr}.step{grid-template-columns:28px 1fr}.step>*:last-child{grid-column:2}}</style></head>
-<body><main><header><div><h1>Memory Engine</h1><div class="meta">Review 1 · evidence-preserving temporal memory</div></div><span id="health" class="tag">checking models…</span></header><div class="grid">
-<section class="panel"><h2>Ingest interaction</h2><label>Namespace</label><input id="ns" value="review"><label>Session</label><input id="sid" value="review-session"><label>Interaction text</label><textarea id="text">Aryan prefers Python for programming.</textarea><div class="row"><button onclick="ingest(false)">Live extraction</button><button class="secondary" onclick="ingest(true)">Deterministic fixture</button></div><div class="row"><button class="secondary" onclick="correction()">Load Rust correction</button><button class="danger" onclick="resetDemo()">Reset</button></div><label>Processing result</label><div id="ingestOut" class="output">Ready.</div></section>
-<section class="panel"><h2>Hybrid recall</h2><label>Question</label><input id="query" value="What language does Aryan like to code in?"><div class="row"><input id="tokens" type="number" value="128" title="Max tokens"><button onclick="search()">Search active memory</button></div><label>Fused ranks</label><div id="ranks" class="output">No search yet.</div><label>Token-bounded context</label><div id="context" class="output">—</div></section>
-<section class="panel wide"><div class="row"><div><h2>Operation observatory</h2><div class="meta">Durable, stage-level evidence for every ingestion and search</div></div><button class="secondary" onclick="loadTraces()">Refresh traces</button></div><div class="trace-layout"><div id="traceList" class="trace-list">No operations yet.</div><div id="traceDetail" class="output">Run an ingestion or search to inspect its pipeline.</div></div></section>
-<section class="panel wide"><div class="row"><h2>Memory ledger and provenance</h2><button class="secondary" onclick="loadMemories()">Refresh history</button></div><div id="memories">No memories yet.</div></section></div></main><script>
-const $=id=>document.getElementById(id);let sessionId=null;async function json(url,opts={}){const r=await fetch(url,{headers:{'content-type':'application/json'},...opts});const body=await r.json();if(!r.ok)throw Error(body.error||r.statusText);return body}async function session(){const d=await json('/api/v1/sessions',{method:'POST',body:JSON.stringify({namespace:$('ns').value,external_id:$('sid').value})});sessionId=d.id;return d.id}async function ingest(fixture){try{const id=await session();const d=await json('/api/v1/events',{method:'POST',body:JSON.stringify({session_id:id,role:'user',content:$('text').value,deterministic_fixture:fixture})});$('ingestOut').textContent=`${d.outcomes.map(x=>`${x.action} v${x.version}`).join(', ')||'No durable facts'} · ${d.elapsed_ms} ms · trace ${d.trace_id}${d.degraded_mode?' · embeddings degraded':''}`;await Promise.all([loadMemories(),loadTraces(d.trace_id)])}catch(e){$('ingestOut').textContent=e.message;await loadTraces()}}function correction(){$('text').value='Aryan now prefers Rust for programming.'}async function search(){try{const d=await json('/api/v1/search',{method:'POST',body:JSON.stringify({namespace:$('ns').value,query:$('query').value,top_k:5,max_tokens:+$('tokens').value})});$('ranks').innerHTML=d.results.map(x=>`<div>${esc(x.statement)}<div class="badges"><span class="badge">lex ${x.lexical_rank??'—'}</span><span class="badge">sem ${x.semantic_rank??'—'}</span><span class="badge">RRF ${x.fused_score.toFixed(5)}</span></div></div>`).join('')||'No matches';$('context').textContent=`${d.context||'(empty)'}\n${d.estimated_tokens} estimated tokens · ${d.elapsed_ms} ms · trace ${d.trace_id}${d.degraded_mode?' · lexical degraded mode':''}`;await loadTraces(d.trace_id)}catch(e){$('ranks').textContent=e.message;await loadTraces()}}async function loadMemories(){try{const d=await json(`/api/v1/memories?namespace=${encodeURIComponent($('ns').value)}&include_history=true`);$('memories').innerHTML=d.map(x=>`<div class="memory ${x.status}"><b>${esc(x.statement)}</b> <span class="badge">v${x.version} ${x.status}</span><div class="meta">${esc(x.canonical_key)} · valid ${x.valid_from}${x.valid_to?' → '+x.valid_to:' → present'} · extractor ${esc(x.extractor_version)}${x.supersedes?' · supersedes '+x.supersedes:''}</div>${x.sources.map(s=>`<div class="meta">“${esc(s.quote)}” — ${esc(s.external_session_id)}, ${s.occurred_at}</div>`).join('')}</div>`).join('')||'No memories yet.'}catch(e){$('memories').textContent=e.message}}async function loadTraces(select){try{const d=await json(`/api/v1/traces?namespace=${encodeURIComponent($('ns').value)}&limit=30`);$('traceList').innerHTML=d.map(t=>`<div class="trace-item" onclick="showTrace('${t.id}')"><b>${esc(t.operation_type)}</b> <span class="${t.status}">${esc(t.status)}</span><div class="meta">${t.duration_ms} ms · ${new Date(t.started_at).toLocaleTimeString()}<br>${t.id}</div></div>`).join('')||'No operations yet.';if(select)await showTrace(select);else if(d[0])renderTrace(d[0])}catch(e){$('traceList').textContent=e.message}}async function showTrace(id){renderTrace(await json(`/api/v1/traces/${id}`))}function renderTrace(t){$('traceDetail').innerHTML=`<div><b>${esc(t.operation_type.toUpperCase())}</b> <span class="badge ${t.status}">${esc(t.status)}</span> <span class="badge">${t.duration_ms} ms total</span><div class="meta">operation ${t.id} · ${t.started_at}<br>request ${esc(JSON.stringify(t.request))}</div></div>${t.steps.map(s=>`<div class="step"><span class="step-num">${s.ordinal+1}</span><b>${esc(s.stage)}</b><span class="${s.status}">${esc(s.status)} · ${s.duration_ms} ms</span><pre>${esc(JSON.stringify(s.details,null,2))}</pre></div>`).join('')}`}async function resetDemo(){await json('/api/v1/demo/reset',{method:'POST'});sessionId=null;$('ingestOut').textContent='Database reset.';await Promise.all([loadMemories(),loadTraces()])}function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}async function health(){try{const h=await json('/healthz');$('health').textContent=`DB ${h.database?'ready':'down'} · extraction ${h.extractor?'ready':'down'} · embedding ${h.embedder?'ready':'down'}${h.degraded_mode?' · degraded':''}`}catch(e){$('health').textContent='service unavailable'}}health();loadMemories();loadTraces();
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Memory Engine — temporal memory console</title>
+<style>
+/* ─────────────────────────────────────────────────────────────────────────
+   A console for inspecting temporal memory. The corpus is the subject, so
+   the surface stays quiet: paper ground, one ink, one accent, and colour
+   reserved for the two states that carry meaning — active and superseded.
+   ───────────────────────────────────────────────────────────────────────── */
+:root{
+  --paper:#FBFBF9; --surface:#FFF; --sunk:#F4F4F1;
+  --ink:#15171C; --ink-2:#3D424D; --muted:#666C79;
+  --line:#E3E3DE; --line-2:#D2D2CB;
+  --accent:#2450D8; --accent-soft:#EEF2FE;
+  --live:#0B6E4F; --live-soft:#E7F4EF;
+  --past:#9A5B08; --past-soft:#FBF1E0;
+  --danger:#A82D28;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Inter,Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,"Cascadia Mono","Roboto Mono",monospace;
+  --rail:236px;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--paper); color:var(--ink);
+  font:400 14px/1.55 var(--sans);
+  font-feature-settings:"tnum" 1,"cv05" 1;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:#D9E2FD;color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+*{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:3px solid var(--paper)}
+::-webkit-scrollbar-thumb:hover{background:#B9B9B1}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ── shell ─────────────────────────────────────────────────────────────── */
+.shell{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);min-height:100vh}
+.rail{
+  border-right:1px solid var(--line);background:var(--surface);
+  padding:20px 14px;display:flex;flex-direction:column;gap:26px;
+  position:sticky;top:0;height:100vh;overflow:auto;
+}
+.brand{display:flex;gap:10px;align-items:flex-start;padding:0 6px}
+.brand svg{flex:none;margin-top:2px}
+.brand h1{font-size:14px;font-weight:650;letter-spacing:-.01em;line-height:1.3}
+.brand p{font-size:11.5px;color:var(--muted);margin-top:1px}
+nav{display:flex;flex-direction:column;gap:2px}
+.navlabel{font-size:10.5px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);padding:0 8px 7px}
+.navitem{
+  display:flex;align-items:center;gap:10px;padding:8px;border-radius:7px;
+  color:var(--ink-2);font-size:13.5px;font-weight:500;cursor:pointer;border:0;
+  background:none;width:100%;text-align:left;font-family:inherit;
+  transition:background .13s ease,color .13s ease;
+}
+.navitem:hover{background:var(--sunk);color:var(--ink)}
+.navitem[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.navitem svg{flex:none;opacity:.85}
+.navitem .n{margin-left:auto;font:500 11.5px/1 var(--mono);color:var(--muted)}
+.navitem[aria-current="page"] .n{color:var(--accent)}
+
+.railfoot{margin-top:auto;display:flex;flex-direction:column;gap:9px;padding:0 6px}
+.stat{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  font-size:12px;color:var(--muted)}
+.stat b{font:600 12.5px/1 var(--mono);color:var(--ink-2)}
+.health{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted);
+  padding-top:10px;border-top:1px solid var(--line)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--line-2);flex:none}
+.dot.up{background:var(--live);box-shadow:0 0 0 3px var(--live-soft)}
+.dot.down{background:var(--danger);box-shadow:0 0 0 3px #F7E4E3}
+
+/* ── main ──────────────────────────────────────────────────────────────── */
+main{min-width:0;display:flex;flex-direction:column}
+.head{padding:26px 32px 0;max-width:1180px;width:100%}
+.head h2{font-size:21px;font-weight:640;letter-spacing:-.02em}
+.head p{color:var(--muted);margin-top:5px;max-width:70ch;font-size:13.5px}
+.body{padding:20px 32px 56px;max-width:1180px;width:100%;flex:1}
+
+.toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:20px 0 16px}
+.field{position:relative;flex:1;min-width:230px}
+.field svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);
+  color:var(--muted);pointer-events:none}
+input[type=text],input[type=search],input[type=number],textarea{
+  width:100%;font:400 13.5px/1.5 var(--sans);color:var(--ink);
+  background:var(--surface);border:1px solid var(--line-2);border-radius:7px;
+  padding:8px 11px;transition:border-color .13s ease,box-shadow .13s ease;
+}
+.field input{padding-left:33px}
+input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}
+input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);outline:none}
+textarea{min-height:86px;resize:vertical;font-family:var(--sans)}
+input,textarea{caret-color:var(--accent)}
+
+button{font:500 13px/1 var(--sans);cursor:pointer;border-radius:7px;
+  border:1px solid transparent;padding:9px 13px;transition:background .13s,border-color .13s}
+.btn{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn:hover{background:#000}
+.btn:disabled{background:var(--line-2);border-color:var(--line-2);color:#fff;cursor:not-allowed}
+.btn-2{background:var(--surface);color:var(--ink-2);border-color:var(--line-2)}
+.btn-2:hover{background:var(--sunk);color:var(--ink)}
+.btn-2[aria-pressed="true"]{background:var(--accent-soft);border-color:#BFD0FB;color:var(--accent)}
+
+/* ── version chains ────────────────────────────────────────────────────── */
+.chain{
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  margin-bottom:12px;overflow:hidden;
+  animation:rise .34s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.chain{animation:none}}
+.chain-h{display:flex;align-items:center;gap:11px;padding:12px 16px;
+  border-bottom:1px solid var(--line);background:linear-gradient(var(--surface),var(--surface))}
+.ckey{font:600 13px/1.4 var(--mono);letter-spacing:-.01em;word-break:break-all}
+.pill{font:600 10.5px/1 var(--sans);letter-spacing:.03em;text-transform:uppercase;
+  padding:4px 7px;border-radius:5px;white-space:nowrap;flex:none}
+.pill.count{background:var(--sunk);color:var(--ink-2)}
+.pill.live{background:var(--live-soft);color:var(--live)}
+.pill.past{background:var(--past-soft);color:var(--past)}
+.pill.kind{background:var(--sunk);color:var(--muted)}
+.chain-h .sp{margin-left:auto;display:flex;gap:6px;align-items:center}
+
+.track{padding:6px 16px 14px}
+.node{display:grid;grid-template-columns:26px minmax(0,1fr);gap:13px;position:relative;
+  padding:12px 0 4px}
+.node::before{content:"";position:absolute;left:12.5px;top:34px;bottom:-4px;
+  width:1px;background:var(--line-2)}
+.node:last-child::before{display:none}
+.vtag{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  font:600 11px/1 var(--mono);border:1px solid var(--line-2);background:var(--surface);
+  color:var(--muted);z-index:1}
+.node.is-live .vtag{border-color:var(--live);color:var(--live);background:var(--live-soft)}
+.vhead{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.vval{font-size:14.5px;font-weight:560;letter-spacing:-.01em}
+.node.is-past .vval{color:var(--muted);text-decoration:line-through;
+  text-decoration-color:var(--line-2);text-decoration-thickness:1px}
+.vstmt{color:var(--ink-2);font-size:13px;margin-top:3px}
+.window{font:500 11.5px/1 var(--mono);color:var(--muted);margin-top:7px;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.window .arrow{color:#9AA0AC}
+.quote{margin-top:9px;padding:9px 12px;background:var(--sunk);border-radius:7px;
+  font-size:12.5px;color:var(--ink-2)}
+.quote q{quotes:"\201C" "\201D";font-style:normal}
+.quote .src{display:block;margin-top:4px;font:500 11px/1.4 var(--mono);color:var(--muted)}
+.edge{display:flex;align-items:center;gap:6px;margin:9px 0 0;
+  font:500 11px/1 var(--mono);color:var(--past)}
+
+/* ── retrieval ─────────────────────────────────────────────────────────── */
+.rank{width:100%;border-collapse:collapse;background:var(--surface);
+  border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rank th{font:600 10.5px/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);
+  background:var(--sunk);white-space:nowrap}
+.rank td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13.5px}
+.rank tr:last-child td{border-bottom:0}
+.rank tr:hover td{background:#FCFCFB}
+.rank .num{font:500 12.5px/1.4 var(--mono);text-align:right;white-space:nowrap;color:var(--ink-2)}
+.rank .num.dim{color:var(--line-2)}
+.rank .fuse{font-weight:650;color:var(--accent)}
+.bar{height:3px;background:var(--sunk);border-radius:2px;overflow:hidden;margin-top:6px}
+.bar span{display:block;height:100%;background:var(--accent);border-radius:2px}
+.ctx{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:15px;margin-top:14px;font:400 13px/1.6 var(--mono);white-space:pre-wrap;
+  color:var(--ink-2);word-break:break-word}
+.budget{display:flex;align-items:center;gap:11px;margin-top:12px;font-size:12.5px;color:var(--muted)}
+.budget .track2{flex:1;height:6px;background:var(--sunk);border-radius:3px;overflow:hidden;max-width:280px}
+.budget .track2 span{display:block;height:100%;background:var(--accent)}
+
+/* ── traces ────────────────────────────────────────────────────────────── */
+.split{display:grid;grid-template-columns:290px minmax(0,1fr);gap:14px;align-items:start}
+.tlist{display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow:auto;padding-right:2px}
+.titem{display:block;width:100%;text-align:left;background:var(--surface);
+  border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;
+  font-family:inherit;transition:border-color .13s,background .13s}
+.titem:hover{border-color:var(--line-2);background:#FCFCFB}
+.titem[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.titem .op{font:600 12.5px/1.3 var(--sans);display:flex;align-items:center;gap:7px}
+.titem .meta{font:500 11px/1.5 var(--mono);color:var(--muted);margin-top:4px}
+.steps{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.step{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:12px;padding:13px 16px;
+  border-bottom:1px solid var(--line);align-items:baseline}
+.step:last-child{border-bottom:0}
+.snum{width:22px;height:22px;border-radius:6px;background:var(--sunk);color:var(--muted);
+  display:grid;place-items:center;font:600 11px/1 var(--mono)}
+.sname{font:600 13px/1.4 var(--mono)}
+.sms{font:500 12px/1 var(--mono);color:var(--muted);white-space:nowrap}
+.sdet{grid-column:2/-1;margin-top:6px;font:400 11.5px/1.6 var(--mono);color:var(--muted);
+  white-space:pre-wrap;word-break:break-word;max-height:180px;overflow:auto}
+.s-ok{color:var(--live)} .s-degraded,.s-skipped{color:var(--past)} .s-error{color:var(--danger)}
+
+/* ── shared ────────────────────────────────────────────────────────────── */
+.note{color:var(--muted);font-size:13px;padding:16px 0}
+.empty{border:1px dashed var(--line-2);border-radius:10px;padding:34px 20px;text-align:center;
+  color:var(--muted);font-size:13.5px;background:var(--surface)}
+.empty b{display:block;color:var(--ink-2);font-weight:600;margin-bottom:4px;font-size:14px}
+.err{background:#FDF3F2;border:1px solid #F0D4D2;color:var(--danger);
+  border-radius:8px;padding:11px 13px;font-size:13px;margin:12px 0}
+.skel{background:linear-gradient(90deg,var(--sunk) 25%,#EDEDE9 37%,var(--sunk) 63%);
+  background-size:400% 100%;animation:sh 1.3s ease infinite;border-radius:8px;height:74px;margin-bottom:12px}
+@keyframes sh{from{background-position:100% 0}to{background-position:0 0}}
+.pager{display:flex;align-items:center;gap:11px;justify-content:flex-end;margin-top:18px;
+  font-size:12.5px;color:var(--muted)}
+.hide{display:none!important}
+
+@media (max-width:1000px){
+  :root{--rail:0px}
+  .shell{grid-template-columns:1fr}
+  .rail{position:static;height:auto;flex-direction:row;align-items:center;gap:14px;
+    flex-wrap:wrap;padding:12px 16px;border-right:0;border-bottom:1px solid var(--line)}
+  .railfoot{display:none}
+  nav{flex-direction:row;flex-wrap:wrap;gap:4px}
+  .navlabel{display:none}
+  .navitem{width:auto;padding:7px 10px}
+  .navitem .n{display:none}
+  .head,.body{padding-left:16px;padding-right:16px}
+  .split{grid-template-columns:1fr}
+  .tlist{max-height:280px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside class="rail">
+  <div class="brand">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#2450D8" stroke-width="1.7"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <ellipse cx="12" cy="5.5" rx="7.5" ry="3"/><path d="M4.5 5.5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/>
+      <path d="M4.5 11.5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/>
+    </svg>
+    <div>
+      <h1>Memory Engine</h1>
+      <p>Temporal memory console</p>
+    </div>
+  </div>
+
+  <nav aria-label="Views">
+    <span class="navlabel">Inspect</span>
+    <button class="navitem" data-view="chains" aria-current="page">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><circle cx="12" cy="6" r="2.5"/>
+      <circle cx="12" cy="18" r="2.5"/><path d="M12 8.5v7"/></svg>
+      Version chains<span class="n" id="nChains">—</span>
+    </button>
+    <button class="navitem" data-view="retrieval">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+           stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.9-3.9"/></svg>
+      Retrieval<span class="n">RRF</span>
+    </button>
+    <button class="navitem" data-view="pipeline">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
+      Pipeline<span class="n" id="nTraces">—</span>
+    </button>
+    <span class="navlabel" style="padding-top:16px">Write</span>
+    <button class="navitem" data-view="ingest">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      Ingest text
+    </button>
+  </nav>
+
+  <div class="railfoot">
+    <div class="stat"><span>Memories</span><b id="sMem">—</b></div>
+    <div class="stat"><span>Versions</span><b id="sVer">—</b></div>
+    <div class="stat"><span>Superseded</span><b id="sSup">—</b></div>
+    <div class="stat"><span>Relations</span><b id="sRel">—</b></div>
+    <div class="stat"><span>Sessions</span><b id="sSes">—</b></div>
+    <div class="stat"><span>Evidence chunks</span><b id="sChk">—</b></div>
+    <div class="health"><span class="dot" id="hDb"></span><span id="hTxt">checking services…</span></div>
+  </div>
+</aside>
+
+<main>
+  <!-- ── chains ───────────────────────────────────────────────────────── -->
+  <section id="v-chains">
+    <div class="head">
+      <h2>Version chains</h2>
+      <p>Every claim keeps its history. When a fact changes the earlier version is closed,
+         not overwritten. It keeps its validity window, its source quote, and a
+         <code>supersedes</code> edge to the version that replaced it.</p>
+    </div>
+    <div class="body">
+      <div class="toolbar">
+        <label class="field">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.9-3.9"/></svg>
+          <input type="search" id="cq" placeholder="Filter by subject, predicate or statement…"
+                 aria-label="Filter memories">
+        </label>
+        <button class="btn-2" id="tChains" aria-pressed="true">Corrected only</button>
+      </div>
+      <div id="chains"></div>
+      <div class="pager hide" id="cPager">
+        <span id="cRange"></span>
+        <button class="btn-2" id="cPrev">Previous</button>
+        <button class="btn-2" id="cNext">Next</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── retrieval ────────────────────────────────────────────────────── -->
+  <section id="v-retrieval" class="hide">
+    <div class="head">
+      <h2>Retrieval</h2>
+      <p>Lexical and semantic candidates are fetched in parallel, then fused by reciprocal
+         rank. Only versions still live at query time are eligible, so a superseded fact
+         can never come back as current.</p>
+    </div>
+    <div class="body">
+      <div class="toolbar">
+        <label class="field">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.9-3.9"/></svg>
+          <input type="text" id="q" value="What car does Evan drive?" aria-label="Query">
+        </label>
+        <input type="number" id="tok" value="600" min="50" max="4000" step="50"
+               style="width:104px" aria-label="Token budget" title="Token budget">
+        <button class="btn" id="go">Search</button>
+      </div>
+      <div id="rout"></div>
+    </div>
+  </section>
+
+  <!-- ── pipeline ─────────────────────────────────────────────────────── -->
+  <section id="v-pipeline" class="hide">
+    <div class="head">
+      <h2>Pipeline</h2>
+      <p>Every ingestion and every query writes a durable trace. Each stage records its
+         status, its duration, and the model that ran it.</p>
+    </div>
+    <div class="body">
+      <div class="toolbar"><button class="btn-2" id="tRefresh">Refresh</button></div>
+      <div class="split">
+        <div class="tlist" id="tlist"></div>
+        <div id="tdetail"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ingest ───────────────────────────────────────────────────────── -->
+  <section id="v-ingest" class="hide">
+    <div class="head">
+      <h2>Ingest text</h2>
+      <p>Run the write path live: extract typed memories, canonicalise them, embed them,
+         and resolve them against what is already stored. Contradicting a stored fact
+         opens a new version and supersedes the old one.</p>
+    </div>
+    <div class="body" style="max-width:760px">
+      <label class="navlabel" style="padding:0 0 7px" for="itext">Interaction text</label>
+      <textarea id="itext">Evan sold the Prius and now drives a Volvo wagon.</textarea>
+      <div class="toolbar">
+        <button class="btn" id="iGo">Extract and resolve</button>
+        <button class="btn-2" id="iEx1">Try a correction</button>
+        <button class="btn-2" id="iEx2">Try a new fact</button>
+      </div>
+      <div id="iout"></div>
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+"use strict";
+const NS = "demo", $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const nf = new Intl.NumberFormat("en-US");
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
+  const text = await r.text();
+  let body; try { body = JSON.parse(text); } catch { body = { error: text.slice(0, 200) }; }
+  if (!r.ok) throw new Error(body.error || `${r.status} ${r.statusText}`);
+  return body;
+}
+const errBox = m => `<div class="err">${esc(m)}</div>`;
+const day = s => s ? new Date(s).toLocaleDateString("en-GB",
+  { day:"2-digit", month:"short", year:"numeric" }) : "";
+const clock = s => new Date(s).toLocaleTimeString("en-GB", { hour12:false });
+
+/* ── navigation ───────────────────────────────────────────────────────── */
+const VIEWS = ["chains","retrieval","pipeline","ingest"];
+let loaded = {};
+function show(v) {
+  VIEWS.forEach(x => $("#v-" + x).classList.toggle("hide", x !== v));
+  document.querySelectorAll(".navitem").forEach(b =>
+    b.dataset.view === v ? b.setAttribute("aria-current","page") : b.removeAttribute("aria-current"));
+  history.replaceState(null, "", "#" + v);
+  if (v === "pipeline" && !loaded.pipeline) { loaded.pipeline = 1; traces(); }
+}
+document.querySelectorAll(".navitem").forEach(b =>
+  b.addEventListener("click", () => show(b.dataset.view)));
+
+/* ── header stats ─────────────────────────────────────────────────────── */
+async function stats() {
+  try {
+    const s = await api(`/api/v1/stats?namespace=${NS}`);
+    $("#sMem").textContent = nf.format(s.memories);
+    $("#sVer").textContent = nf.format(s.versions);
+    $("#sSup").textContent = nf.format(s.superseded);
+    $("#sRel").textContent = nf.format(s.relations);
+    $("#sSes").textContent = nf.format(s.sessions);
+    $("#sChk").textContent = nf.format(s.chunks);
+    $("#nChains").textContent = nf.format(s.chains);
+  } catch { /* rail stays em-dashed; not worth an alarm */ }
+}
+async function health() {
+  try {
+    const h = await api("/healthz");
+    const ok = h.database && h.embedder;
+    $("#hDb").className = "dot " + (ok ? "up" : "down");
+    $("#hTxt").textContent = h.database
+      ? `database · embedder ${h.embedder ? "ready" : "offline"}`
+      : "database unreachable";
+  } catch {
+    $("#hDb").className = "dot down";
+    $("#hTxt").textContent = "service unavailable";
+  }
+}
+
+/* ── version chains ───────────────────────────────────────────────────── */
+const PAGE = 20;
+let offset = 0, total = 0, onlyChains = true, cq = "";
+
+function renderChain(vs) {
+  // API returns versions newest-first; a chain reads better oldest-first.
+  const ordered = [...vs].sort((a,b) => a.version - b.version);
+  const head = ordered[ordered.length - 1];
+  const nodes = ordered.map(v => {
+    const live = v.status === "active";
+    const src = (v.sources || [])[0];
+    return `
+    <div class="node ${live ? "is-live" : "is-past"}">
+      <span class="vtag">${v.version}</span>
+      <div>
+        <div class="vhead">
+          <span class="vval">${esc(v.value)}</span>
+          <span class="pill ${live ? "live" : "past"}">${live ? "active" : "superseded"}</span>
+        </div>
+        <div class="vstmt">${esc(v.statement)}</div>
+        <div class="window">
+          <span>${day(v.valid_from)}</span><span class="arrow">→</span>
+          <span>${v.valid_to ? day(v.valid_to) : "present"}</span>
+          <span class="arrow">·</span><span>${esc(v.extractor_version)}</span>
+        </div>
+        ${src ? `<div class="quote"><q>${esc(src.quote)}</q>
+          <span class="src">${esc(src.external_session_id)} · ${day(src.occurred_at)}</span></div>` : ""}
+        ${v.supersedes ? `<div class="edge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>supersedes v${v.version - 1}</div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+  return `<article class="chain">
+    <div class="chain-h">
+      <span class="ckey">${esc(head.canonical_key)}</span>
+      <span class="pill kind">${esc(head.kind)}</span>
+      <span class="sp">
+        <span class="pill count">${ordered.length} version${ordered.length > 1 ? "s" : ""}</span>
+      </span>
+    </div>
+    <div class="track">${nodes}</div>
+  </article>`;
+}
+
+async function chains() {
+  const box = $("#chains");
+  box.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+  try {
+    const p = new URLSearchParams({ namespace: NS, only_chains: onlyChains,
+                                    limit: PAGE, offset });
+    if (cq.trim().length > 2) p.set("search", cq.trim());
+    const d = await api("/api/v1/browse?" + p);
+    total = d.total;
+    if (!d.memories.length) {
+      box.innerHTML = `<div class="empty"><b>Nothing matches</b>
+        ${cq ? "No memory mentions “" + esc(cq) + "”." : "This namespace is empty."}</div>`;
+      $("#cPager").classList.add("hide");
+      return;
+    }
+    box.innerHTML = d.memories.map(renderChain).join("");
+    box.querySelectorAll(".chain").forEach((el, i) =>
+      el.style.animationDelay = Math.min(i * 26, 340) + "ms");
+    $("#cPager").classList.remove("hide");
+    $("#cRange").textContent =
+      `${nf.format(offset + 1)}–${nf.format(Math.min(offset + PAGE, total))} of ${nf.format(total)}`;
+    $("#cPrev").disabled = offset === 0;
+    $("#cNext").disabled = offset + PAGE >= total;
+  } catch (e) { box.innerHTML = errBox(e.message); }
+}
+let t;
+$("#cq").addEventListener("input", e => {
+  clearTimeout(t); cq = e.target.value;
+  t = setTimeout(() => { offset = 0; chains(); }, 260);
+});
+$("#tChains").addEventListener("click", e => {
+  onlyChains = !onlyChains;
+  e.currentTarget.setAttribute("aria-pressed", String(onlyChains));
+  e.currentTarget.textContent = onlyChains ? "Corrected only" : "All memories";
+  offset = 0; chains();
+});
+$("#cPrev").addEventListener("click", () => { offset = Math.max(0, offset - PAGE); chains(); scrollTo(0,0); });
+$("#cNext").addEventListener("click", () => { offset += PAGE; chains(); scrollTo(0,0); });
+
+/* ── retrieval ────────────────────────────────────────────────────────── */
+async function search() {
+  const out = $("#rout"), btn = $("#go");
+  btn.disabled = true; btn.textContent = "Searching…";
+  out.innerHTML = '<div class="skel" style="height:150px"></div>';
+  try {
+    const d = await api("/api/v1/search", { method:"POST", body: JSON.stringify({
+      namespace: NS, query: $("#q").value, top_k: 8, max_tokens: +$("#tok").value }) });
+    const top = Math.max(...d.results.map(r => r.fused_score), 1e-9);
+    const rows = d.results.map(r => `
+      <tr>
+        <td>${esc(r.statement)}<div class="bar"><span style="width:${(r.fused_score/top*100).toFixed(1)}%"></span></div></td>
+        <td class="num ${r.lexical_rank == null ? "dim" : ""}">${r.lexical_rank ?? "—"}</td>
+        <td class="num ${r.semantic_rank == null ? "dim" : ""}">${r.semantic_rank ?? "—"}</td>
+        <td class="num fuse">${r.fused_score.toFixed(5)}</td>
+      </tr>`).join("");
+    const pct = Math.min(100, d.estimated_tokens / +$("#tok").value * 100);
+    out.innerHTML = d.results.length ? `
+      <table class="rank">
+        <thead><tr><th>Memory</th><th style="text-align:right">Lexical</th>
+          <th style="text-align:right">Semantic</th><th style="text-align:right">RRF</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="budget">
+        <span>${nf.format(d.estimated_tokens)} of ${nf.format(+$("#tok").value)} tokens packed</span>
+        <span class="track2"><span style="width:${pct}%"></span></span>
+        <span>${d.elapsed_ms} ms${d.degraded_mode ? " · lexical-only fallback" : ""}</span>
+      </div>
+      <div class="ctx">${esc(d.context || "(empty)")}</div>` :
+      `<div class="empty"><b>No memory matched</b>Nothing in the corpus answers that.</div>`;
+  } catch (e) { out.innerHTML = errBox(e.message); }
+  finally { btn.disabled = false; btn.textContent = "Search"; }
+}
+$("#go").addEventListener("click", search);
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter") search(); });
+
+/* ── pipeline ─────────────────────────────────────────────────────────── */
+async function traces(select) {
+  const list = $("#tlist");
+  try {
+    const d = await api(`/api/v1/traces?namespace=${NS}&limit=40`);
+    $("#nTraces").textContent = d.length;
+    if (!d.length) {
+      list.innerHTML = "";
+      $("#tdetail").innerHTML = `<div class="empty"><b>No operations yet</b>
+        Run a search or ingest some text. Every operation records a durable trace.</div>`;
+      return;
+    }
+    list.innerHTML = d.map(t => `
+      <button class="titem" data-id="${t.id}">
+        <span class="op"><span class="dot ${t.status === "ok" ? "up" : "down"}"></span>
+          ${esc(t.operation_type)}</span>
+        <span class="meta">${t.duration_ms} ms · ${clock(t.started_at)}</span>
+      </button>`).join("");
+    list.querySelectorAll(".titem").forEach(b =>
+      b.addEventListener("click", () => trace(b.dataset.id)));
+    trace(select || d[0].id);
+  } catch (e) { list.innerHTML = errBox(e.message); }
+}
+async function trace(id) {
+  document.querySelectorAll(".titem").forEach(b =>
+    b.setAttribute("aria-current", String(b.dataset.id === id)));
+  try {
+    const t = await api(`/api/v1/traces/${id}`);
+    $("#tdetail").innerHTML = `<div class="steps">${t.steps.map(s => `
+      <div class="step">
+        <span class="snum">${s.ordinal + 1}</span>
+        <span class="sname">${esc(s.stage)}</span>
+        <span class="sms s-${esc(s.status)}">${esc(s.status)} · ${s.duration_ms} ms</span>
+        <pre class="sdet">${esc(JSON.stringify(s.details, null, 2))}</pre>
+      </div>`).join("")}</div>`;
+  } catch (e) { $("#tdetail").innerHTML = errBox(e.message); }
+}
+$("#tRefresh").addEventListener("click", () => traces());
+
+/* ── ingest ───────────────────────────────────────────────────────────── */
+$("#iEx1").addEventListener("click", () =>
+  $("#itext").value = "Evan sold the Prius and now drives a Volvo wagon.");
+$("#iEx2").addEventListener("click", () =>
+  $("#itext").value = "Melanie started learning classical guitar this month.");
+$("#iGo").addEventListener("click", async () => {
+  const out = $("#iout"), btn = $("#iGo");
+  btn.disabled = true; btn.textContent = "Running…";
+  out.innerHTML = '<div class="skel" style="height:96px"></div>';
+  try {
+    const s = await api("/api/v1/sessions", { method:"POST",
+      body: JSON.stringify({ namespace: NS, external_id: "console" }) });
+    const d = await api("/api/v1/events", { method:"POST", body: JSON.stringify({
+      session_id: s.id, role:"user", content: $("#itext").value }) });
+    // Show the resulting chain, not just the outcome codes: the point of the
+    // write path is that a contradiction opens a version rather than overwriting.
+    if (d.outcomes.length) {
+      const ids = [...new Set(d.outcomes.map(o => o.memory_id))];
+      const chainsOut = await Promise.all(ids.map(id => api(`/api/v1/memories/${id}`)));
+      const actions = d.outcomes.map(o => esc(o.action)).join(", ");
+      out.innerHTML = `<div class="budget" style="margin:14px 0 10px">
+          <span>${esc(actions)} · ${d.elapsed_ms} ms · trace ${esc(d.trace_id)}${
+            d.degraded_mode ? " · embeddings degraded" : ""}</span></div>
+        ${chainsOut.map(renderChain).join("")}`;
+    } else {
+      out.innerHTML = `<div class="empty" style="margin-top:14px"><b>Nothing durable in that text</b>
+        Transient or non-factual input is dropped rather than stored.</div>`;
+    }
+    stats(); loaded.pipeline = 1; traces(d.trace_id);
+  } catch (e) { out.innerHTML = errBox(e.message); }
+  finally { btn.disabled = false; btn.textContent = "Extract and resolve"; }
+});
+
+/* ── boot ─────────────────────────────────────────────────────────────── */
+const initial = location.hash.replace("#","");
+show(VIEWS.includes(initial) ? initial : "chains");
+stats(); health(); chains();
+</script>
+</body>
+</html>

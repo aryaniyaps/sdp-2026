@@ -1,6 +1,7 @@
 use crate::{
     AppError, AppState,
-    domain::{ExtractedMemory, MemoryKind, ResolveOutcome, VersionView},
+    domain::{BrowsePage, CorpusStats, ExtractedMemory, MemoryKind, ResolveOutcome,
+             VersionView},
     observability::{OperationTrace, TraceBuilder},
     search,
 };
@@ -26,6 +27,8 @@ use uuid::Uuid;
         ingest,
         search_memories,
         list_memories,
+        browse_memories,
+        corpus_stats,
         memory_chain,
         list_traces,
         get_trace,
@@ -40,6 +43,9 @@ use uuid::Uuid;
         SearchResponse,
         HealthResponse,
         MemoriesQuery,
+        BrowseQuery,
+        BrowsePage,
+        CorpusStats,
         VersionView,
         ResolveOutcome,
         OperationTrace,
@@ -57,6 +63,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/v1/events", post(ingest))
         .route("/api/v1/search", post(search_memories))
         .route("/api/v1/memories", get(list_memories))
+        .route("/api/v1/browse", get(browse_memories))
+        .route("/api/v1/stats", get(corpus_stats))
         .route("/api/v1/memories/{id}", get(memory_chain))
         .route("/api/v1/traces", get(list_traces))
         .route("/api/v1/traces/{id}", get(get_trace))
@@ -388,6 +396,48 @@ async fn list_memories(
 ) -> Result<Json<Vec<VersionView>>, AppError> {
     Ok(Json(s.store.list(&q.namespace, q.include_history).await?))
 }
+#[derive(Deserialize, ToSchema, utoipa::IntoParams)]
+pub struct BrowseQuery {
+    pub namespace: String,
+    /// Only return memories that have more than one version.
+    #[serde(default)]
+    pub only_chains: bool,
+    /// Substring match on canonical key or statement. Ignored under 3 characters.
+    pub search: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[utoipa::path(get, path = "/api/v1/browse", params(BrowseQuery),
+    responses((status = 200, body = BrowsePage)))]
+async fn browse_memories(
+    State(s): State<Arc<AppState>>,
+    Query(q): Query<BrowseQuery>,
+) -> Result<Json<BrowsePage>, AppError> {
+    required(&q.namespace, "namespace")?;
+    Ok(Json(
+        s.store
+            .browse(
+                &q.namespace,
+                q.only_chains,
+                q.search.as_deref(),
+                q.limit.unwrap_or(25),
+                q.offset.unwrap_or(0),
+            )
+            .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/v1/stats", params(("namespace" = String, Query)),
+    responses((status = 200, body = CorpusStats)))]
+async fn corpus_stats(
+    State(s): State<Arc<AppState>>,
+    Query(q): Query<MemoriesQuery>,
+) -> Result<Json<CorpusStats>, AppError> {
+    required(&q.namespace, "namespace")?;
+    Ok(Json(s.store.stats(&q.namespace).await?))
+}
+
 #[utoipa::path(get,path="/api/v1/memories/{id}",params(("id"=Uuid,Path)),responses((status=200,body=[VersionView]),(status=404)))]
 async fn memory_chain(
     State(s): State<Arc<AppState>>,
