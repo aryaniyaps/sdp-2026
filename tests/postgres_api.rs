@@ -108,6 +108,11 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
         graph: None,
         extractor: Arc::new(FakeExtractor),
         embedder: Arc::new(FakeEmbedder { fail: false }),
+        model: Arc::new(memory_engine::model::OllamaJsonModel {
+            base: "http://127.0.0.1:1".into(),
+            model: "unused".into(),
+        }),
+        worker_concurrency: 1,
         demo_mode: true,
         metrics: Arc::new(memory_engine::observability::Metrics::default()),
     });
@@ -169,6 +174,20 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
     let rows = store.list("n1", true).await.unwrap();
     assert_eq!(rows.len(), 2);
     assert_eq!(rows.iter().filter(|x| x.status == "active").count(), 1);
+    for version in &rows {
+        let assertion = store.assertion("n1", version.id).await.unwrap();
+        assert_eq!(assertion.status, version.status);
+        assert_eq!(assertion.sources.len(), version.sources.len());
+        assert_eq!(assertion.valid_to, version.valid_to);
+        if version.value == "Rust" {
+            assert!(
+                assertion
+                    .relations
+                    .iter()
+                    .any(|edge| edge.relation == "supersedes")
+            );
+        }
+    }
     assert_eq!(
         rows.iter()
             .find(|x| x.value == "Python")
@@ -208,6 +227,11 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
         graph: None,
         extractor: Arc::new(FakeExtractor),
         embedder: Arc::new(FakeEmbedder { fail: true }),
+        model: Arc::new(memory_engine::model::OllamaJsonModel {
+            base: "http://127.0.0.1:1".into(),
+            model: "unused".into(),
+        }),
+        worker_concurrency: 1,
         demo_mode: true,
         metrics: Arc::new(memory_engine::observability::Metrics::default()),
     }));

@@ -8,7 +8,7 @@ use sqlx::postgres::PgPoolOptions;
 use std::{env, sync::Arc};
 use tower_http::trace::TraceLayer;
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     dotenvy::dotenv().ok();
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| "memory_engine=info,tower_http=info".into());
@@ -43,20 +43,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         let graph_store = GraphStore::new(graph_uri, graph_user, graph_password, Some(graph_db));
         if let Err(err) = graph_store.ensure_constraints().await {
-            tracing::warn!(error=%err, "Neo4j constraints not ready yet; continuing without graph sync");
-            None
-        } else {
-            Some(Arc::new(graph_store))
+            tracing::warn!(error=%err, "Neo4j constraints not ready; projection worker will retry initialization");
         }
+        Some(Arc::new(graph_store))
     };
+    let concurrency = env::var("MEMORY_WORKER_CONCURRENCY")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(4)
+        .clamp(1, 8);
     let state = Arc::new(AppState {
         store,
+        worker_concurrency: concurrency,
         graph,
         extractor: Arc::new(OllamaExtractor::new(base.clone(), extraction)),
         embedder: Arc::new(OllamaEmbedder::new(base, embedding)),
+        model: if env::var("MEMORY_MODEL_PROVIDER").as_deref() == Ok("ollama") {
+            Arc::new(memory_engine::model::OllamaJsonModel {
+                base: env::var("OLLAMA_URL").unwrap_or_else(|_| "http://127.0.0.1:11434".into()),
+                model: env::var("EXTRACTION_MODEL")
+                    .unwrap_or_else(|_| "qwen2.5:14b-instruct-q4_K_M".into()),
+            })
+        } else {
+            Arc::new(memory_engine::model::PiModel {
+                executable: env::var("PI_EXECUTABLE").unwrap_or_else(|_| "pi".into()),
+                provider: env::var("PI_PROVIDER").unwrap_or_else(|_| "openai".into()),
+                model: env::var("PI_MODEL").unwrap_or_else(|_| "gpt-5.6-sol".into()),
+            })
+        },
         demo_mode: env::var("DEMO_MODE").map(|v| v == "true").unwrap_or(false),
         metrics: Arc::new(memory_engine::observability::Metrics::default()),
     });
+    let mut inference_workers = Vec::new();
+    for _ in 0..concurrency {
+        inference_workers.push(tokio::spawn(memory_engine::worker::run(
+            state.clone(),
+            &["extract", "consolidate"],
+        )));
+    }
+    let projection_worker = tokio::spawn(memory_engine::worker::run(
+        state.clone(),
+        &["project", "rebuild", "clear_graph"],
+    ));
     let app = api::router(state).layer(TraceLayer::new_for_http().make_span_with(|request:&axum::http::Request<_>|tracing::info_span!("http_request",method=%request.method(),uri=%request.uri())).on_response(|response:&axum::http::Response<_>,latency:std::time::Duration,_span:&tracing::Span|tracing::info!(status=%response.status(),latency_ms=latency.as_millis(),"response completed")));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
     tracing::info!("UI http://127.0.0.1:8080 — Swagger http://127.0.0.1:8080/swagger-ui/");
@@ -65,5 +93,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tokio::signal::ctrl_c().await.ok();
         })
         .await?;
+    for worker in inference_workers {
+        worker.abort();
+    }
+    projection_worker.abort();
     Ok(())
 }
