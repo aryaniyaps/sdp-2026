@@ -1,4 +1,11 @@
 services:
+  ollama:
+    image: ollama/ollama:0.13.5
+    profiles: ["local-models"]
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - memory_ollama:/root/.ollama
   postgres:
     image: pgvector/pgvector:pg17
     environment:
@@ -41,7 +48,8 @@ services:
     network_mode: host
     environment:
       DATABASE_URL: postgres://memory:memory@127.0.0.1:55432/memory
-      NEO4J_URI: bolt://127.0.0.1:7687
+      NEO4J_URI: http://127.0.0.1:7474
+      MEMORY_MODEL_PROVIDER: ollama
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: password
       OLLAMA_URL: http://127.0.0.1:11434
@@ -55,6 +63,7 @@ services:
       neo4j:
         condition: service_healthy
 volumes:
+  memory_ollama:
   memory_pgdata:
   neo4j_data:
   neo4j_logs:
