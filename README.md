@@ -58,13 +58,24 @@ Every operation ──► operations + operation_steps
 | Layer | Technology | Purpose |
 |---|---|---|
 | Service | Rust 1.96, Tokio, Axum | Async API and embedded UI |
-| Persistence | PostgreSQL 17, SQLx 0.9 | Transactions, versions, provenance |
+| System of record | PostgreSQL 17, SQLx 0.9 | Transactions, versions, provenance |
+| Graph layer | Neo4j 5.26 | Relationship-aware knowledge graph for graph RAG |
 | Retrieval | PostgreSQL FTS + pgvector 0.4 | Lexical and semantic candidates |
 | Extraction | Ollama `qwen2.5:14b-instruct-q4_K_M` | Local typed-memory extraction |
 | Embeddings | Ollama `qwen3-embedding:0.6b` | Local 1,024-dimensional embeddings |
 | API docs | Utoipa + Swagger UI | Generated executable API contract |
 | Observability | tracing, PostgreSQL traces, Prometheus text | Logs, explanations, counters |
 | Packaging | Docker Compose | Repeatable database and API runtime |
+
+## Graph RAG direction
+
+This project is moving toward a hybrid graph RAG design:
+
+- PostgreSQL remains the durable source of truth for temporal memory versions, provenance, and validity windows.
+- Neo4j becomes the relationship layer for entity, fact, and correction traversal.
+- Retrieval still starts with lexical + semantic candidate generation, then expands through graph neighbors for explainability and relationship-aware answer construction.
+
+This keeps the current observability and memory model intact while adding explicit graph traversal for relationships like `supersedes`, `supports`, and `contradicts`.
 
 ## Prerequisites
 

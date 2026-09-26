@@ -1,5 +1,6 @@
 pub mod api;
 pub mod domain;
+pub mod graph;
 pub mod observability;
 pub mod providers;
 pub mod search;
@@ -15,6 +16,7 @@ use store::Store;
 #[derive(Clone)]
 pub struct AppState {
     pub store: Store,
+    pub graph: Option<std::sync::Arc<graph::GraphStore>>,
     pub extractor: DynExtractor,
     pub embedder: DynEmbedder,
     pub demo_mode: bool,

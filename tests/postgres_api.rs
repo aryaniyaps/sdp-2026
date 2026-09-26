@@ -105,6 +105,7 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
     store.reset().await.unwrap();
     let state = Arc::new(AppState {
         store: store.clone(),
+        graph: None,
         extractor: Arc::new(FakeExtractor),
         embedder: Arc::new(FakeEmbedder { fail: false }),
         demo_mode: true,
@@ -204,6 +205,7 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
     assert_eq!(status, StatusCode::BAD_GATEWAY);
     let degraded = api::router(Arc::new(AppState {
         store,
+        graph: None,
         extractor: Arc::new(FakeExtractor),
         embedder: Arc::new(FakeEmbedder { fail: true }),
         demo_mode: true,
