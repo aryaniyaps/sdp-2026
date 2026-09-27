@@ -3,6 +3,11 @@
 Status observed on 2026-10-05. The authoritative scope is
 `project-requirements.json`. This audit does **not** declare the goal complete.
 
+The user subsequently delegated benchmark execution to a friend. The handoff is
+[`benchmark/README.md`](../benchmark/README.md); the partial run stopped at the
+subscription-sharing usage limit. Final empirical completion remains the team's
+responsibility, and the report is explicitly incomplete.
+
 | Requirement group | Evidence inspected | Current conclusion |
 |---|---|---|
 | Storage and temporal graph | Migrations 0003–0010, `knowledge_store.rs`, PostgreSQL integration tests, live correction/provenance UI | Implemented; lifecycle, lease recovery, bank serialization and retroactive correction tests pass |

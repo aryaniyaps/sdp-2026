@@ -8,5 +8,12 @@
     "evaluation": ["dataset/upstream/model/config/code manifests", "no ground-truth ingestion", "all 500 full histories", "four primary conditions", "two additional repeats on fixed 100-question sample", "500-question retrieval and 100-question answer ablations", "blinded subscription judge", "two human reviewers and adjudication", "paired confidence intervals", "operational metrics", "raw reproducible artifacts and report"],
     "delivery": ["one-command runtime", "isolated database and Neo4j tests", "TypeScript tests/checks", "benchmark protocol tests", "rendered UI verification", "four subsystem design/review explanations", "requirement-by-requirement final completion audit"]
   },
-  "status": "implementation in progress; do not infer completion from the presence of files or initial passing tests"
+  "execution_handoff": {
+    "requested_by_user": "just document benchmark docs. my friend will run it",
+    "runbook": "benchmark/README.md",
+    "partial_run": "review-full-v3",
+    "reason_execution_stopped": "subscription-sharing usage limit",
+    "remaining_team_work": "run all 500 questions, repetitions, ablations, judging, actual human audit and final empirical completion audit"
+  },
+  "status": "implementation and benchmark handoff delivered; empirical evaluation incomplete and delegated to the project team; no improvement claim"
 }
