@@ -1,4 +1,7 @@
 /target
 /.env
 /.demo
-
+**/node_modules/
+/benchmark/data/
+/benchmark/runs/
+**/__pycache__/
