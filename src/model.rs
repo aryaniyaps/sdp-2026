@@ -87,15 +87,29 @@ pub fn parse_pi_json(output: &str) -> Result<Value, AppError> {
 
     let text = final_text
         .ok_or_else(|| AppError::Provider("Pi returned no finalized assistant message".into()))?;
-    let text = text.trim();
-    let text = text
-        .strip_prefix("```json")
-        .or_else(|| text.strip_prefix("```"))
-        .unwrap_or(text);
-    let text = text.strip_suffix("```").unwrap_or(text).trim();
-    serde_json::from_str(text).map_err(|e| {
+    first_json_object(&text).map_err(|e| {
         AppError::Provider(format!("Pi JSON schema response could not be parsed: {e}"))
     })
+}
+/// Models often wrap the requested object in a code fence and follow it with an
+/// explanation. Take the first complete JSON object and ignore the surrounding
+/// prose; schema validation of the object itself stays strict.
+fn first_json_object(text: &str) -> Result<Value, String> {
+    let mut last_error = String::from("no JSON object found");
+    for (attempts, (start, _)) in text.match_indices('{').enumerate() {
+        if attempts == 64 {
+            break;
+        }
+        match serde_json::Deserializer::from_str(&text[start..])
+            .into_iter::<Value>()
+            .next()
+        {
+            Some(Ok(value)) if value.is_object() => return Ok(value),
+            Some(Err(e)) => last_error = e.to_string(),
+            _ => {}
+        }
+    }
+    Err(last_error)
 }
 pub struct OllamaJsonModel {
     pub base: String,
@@ -118,6 +132,26 @@ impl JsonModel for OllamaJsonModel {
         .map_err(|e| AppError::Provider(e.to_string()))
     }
 }
+fn cache_key(model: &dyn JsonModel, version: &str, prompt: &str) -> String {
+    format!(
+        "{:x}",
+        Sha256::digest(format!("{}\n{version}\n{prompt}", model.identity()))
+    )
+}
+/// Drop a cached response that failed validation. Without this a retry replays
+/// the same invalid answer forever and the job can never succeed.
+pub async fn forget_generated(
+    store: &Store,
+    model: &dyn JsonModel,
+    version: &str,
+    prompt: &str,
+) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM model_cache WHERE cache_key=$1")
+        .bind(cache_key(model, version, prompt))
+        .execute(&store.pool)
+        .await?;
+    Ok(())
+}
 pub async fn cached_generate(
     store: &Store,
     model: &dyn JsonModel,
@@ -125,10 +159,7 @@ pub async fn cached_generate(
     prompt: &str,
 ) -> Result<Value, AppError> {
     let identity = model.identity();
-    let key = format!(
-        "{:x}",
-        Sha256::digest(format!("{identity}\n{version}\n{prompt}"))
-    );
+    let key = cache_key(model, version, prompt);
     if let Some(v) = sqlx::query_scalar("SELECT response FROM model_cache WHERE cache_key=$1")
         .bind(&key)
         .fetch_optional(&store.pool)
@@ -149,5 +180,30 @@ mod tests {
         let s = "{\"type\":\"message_update\",\"text\":\"untrusted\"}\n{\"type\":\"message_end\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"ok\\\":true}\"}]}}";
         assert_eq!(parse_pi_json(s).unwrap(), json!({"ok":true}));
         assert!(parse_pi_json("{\"type\":\"agent_start\"}").is_err());
+    }
+    #[test]
+    fn fenced_object_followed_by_prose_is_accepted() {
+        let reply = "```json\n{\n  \"from\": \"2026-09-29T00:00:00Z\"\n}\n```\n\n**Reasoning:** the range is {half-open}.";
+        assert_eq!(
+            first_json_object(reply).unwrap(),
+            json!({"from":"2026-09-29T00:00:00Z"})
+        );
+    }
+    #[test]
+    fn leading_prose_and_plain_object_are_accepted() {
+        assert_eq!(
+            first_json_object("Here you go: {\"ok\": true} Thanks").unwrap(),
+            json!({"ok":true})
+        );
+        assert_eq!(
+            first_json_object("{\"a\":{\"b\":\"```\"}}").unwrap(),
+            json!({"a":{"b":"```"}})
+        );
+    }
+    #[test]
+    fn replies_without_an_object_still_fail_loudly() {
+        assert!(first_json_object("I cannot do that.").is_err());
+        assert!(first_json_object("[1,2,3]").is_err());
+        assert!(first_json_object("{\"unterminated\": ").is_err());
     }
 }
