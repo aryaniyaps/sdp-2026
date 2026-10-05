@@ -6,7 +6,7 @@ A Rust memory service for programming assistants and long conversations. It reta
 
 ## Run
 
-Requirements: Docker Compose, Node/npm, Python 3, and Pi with an authenticated subscription provider. Local embeddings use Ollama `qwen3-embedding:0.6b`; the runtime script downloads the model if needed. Rust compilation runs in a pinned container.
+Requirements: Docker Compose, Node/npm, Python 3, and Pi with an authenticated provider. Local embeddings use Ollama `qwen3-embedding:0.6b`; the runtime script downloads the model if needed. Rust is built with host cargo when it is the pinned toolchain, otherwise in a pinned container.
 
 ```sh
 ./scripts/run-memory.sh
@@ -14,7 +14,7 @@ Requirements: Docker Compose, Node/npm, Python 3, and Pi with an authenticated s
 # Swagger:     http://127.0.0.1:8080/swagger-ui/
 ```
 
-The defaults are Pi `openai/gpt-5.6-sol`, PostgreSQL on port 55432, Neo4j HTTP on 7474, and Ollama on 11434. Override `PI_PROVIDER`, `PI_MODEL`, `DATABASE_URL`, `NEO4J_URI`, `OLLAMA_URL`, or `MEMORY_WORKER_CONCURRENCY` as needed. The application uses a separate `memory_app` database; tests use `memory_test`. Compose credentials are for local development.
+The extraction worker runs through Pi. Without `PI_PROVIDER` and `PI_MODEL` it uses Pi's own default model; set both to choose another (the benchmark runbook pins its own). `scripts/check-worker.py` runs first and stops with the reason if the provider is not authenticated, the model is unknown, or a small test request fails, so a misconfigured worker never starts silently. Defaults are PostgreSQL on port 55432, Neo4j HTTP on 7474, and Ollama on 11434. Override `DATABASE_URL`, `NEO4J_URI`, `OLLAMA_URL`, or `MEMORY_WORKER_CONCURRENCY` as needed. The application uses a separate `memory_app` database; tests use `memory_test`. Compose credentials are for local development.
 
 ## What changed
 
@@ -27,13 +27,25 @@ The defaults are Pi `openai/gpt-5.6-sol`, PostgreSQL on port 55432, Neo4j HTTP o
 
 ## Use with Pi
 
-In a repository where you want persistent memory:
+Try it in one session:
 
 ```sh
 pi -e /absolute/path/to/sdp-2026/integrations/pi/extension.ts
 ```
 
-Automatic recall runs before the agent starts. Evidence is queued locally before submission. The extension supplies `memory_recall`, `memory_remember`, and `/memory-status`. Repository namespaces are derived from the repository root unless `MEMORY_NAMESPACE` is set. `MEMORY_URL` and `MEMORY_SPOOL` configure the endpoint and local spool.
+Or load it in every session, in any directory:
+
+```sh
+pi install /absolute/path/to/sdp-2026/integrations/pi
+```
+
+Installing sends the content of every Pi session, including tool output, to the memory service, so do it only for a service you trust. `pi remove` undoes it.
+
+All sessions share one memory per user (namespace `user:<login name>`), whatever directory they run in. Set `MEMORY_NAMESPACE` to keep a project's memory separate, for example from a direnv file. `MEMORY_URL` and `MEMORY_SPOOL` configure the endpoint and the local spool, which defaults to a directory derived from the namespace so any session can deliver evidence another directory queued.
+
+Automatic recall runs before the agent starts. It skips the server's LLM date planner so it stays fast, and it also searches retained source text and ranks it with the extracted assertions, so a missed or misread extraction is less likely to hide something you just said. Evidence is queued locally before submission, and each turn retains only what is new. The extension supplies `memory_recall`, `memory_remember`, and `/memory-status`.
+
+Retention returns as soon as the evidence is durable. Its text is searchable immediately (lexical and, once the embedder has run, semantic), while extracted facts, corrections and observations appear after the worker finishes. If extraction jobs fail, recall says so in its `degraded_reasons` and `/memory-status` shows the failed jobs.
 
 The worker disables tools, extensions and skills during inference to avoid recursively ingesting itself. Pi reader calls in the benchmark also disable memory and tools.
 
@@ -57,6 +69,8 @@ Retention acknowledges durable evidence; extraction is asynchronous. Inspect job
 
 ```sh
 ./scripts/test.sh
+# Live check through real Pi sessions (bills your provider; needs the service running):
+python3 scripts/pi-rpc-e2e.py
 python3 benchmark/run.py fetch
 python3 benchmark/run.py all --run development-10 --limit 10
 # After freezing the implementation:
