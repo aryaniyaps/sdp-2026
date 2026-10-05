@@ -79,7 +79,7 @@ pub struct SourceView {
     pub occurred_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ResolveOutcome {
     pub memory_id: Uuid,
     pub version_id: Uuid,

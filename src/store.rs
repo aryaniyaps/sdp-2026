@@ -142,9 +142,33 @@ impl Store {
         extractor: &str,
         embedding: Option<Vec<f32>>,
     ) -> Result<ResolveOutcome, AppError> {
+        self.resolve_once(namespace, m, chunk, at, extractor, embedding, None)
+            .await
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn resolve_once(
+        &self,
+        namespace: &str,
+        m: &ExtractedMemory,
+        chunk: Uuid,
+        at: DateTime<Utc>,
+        extractor: &str,
+        embedding: Option<Vec<f32>>,
+        receipt: Option<&str>,
+    ) -> Result<ResolveOutcome, AppError> {
         let key = canonical_key(&m.subject, &m.predicate);
         let norm = normalize_component(&m.value);
         let mut tx = self.pool.begin().await?;
+        if let Some(receipt) = receipt {
+            sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
+                .bind(format!("legacy:{namespace}"))
+                .execute(&mut *tx)
+                .await?;
+            if let Some(outcome) = sqlx::query_scalar::<_,serde_json::Value>("SELECT outcome FROM legacy_resolution_receipts WHERE namespace=$1 AND receipt_key=$2").bind(namespace).bind(receipt).fetch_optional(&mut *tx).await? {
+                return serde_json::from_value(outcome).map_err(|e| AppError::Validation(e.to_string()));
+            }
+        }
+
         let memory_id:Uuid=sqlx::query_scalar("INSERT INTO memories(namespace,canonical_key,subject,predicate) VALUES($1,$2,$3,$4) ON CONFLICT(namespace,canonical_key) DO UPDATE SET subject=memories.subject RETURNING id").bind(namespace).bind(&key).bind(m.subject.trim()).bind(m.predicate.trim()).fetch_one(&mut *tx).await?;
         sqlx::query("SELECT id FROM memories WHERE id=$1 FOR UPDATE")
             .bind(memory_id)
@@ -158,13 +182,15 @@ impl Store {
             let valid_from: DateTime<Utc> = row.get("valid_from");
             if norm == old {
                 Self::add_source(&mut tx, id, chunk).await?;
-                tx.commit().await?;
-                return Ok(ResolveOutcome {
+                let outcome = ResolveOutcome {
                     memory_id,
                     version_id: id,
                     version,
                     action: "reinforced".into(),
-                });
+                };
+                Self::legacy_receipt(&mut tx, namespace, receipt, &outcome).await?;
+                tx.commit().await?;
+                return Ok(outcome);
             }
             if at < valid_from {
                 return Err(AppError::Conflict(
@@ -182,24 +208,39 @@ impl Store {
                     .await?;
             Self::add_source(&mut tx, new_id, chunk).await?;
             sqlx::query("INSERT INTO memory_relations(from_version_id,to_version_id,relation_type) VALUES($1,$2,'supersedes')").bind(new_id).bind(id).execute(&mut *tx).await?;
-            tx.commit().await?;
-            return Ok(ResolveOutcome {
+            let outcome = ResolveOutcome {
                 memory_id,
                 version_id: new_id,
                 version: next,
                 action: "superseded".into(),
-            });
+            };
+            Self::legacy_receipt(&mut tx, namespace, receipt, &outcome).await?;
+            tx.commit().await?;
+            return Ok(outcome);
         }
         let id =
             Self::insert_version(&mut tx, memory_id, 1, m, &norm, at, extractor, embedding).await?;
         Self::add_source(&mut tx, id, chunk).await?;
-        tx.commit().await?;
-        Ok(ResolveOutcome {
+        let outcome = ResolveOutcome {
             memory_id,
             version_id: id,
             version: 1,
             action: "created".into(),
-        })
+        };
+        Self::legacy_receipt(&mut tx, namespace, receipt, &outcome).await?;
+        tx.commit().await?;
+        Ok(outcome)
+    }
+    async fn legacy_receipt(
+        tx: &mut Transaction<'_, Postgres>,
+        namespace: &str,
+        receipt: Option<&str>,
+        outcome: &ResolveOutcome,
+    ) -> Result<(), AppError> {
+        if let Some(receipt) = receipt {
+            sqlx::query("INSERT INTO legacy_resolution_receipts(namespace,receipt_key,outcome) VALUES($1,$2,$3)").bind(namespace).bind(receipt).bind(serde_json::to_value(outcome).unwrap()).execute(&mut **tx).await?;
+        }
+        Ok(())
     }
     #[allow(clippy::too_many_arguments)]
     async fn insert_version(
@@ -274,7 +315,7 @@ impl Store {
         }
         Ok(out)
     }
-    async fn version(&self, id: Uuid) -> Result<VersionView, AppError> {
+    pub(crate) async fn version(&self, id: Uuid) -> Result<VersionView, AppError> {
         let r=sqlx::query("SELECT mv.*,m.canonical_key,m.subject,m.predicate,(SELECT to_version_id FROM memory_relations WHERE from_version_id=mv.id AND relation_type='supersedes') supersedes FROM memory_versions mv JOIN memories m ON m.id=mv.memory_id WHERE mv.id=$1").bind(id).fetch_one(&self.pool).await?;
         let sources=sqlx::query("SELECT c.id chunk_id,c.content quote,e.role,e.session_id,s.external_id,e.occurred_at FROM memory_version_sources mvs JOIN chunks c ON c.id=mvs.chunk_id JOIN raw_events e ON e.id=c.raw_event_id JOIN sessions s ON s.id=e.session_id WHERE mvs.memory_version_id=$1 ORDER BY e.occurred_at").bind(id).fetch_all(&self.pool).await?.into_iter().map(|x|SourceView{chunk_id:x.get("chunk_id"),quote:x.get("quote"),role:x.get("role"),session_id:x.get("session_id"),external_session_id:x.get("external_id"),occurred_at:x.get("occurred_at")}).collect();
         Ok(VersionView {
@@ -296,7 +337,91 @@ impl Store {
         })
     }
     pub async fn reset(&self) -> Result<(), AppError> {
-        sqlx::query("TRUNCATE operation_steps,operations,memory_relations,memory_version_sources,memory_versions,memories,chunks,raw_events,sessions CASCADE").execute(&self.pool).await?;
+        let mut tx = self.pool.begin().await?;
+        let min_revision: i64 = sqlx::query_scalar("SELECT nextval('assertion_revision_sequence')")
+            .fetch_one(&mut *tx)
+            .await?;
+        let namespaces: Vec<String> = sqlx::query_scalar("SELECT DISTINCT namespace FROM entities")
+            .fetch_all(&mut *tx)
+            .await?;
+        sqlx::query("TRUNCATE legacy_resolution_receipts,memory_jobs,assertion_edges,assertion_entities,assertion_sources,assertions,entity_aliases,entities,episode_sources,episodes,operation_steps,operations,memory_relations,memory_version_sources,memory_versions,memories,chunks,raw_events,sessions CASCADE").execute(&mut *tx).await?;
+        for namespace in namespaces {
+            crate::knowledge_store::enqueue(
+                &mut tx,
+                &namespace,
+                "clear_graph",
+                &format!("clear:{namespace}:{}", Uuid::new_v4()),
+                serde_json::json!({"min_revision":min_revision}),
+            )
+            .await?;
+        }
+        tx.commit().await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod receipt_tests {
+    use super::*;
+    #[tokio::test]
+    async fn retry_does_not_restore_a_superseded_legacy_value() {
+        let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+            return;
+        };
+        let store = Store::new(
+            sqlx::postgres::PgPoolOptions::new()
+                .connect(&url)
+                .await
+                .unwrap(),
+        );
+        store.migrate().await.unwrap();
+        let ns = format!("receipt-{}", Uuid::new_v4());
+        let (session, _) = store.create_session(&ns, "session").await.unwrap();
+        let at = Utc::now();
+        let (_, chunk) = store
+            .begin_event(session, "user", "Python, then Rust", at)
+            .await
+            .unwrap();
+        let mut memory = ExtractedMemory {
+            subject: "Ada".into(),
+            predicate: "prefers".into(),
+            value: "Python".into(),
+            statement: "Ada prefers Python".into(),
+            kind: MemoryKind::Preference,
+        };
+        let first = store
+            .resolve_once(&ns, &memory, chunk, at, "fixture", None, Some("job-1:0"))
+            .await
+            .unwrap();
+        memory.value = "Rust".into();
+        memory.statement = "Ada prefers Rust".into();
+        let second = store
+            .resolve_once(
+                &ns,
+                &memory,
+                chunk,
+                at + chrono::Duration::seconds(1),
+                "fixture",
+                None,
+                Some("job-2:0"),
+            )
+            .await
+            .unwrap();
+        memory.value = "Python".into();
+        memory.statement = "Ada prefers Python".into();
+        let retried = store
+            .resolve_once(&ns, &memory, chunk, at, "fixture", None, Some("job-1:0"))
+            .await
+            .unwrap();
+        assert_eq!(first.version_id, retried.version_id);
+        assert_eq!(
+            store.version(first.version_id).await.unwrap().status,
+            "superseded"
+        );
+        assert_eq!(
+            store.list(&ns, false).await.unwrap()[0].id,
+            second.version_id
+        );
+        assert_eq!(store.chain(first.memory_id).await.unwrap().len(), 2);
     }
 }

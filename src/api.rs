@@ -50,6 +50,8 @@ use uuid::Uuid;
 pub struct ApiDoc;
 
 pub fn router(state: Arc<AppState>) -> Router {
+    let mut document = ApiDoc::openapi();
+    document.merge(crate::v2::ApiDoc::openapi());
     Router::new()
         .route("/", get(index))
         .route("/healthz", get(health))
@@ -62,7 +64,8 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/api/v1/traces/{id}", get(get_trace))
         .route("/metrics", get(metrics))
         .route("/api/v1/demo/reset", post(reset_demo))
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .merge(crate::v2::router())
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", document))
         .with_state(state)
 }
 
@@ -431,6 +434,10 @@ pub struct HealthResponse {
     pub extractor: bool,
     pub embedder: bool,
     pub degraded_mode: bool,
+    pub worker_model: String,
+    pub worker_concurrency: usize,
+    pub embedding_model: String,
+    pub demo_mode: bool,
 }
 #[utoipa::path(get,path="/healthz",responses((status=200,body=HealthResponse)))]
 async fn health(State(s): State<Arc<AppState>>) -> Json<HealthResponse> {
@@ -444,6 +451,10 @@ async fn health(State(s): State<Arc<AppState>>) -> Json<HealthResponse> {
         extractor,
         embedder,
         degraded_mode: !extractor || !embedder,
+        worker_model: s.model.identity(),
+        worker_concurrency: s.worker_concurrency,
+        embedding_model: s.embedder.version().into(),
+        demo_mode: s.demo_mode,
     })
 }
 #[utoipa::path(post,path="/api/v1/demo/reset",responses((status=200)))]

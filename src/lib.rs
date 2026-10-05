@@ -1,10 +1,15 @@
 pub mod api;
 pub mod domain;
 pub mod graph;
+pub mod knowledge;
+pub mod knowledge_store;
+pub mod model;
 pub mod observability;
 pub mod providers;
 pub mod search;
 pub mod store;
+pub mod v2;
+pub mod worker;
 use axum::{
     Json,
     http::StatusCode,
@@ -19,7 +24,9 @@ pub struct AppState {
     pub graph: Option<std::sync::Arc<graph::GraphStore>>,
     pub extractor: DynExtractor,
     pub embedder: DynEmbedder,
+    pub model: std::sync::Arc<dyn model::JsonModel>,
     pub demo_mode: bool,
+    pub worker_concurrency: usize,
     pub metrics: std::sync::Arc<observability::Metrics>,
 }
 #[derive(Debug, thiserror::Error)]

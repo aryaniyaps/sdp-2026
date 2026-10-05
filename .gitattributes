@@ -1,0 +1,2 @@
+# Preserve the byte-for-byte, checksummed upstream benchmark rubric.
+benchmark/vendor/evaluate_qa.py -whitespace
