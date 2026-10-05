@@ -4,17 +4,17 @@ This implementation keeps PostgreSQL authoritative and treats Neo4j as a replaya
 
 ## Run
 
-Install Docker Compose, Node/npm, and Pi with an authenticated `openai` subscription provider. The runtime script builds Rust in a pinned container and uses local Qwen embeddings. It does not need a hosted embedding API.
+Install Docker Compose, Node/npm, and Pi with an authenticated provider. The runtime script builds Rust with host cargo when it is the pinned toolchain (otherwise in a pinned container) and uses local Qwen embeddings. It does not need a hosted embedding API.
 
 ```sh
 ./scripts/run-memory.sh
 # UI: http://127.0.0.1:8080
 ./scripts/test.sh
-# In a separate terminal, inside a repository:
+# In a separate terminal, in any directory:
 pi -e /absolute/path/to/sdp-2026/integrations/pi/extension.ts
 ```
 
-`PI_PROVIDER` and `PI_MODEL` select the worker; defaults are `openai` and `gpt-5.6-sol`. `MEMORY_URL`, `MEMORY_NAMESPACE`, and `MEMORY_SPOOL` configure the extension. The service binds localhost. The Compose credentials are development credentials.
+`PI_PROVIDER` and `PI_MODEL` select the worker; set both or neither, in which case Pi's own default model is used and verified by `scripts/check-worker.py` before the service starts. `MEMORY_URL`, `MEMORY_NAMESPACE`, and `MEMORY_SPOOL` configure the extension; without `MEMORY_NAMESPACE` every directory shares the namespace `user:<login name>`. The service binds localhost. The Compose credentials are development credentials.
 
 ## Four technical workstreams
 
