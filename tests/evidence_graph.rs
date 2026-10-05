@@ -599,3 +599,258 @@ async fn retroactive_correction_closes_old_belief_without_negative_interval() {
         (at - Duration::days(1)).timestamp_micros()
     );
 }
+struct ConstantEmbedder;
+#[async_trait]
+impl Embedder for ConstantEmbedder {
+    async fn embed(&self, _: &str) -> Result<Vec<f32>, AppError> {
+        Ok(vec![0.5; 1024])
+    }
+    async fn ready(&self) -> bool {
+        true
+    }
+    fn version(&self) -> &str {
+        "constant"
+    }
+}
+#[tokio::test]
+async fn unprocessed_evidence_is_recalled_before_extraction_and_failures_are_reported() {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("TEST_DATABASE_URL missing; integration skipped");
+        return;
+    };
+    let store = Store::new(
+        PgPoolOptions::new()
+            .max_connections(4)
+            .connect(&url)
+            .await
+            .unwrap(),
+    );
+    store.migrate().await.unwrap();
+    let ns = format!("pending-{}", Uuid::new_v4());
+    let state = AppState {
+        store: store.clone(),
+        graph: None,
+        extractor: Arc::new(NoProviders),
+        embedder: Arc::new(ConstantEmbedder),
+        model: Arc::new(NoModel),
+        worker_concurrency: 1,
+        demo_mode: false,
+        metrics: Arc::new(Default::default()),
+    };
+    let (episode, _, _) = store
+        .retain(&RetainRequest {
+            namespace: ns.clone(),
+            session_id: "session".into(),
+            external_id: "pending-episode".into(),
+            metadata: json!({}),
+            events: vec![EvidenceEvent {
+                role: "user".into(),
+                content: "Remember that my side project is codenamed Marmalade and I deploy it on Fridays".into(),
+                occurred_at: Utc::now(),
+                metadata: json!({}),
+            }],
+        })
+        .await
+        .unwrap();
+    let ask = |query: &str| -> RecallRequest {
+        serde_json::from_value(json!({"namespace":ns,"query":query,"graph":false,"temporal":false}))
+            .unwrap()
+    };
+    // The question shares only some words with the stored sentence, and no worker has run.
+    let natural = recall_engine(
+        &state,
+        ask("What is the codename of my side project, and which day do I deploy it?"),
+    )
+    .await
+    .unwrap();
+    assert_eq!(natural.results[0].kind, "source_chunk");
+    assert!(natural.results[0].statement.contains("Marmalade"));
+    assert!(natural.results[0].ranks.contains_key("raw_fallback"));
+    // Once the chunk has a vector, a question with no shared words still finds it.
+    let evidence = store.episode_evidence(&ns, episode).await.unwrap();
+    memory_engine::worker::embed_missing_chunks(&state, &evidence)
+        .await
+        .unwrap();
+    let paraphrase = recall_engine(&state, ask("zzz unrelated phrasing"))
+        .await
+        .unwrap();
+    assert!(
+        paraphrase.results[0]
+            .ranks
+            .contains_key("raw_fallback_semantic")
+    );
+    // A failed extraction is reported, and the evidence is still served as raw text.
+    sqlx::query("UPDATE memory_jobs SET status='failed',error='fixture' WHERE namespace=$1")
+        .bind(&ns)
+        .execute(&store.pool)
+        .await
+        .unwrap();
+    let degraded = recall_engine(&state, ask("codename")).await.unwrap();
+    assert!(
+        degraded
+            .degraded_reasons
+            .iter()
+            .any(|r| r.contains("extraction jobs failed"))
+    );
+    assert_eq!(degraded.results[0].kind, "source_chunk");
+}
+#[tokio::test]
+async fn include_raw_keeps_recent_source_text_in_an_interpreted_namespace() {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("TEST_DATABASE_URL missing; integration skipped");
+        return;
+    };
+    let store = Store::new(
+        PgPoolOptions::new()
+            .max_connections(4)
+            .connect(&url)
+            .await
+            .unwrap(),
+    );
+    store.migrate().await.unwrap();
+    let ns = format!("raw-{}", Uuid::new_v4());
+    let state = AppState {
+        store: store.clone(),
+        graph: None,
+        extractor: Arc::new(NoProviders),
+        embedder: Arc::new(NoProviders),
+        model: Arc::new(NoModel),
+        worker_concurrency: 1,
+        demo_mode: false,
+        metrics: Arc::new(Default::default()),
+    };
+    // The extractor kept one fact and missed the deployment day stated in the same message.
+    extract(
+        &store,
+        &ns,
+        "Ada uses Python and now deploys on Tuesdays",
+        Utc::now(),
+        vec![claim("Python", Cardinality::Single, false)],
+    )
+    .await;
+    sqlx::query("UPDATE memory_jobs SET status='succeeded' WHERE namespace=$1 AND kind='extract'")
+        .bind(&ns)
+        .execute(&store.pool)
+        .await
+        .unwrap();
+    let ask = |include_raw: bool| -> RecallRequest {
+        serde_json::from_value(json!({"namespace":ns,"query":"Ada Python","graph":false,"temporal":false,"include_raw":include_raw})).unwrap()
+    };
+    let plain = recall_engine(&state, ask(false)).await.unwrap();
+    assert!(!plain.results.is_empty());
+    assert!(plain.results.iter().all(|hit| hit.kind != "source_chunk"));
+    let with_raw = recall_engine(&state, ask(true)).await.unwrap();
+    assert!(
+        with_raw
+            .results
+            .iter()
+            .any(|hit| hit.kind == "source_chunk" && hit.statement.contains("Tuesdays"))
+    );
+    assert!(
+        with_raw
+            .results
+            .iter()
+            .any(|hit| hit.kind != "source_chunk")
+    );
+}
+#[tokio::test]
+async fn requests_without_include_raw_keep_all_words_semantics_when_nothing_matched() {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("TEST_DATABASE_URL missing; integration skipped");
+        return;
+    };
+    let store = Store::new(
+        PgPoolOptions::new()
+            .max_connections(4)
+            .connect(&url)
+            .await
+            .unwrap(),
+    );
+    store.migrate().await.unwrap();
+    let ns = format!("allwords-{}", Uuid::new_v4());
+    let state = AppState {
+        store: store.clone(),
+        graph: None,
+        extractor: Arc::new(NoProviders),
+        embedder: Arc::new(NoProviders),
+        model: Arc::new(NoModel),
+        worker_concurrency: 1,
+        demo_mode: false,
+        metrics: Arc::new(Default::default()),
+    };
+    // Extraction finished and produced no assertion, so only the raw fallback can answer.
+    store
+        .retain(&RetainRequest {
+            namespace: ns.clone(),
+            session_id: "session".into(),
+            external_id: "settled".into(),
+            metadata: json!({}),
+            events: vec![EvidenceEvent {
+                role: "user".into(),
+                content: "Ada deploys the service on Tuesdays".into(),
+                occurred_at: Utc::now(),
+                metadata: json!({}),
+            }],
+        })
+        .await
+        .unwrap();
+    sqlx::query("UPDATE memory_jobs SET status='succeeded' WHERE namespace=$1 AND kind='extract'")
+        .bind(&ns)
+        .execute(&store.pool)
+        .await
+        .unwrap();
+    let ask = |include_raw: bool| -> RecallRequest {
+        serde_json::from_value(json!({"namespace":ns,"query":"What day does Ada deploy the service?","graph":false,"temporal":false,"include_raw":include_raw})).unwrap()
+    };
+    // "day" is not in the stored sentence: the all-words query every request used before matches nothing.
+    let plain = recall_engine(&state, ask(false)).await.unwrap();
+    assert!(plain.results.is_empty(), "{:?}", plain.results);
+    let loose = recall_engine(&state, ask(true)).await.unwrap();
+    assert!(
+        loose
+            .results
+            .iter()
+            .any(|h| h.statement.contains("Tuesdays"))
+    );
+}
+struct Counting(std::sync::atomic::AtomicUsize);
+#[async_trait]
+impl JsonModel for Counting {
+    async fn generate(&self, _: &str) -> Result<Value, AppError> {
+        Ok(json!({"call":self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst)}))
+    }
+    fn identity(&self) -> String {
+        "counting-fixture".into()
+    }
+}
+#[tokio::test]
+async fn forgotten_model_replies_are_asked_again_and_kept_ones_replay() {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("TEST_DATABASE_URL missing; integration skipped");
+        return;
+    };
+    let store = Store::new(
+        PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&url)
+            .await
+            .unwrap(),
+    );
+    store.migrate().await.unwrap();
+    let model = Counting(Default::default());
+    let prompt = format!("prompt-{}", Uuid::new_v4());
+    let first = memory_engine::model::cached_generate(&store, &model, "v", &prompt)
+        .await
+        .unwrap();
+    let replay = memory_engine::model::cached_generate(&store, &model, "v", &prompt)
+        .await
+        .unwrap();
+    assert_eq!(first, replay);
+    memory_engine::model::forget_generated(&store, &model, "v", &prompt)
+        .await
+        .unwrap();
+    let again = memory_engine::model::cached_generate(&store, &model, "v", &prompt)
+        .await
+        .unwrap();
+    assert_ne!(first, again);
+}

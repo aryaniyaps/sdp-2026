@@ -62,12 +62,34 @@ pub fn router() -> Router<Arc<AppState>> {
 struct Namespace {
     namespace: String,
 }
+/// Bounds concurrent early embedding so a bulk import cannot flood the embedder.
+static EMBEDDING_GATE: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
 #[utoipa::path(post,path="/api/v2/retain",responses((status=200,body=Value)),tag="Evidence memory",request_body=RetainRequest)]
 async fn retain(
     State(s): State<Arc<AppState>>,
     Json(r): Json<RetainRequest>,
 ) -> Result<Json<Value>, AppError> {
     let (episode_id, job_id, created) = s.store.retain(&r).await?;
+    if created {
+        // Make the new evidence semantically searchable now instead of after
+        // extraction. Embedding is not on the acknowledgement path: the evidence is
+        // already durable, and the extract job fills any gap left by an outage.
+        let state = s.clone();
+        let namespace = r.namespace.clone();
+        tokio::spawn(async move {
+            let Ok(_permit) = EMBEDDING_GATE.acquire().await else {
+                return;
+            };
+            let outcome = async {
+                let evidence = state.store.episode_evidence(&namespace, episode_id).await?;
+                crate::worker::embed_missing_chunks(&state, &evidence).await
+            }
+            .await;
+            if let Err(error) = outcome {
+                tracing::warn!(%episode_id, %error, "early source embedding failed");
+            }
+        });
+    }
     Ok(Json(
         json!({"episode_id":episode_id,"job_id":job_id,"created":created}),
     ))
@@ -206,6 +228,10 @@ pub struct RecallRequest {
     pub raw_only: bool,
     #[serde(default)]
     pub legacy_only: bool,
+    /// Always add retained source text to the candidates (interactive use). Off by
+    /// default so benchmark conditions keep their defined candidate sets.
+    #[serde(default)]
+    pub include_raw: bool,
     #[serde(default = "default_budget")]
     pub max_tokens: usize,
     #[serde(default = "default_top")]
@@ -299,6 +325,98 @@ async fn raw_sources(
 ) -> Result<Vec<EvidenceSource>, AppError> {
     Ok(sqlx::query("SELECT c.id,c.content quote,e.role,e.occurred_at,e.metadata,se.external_id FROM chunks c JOIN raw_events e ON e.id=c.raw_event_id JOIN sessions se ON se.id=e.session_id WHERE c.id=$1 AND se.namespace=$2").bind(id).bind(namespace).fetch_all(&s.store.pool).await?.into_iter().map(|r|EvidenceSource{chunk_id:r.get("id"),quote:r.get("quote"),role:r.get("role"),session_id:r.get("external_id"),occurred_at:r.get("occurred_at"),metadata:r.get("metadata")}).collect())
 }
+/// Evidence whose extraction job has not succeeded yet. Assertions cannot reflect it,
+/// so it is searched as raw text.
+const UNPROCESSED_CHUNK: &str = "EXISTS(SELECT 1 FROM episode_sources es JOIN memory_jobs j ON j.dedupe_key='extract:'||es.episode_id::text WHERE es.chunk_id=c.id AND j.kind='extract' AND j.status IN ('pending','running','failed'))";
+/// Natural-language questions rarely contain every word of the stored sentence, so
+/// the fallback ORs the content words instead of requiring all of them.
+fn any_word_query(query: &str) -> String {
+    let mut seen = HashSet::new();
+    let mut words = Vec::new();
+    // Split on whitespace only: PostgreSQL's parser keeps identifiers such as v2.rs or
+    // foo-bar as single lexemes, so splitting inside a word would stop them matching.
+    // Quotes and leading dashes are removed so no query syntax can be injected.
+    for word in query.split_whitespace() {
+        let word = word
+            .replace('"', "")
+            .trim_matches(|c: char| !c.is_alphanumeric())
+            .to_lowercase();
+        if word.chars().count() > 1 && word != "or" && seen.insert(word.clone()) {
+            words.push(word);
+            if words.len() == 32 {
+                break;
+            }
+        }
+    }
+    words.join(" or ")
+}
+/// Which retained evidence a raw semantic pass may search.
+#[derive(Clone, Copy, PartialEq)]
+enum RawScope {
+    /// Only evidence whose extraction has not succeeded.
+    Unprocessed,
+    /// Every retained chunk in the namespace.
+    All,
+}
+/// Raw-text candidates for requests assertions cannot answer alone. `search_all`
+/// lets the lexical pass cover already interpreted evidence too; `semantic`
+/// selects the evidence a vector pass covers, if any. `any_word` ORs the query words;
+/// without it the query keeps the all-words semantics every request had before, so a
+/// request that does not ask for the new behaviour retrieves exactly what it did.
+async fn raw_fallback_candidates(
+    s: &AppState,
+    r: &RecallRequest,
+    search_all: bool,
+    any_word: bool,
+    semantic: Option<RawScope>,
+    embedding: Option<&Vec<f32>>,
+) -> Result<(Vec<Uuid>, Vec<Uuid>), AppError> {
+    const BASE: &str = "FROM chunks c JOIN raw_events e ON e.id=c.raw_event_id JOIN sessions se ON se.id=e.session_id WHERE se.namespace=$1 AND ($2::timestamptz IS NULL OR e.occurred_at<=$2) AND ($3::timestamptz IS NULL OR e.occurred_at>=$3) AND ($4::timestamptz IS NULL OR e.occurred_at<$4)";
+    let words = if any_word {
+        any_word_query(&r.query)
+    } else {
+        r.query.clone()
+    };
+    let mut lexical = Vec::new();
+    if !words.trim().is_empty() {
+        let scope = if search_all {
+            "TRUE"
+        } else {
+            UNPROCESSED_CHUNK
+        };
+        let sql = format!(
+            "SELECT c.id {BASE} AND {scope} AND c.search_vector @@ websearch_to_tsquery('english',$5) ORDER BY ts_rank_cd(c.search_vector,websearch_to_tsquery('english',$5)) DESC,c.id LIMIT 40"
+        );
+        lexical = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.as_str()))
+            .bind(&r.namespace)
+            .bind(r.as_of)
+            .bind(r.from)
+            .bind(r.to)
+            .bind(&words)
+            .fetch_all(&s.store.pool)
+            .await?;
+    }
+    let mut nearest = Vec::new();
+    if let (Some(scope), Some(vector)) = (semantic, embedding) {
+        let scope = if scope == RawScope::All {
+            "TRUE"
+        } else {
+            UNPROCESSED_CHUNK
+        };
+        let sql = format!(
+            "SELECT c.id {BASE} AND {scope} AND c.embedding IS NOT NULL ORDER BY c.embedding <=> $5,c.id LIMIT 10"
+        );
+        nearest = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.as_str()))
+            .bind(&r.namespace)
+            .bind(r.as_of)
+            .bind(r.from)
+            .bind(r.to)
+            .bind(Vector::from(vector.clone()))
+            .fetch_all(&s.store.pool)
+            .await?;
+    }
+    Ok((lexical, nearest))
+}
 pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallResponse, AppError> {
     if r.legacy_only && r.raw_only {
         return Err(AppError::Validation(
@@ -368,8 +486,8 @@ pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallR
         s.embedder.embed(&r.query)
     );
     let lexical = lexical?;
-    let semantic = match embedding {
-        Ok(v) => candidates(s, &r, "semantic", Some(v)).await?,
+    let semantic = match &embedding {
+        Ok(v) => candidates(s, &r, "semantic", Some(v.clone())).await?,
         Err(e) => {
             degraded.push(format!("semantic unavailable: {e}"));
             vec![]
@@ -465,22 +583,42 @@ pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallR
             ranks.entry(id).or_default().insert(strategy.into(), i + 1);
         }
     }
-    // Retained evidence remains searchable before extraction, and when the
-    // extractor found no suitable assertion. Keep its origin explicit.
+    // Retained evidence remains searchable before extraction has interpreted it,
+    // and when nothing else matched. Keep its origin explicit.
     let mut fallback_ids = HashSet::new();
-    if ranks.is_empty() && !r.raw_only && !r.legacy_only {
-        let mut raw_request = r.clone();
-        raw_request.raw_only = true;
-        for (i, (id, _)) in candidates(s, &raw_request, "lexical", None)
-            .await?
-            .into_iter()
-            .enumerate()
-        {
-            fallback_ids.insert(id);
-            ranks
-                .entry(id)
-                .or_default()
-                .insert("raw_fallback".into(), i + 1);
+    if !r.raw_only && !r.legacy_only {
+        let (unprocessed, failed): (i64, i64) = sqlx::query_as("SELECT count(*),count(*) FILTER(WHERE status='failed') FROM memory_jobs WHERE namespace=$1 AND kind='extract' AND status IN ('pending','running','failed')").bind(&r.namespace).fetch_one(&s.store.pool).await?;
+        if failed > 0 {
+            degraded.push(format!(
+                "{failed} extraction jobs failed; the newest evidence is served as raw text until they are retried"
+            ));
+        }
+        if ranks.is_empty() || unprocessed > 0 || r.include_raw {
+            let semantic_scope = if r.include_raw {
+                Some(RawScope::All)
+            } else if unprocessed > 0 {
+                Some(RawScope::Unprocessed)
+            } else {
+                None
+            };
+            let (lexical, semantic) = raw_fallback_candidates(
+                s,
+                &r,
+                ranks.is_empty() || r.include_raw,
+                r.include_raw || unprocessed > 0,
+                semantic_scope,
+                embedding.as_ref().ok(),
+            )
+            .await?;
+            for (strategy, ids) in [
+                ("raw_fallback", lexical),
+                ("raw_fallback_semantic", semantic),
+            ] {
+                for (i, id) in ids.into_iter().enumerate() {
+                    fallback_ids.insert(id);
+                    ranks.entry(id).or_default().insert(strategy.into(), i + 1);
+                }
+            }
         }
     }
     let mut ranking = Vec::new();
@@ -728,4 +866,21 @@ async fn perform_reflect(s: &AppState, r: RecallRequest) -> Result<Value, AppErr
     Ok(
         json!({"answer":output["answer"],"citations":citations,"insufficient_evidence":output["insufficient_evidence"],"recall":recall}),
     )
+}
+#[cfg(test)]
+mod tests {
+    use super::any_word_query;
+    #[test]
+    fn natural_questions_become_any_word_queries() {
+        assert_eq!(
+            any_word_query("What is my side project's codename, and which day do I deploy it?"),
+            "what or is or my or side or project's or codename or and or which or day or do or deploy or it"
+        );
+        // Identifiers stay whole; quotes, dashes and the word "or" cannot change the query structure.
+        assert_eq!(
+            any_word_query("Marmalade-3682cf in \"src/v2.rs\" OR -secret"),
+            "marmalade-3682cf or in or src/v2.rs or secret"
+        );
+        assert_eq!(any_word_query("?! ... a"), "");
+    }
 }
