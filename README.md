@@ -2,7 +2,7 @@
 
 A Rust memory service for programming assistants and long conversations. It retains immutable evidence, extracts typed temporal assertions, derives supported observations, and retrieves attributed context through lexical, vector, temporal and graph search.
 
-**Evaluation is in progress. No accuracy improvement is claimed yet.** The original fork was merged before this enhancement. The implementation, live pilot artifacts and pending completion requirements are distinct from a completed benchmark.
+**Benchmark execution has been handed off to the project team. No accuracy improvement is claimed yet.** The original fork was merged before this enhancement. The implementation, live pilot artifacts and pending completion requirements are distinct from a completed benchmark. See the [complete benchmark runbook](benchmark/README.md).
 
 ## Run
 
