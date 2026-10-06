@@ -54,6 +54,7 @@ pub fn router(state: Arc<AppState>) -> Router {
     document.merge(crate::v2::ApiDoc::openapi());
     Router::new()
         .route("/", get(index))
+        .route("/graph", get(graph_view))
         .route("/healthz", get(health))
         .route("/api/v1/sessions", post(create_session))
         .route("/api/v1/events", post(ingest))
@@ -435,6 +436,9 @@ pub struct HealthResponse {
     pub embedder: bool,
     pub degraded_mode: bool,
     pub worker_model: String,
+    /// Context window and output cap of a local worker model; absent for hosted models.
+    pub worker_num_ctx: Option<usize>,
+    pub worker_num_predict: Option<usize>,
     pub worker_concurrency: usize,
     pub embedding_model: String,
     pub demo_mode: bool,
@@ -452,6 +456,8 @@ async fn health(State(s): State<Arc<AppState>>) -> Json<HealthResponse> {
         embedder,
         degraded_mode: !extractor || !embedder,
         worker_model: s.model.identity(),
+        worker_num_ctx: s.model.context_limits().map(|l| l.num_ctx),
+        worker_num_predict: s.model.context_limits().map(|l| l.num_predict),
         worker_concurrency: s.worker_concurrency,
         embedding_model: s.embedder.version().into(),
         demo_mode: s.demo_mode,
@@ -467,6 +473,9 @@ async fn reset_demo(State(s): State<Arc<AppState>>) -> Result<impl IntoResponse,
 }
 async fn index() -> Html<&'static str> {
     Html(include_str!("ui.html"))
+}
+async fn graph_view() -> Html<&'static str> {
+    Html(include_str!("graph_view.html"))
 }
 fn required(v: &str, name: &str) -> Result<(), AppError> {
     if v.trim().is_empty() {

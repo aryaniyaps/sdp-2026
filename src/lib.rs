@@ -37,6 +37,8 @@ pub enum AppError {
     Conflict(String),
     #[error("provider error: {0}")]
     Provider(String),
+    #[error("dependency unavailable: {0}")]
+    Unavailable(String),
     #[error("not found")]
     NotFound,
     #[error("demo mode is disabled")]
@@ -56,6 +58,7 @@ impl IntoResponse for AppError {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::Provider(_) | Self::Http(_) => StatusCode::BAD_GATEWAY,
+            Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         (status, Json(json!({"error":self.to_string()}))).into_response()

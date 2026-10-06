@@ -1,0 +1,1987 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>Memory Graph</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #1e1e1e;
+  --panel: rgba(38, 38, 38, 0.94);
+  --field: #1a1a1a;
+  --line: #3b3b3b;
+  --line-soft: #303030;
+  --text: #dadada;
+  --muted: #9b9b9b;
+  --faint: #727272;
+  --accent: #a78bfa;
+  --memory: #6dd3a0;
+  --fact: #a78bfa;
+  --entity: #b9bec8;
+  --amber: #e8b85c;
+  --red: #f07178;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 var(--font);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+#cv {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  outline: none;
+  user-select: none;
+}
+#ui {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+#ui > * { min-height: 0; }
+#ui button, #ui input, #ui summary, #details, #legend, #strip, #err { pointer-events: auto; }
+
+/* top bar */
+#top { padding: 10px 12px 0; display: flex; flex-direction: column; gap: 8px; }
+#bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pill {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  white-space: nowrap;
+}
+#nschip { max-width: 240px; color: var(--muted); }
+#nschip b { color: var(--text); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#search { width: 210px; padding: 0 10px; background: var(--field); outline: none; }
+#search:focus { border-color: var(--accent); }
+#search::placeholder { color: var(--faint); }
+#matches { color: var(--muted); font-size: 12px; }
+button.pill { cursor: pointer; }
+button.pill:hover { border-color: #565656; }
+button.pill:focus-visible, #dhead button:focus-visible, .row:focus-visible, #legend summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
+.chip b { font-weight: 500; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="false"] { color: var(--faint); }
+.chip[aria-pressed="false"] .dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); opacity: 0.6; }
+#fit { margin-left: auto; }
+
+/* red banner */
+#err {
+  display: none;
+  padding: 8px 12px;
+  border: 1px solid rgba(240, 113, 120, 0.55);
+  background: rgba(96, 28, 34, 0.94);
+  color: #ffd3d6;
+  border-radius: 8px;
+  line-height: 1.4;
+}
+#err.show { display: block; }
+#err div + div { margin-top: 3px; }
+#err strong { color: #fff; font-weight: 600; }
+
+/* middle row with the details overlay */
+#mid { flex: 1; display: flex; justify-content: flex-end; align-items: flex-start; padding: 10px 12px; }
+#details {
+  display: none;
+  width: 340px;
+  max-width: 100%;
+  max-height: 100%;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+#details.show { display: flex; }
+/* for a moment after a click opens it the panel lets pointer events through, so the second click of a double click reaches the graph */
+#details.settle, #details.settle * { pointer-events: none; }
+#dhead { display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 12px; border-bottom: 1px solid var(--line-soft); flex: none; }
+#dtitle { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#details.collapsed #dhead { border-bottom: 0; }
+#details.collapsed #dbody { display: none; }
+#dhead button { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; background: transparent; border: 0; border-radius: 6px; color: var(--muted); cursor: pointer; }
+#dhead button:hover { background: #333; color: var(--text); }
+#dtoggle svg { transition: transform 0.15s; }
+#details.collapsed #dtoggle svg { transform: rotate(180deg); }
+#dbody { overflow-y: auto; padding: 10px 12px 14px; min-height: 0; overscroll-behavior: contain; }
+#dbody h4 { margin: 14px 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; text-transform: uppercase; }
+.kindpill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.kindpill i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.kindpill.diamond i, .row .rhead i.diamond { border-radius: 1px; transform: rotate(45deg) scale(0.9); }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+.badge { font-size: 12px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+.badge.warn { color: var(--amber); border-color: rgba(232, 184, 92, 0.45); }
+.badge.good { color: var(--memory); border-color: rgba(109, 211, 160, 0.4); }
+.badge.bad { color: var(--red); border-color: rgba(240, 113, 120, 0.5); }
+.statement { font-size: 14px; line-height: 1.5; margin: 8px 0 4px; overflow-wrap: anywhere; max-height: 170px; overflow-y: auto; }
+dl.kv { display: grid; grid-template-columns: 86px 1fr; gap: 4px 10px; margin: 10px 0 0; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+dl.kv dd.mono { font-family: var(--mono); font-size: 12px; }
+.fulltext { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--field); border: 1px solid var(--line-soft); border-radius: 8px; padding: 8px 10px; max-height: 280px; overflow-y: auto; }
+.quote { margin: 6px 0 0; padding: 2px 0 2px 10px; border-left: 2px solid var(--line); color: #c4c4c4; overflow-wrap: anywhere; font-style: italic; }
+.note { color: var(--amber); font-size: 12px; margin-top: 5px; }
+.note.bad { color: var(--red); }
+.empty { color: var(--faint); }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.row { display: block; width: 100%; text-align: left; font: inherit; color: var(--text); background: var(--field); border: 1px solid var(--line-soft); border-radius: 8px; padding: 6px 9px; cursor: pointer; overflow-wrap: anywhere; }
+.row:hover { border-color: #5a5a5a; }
+div.row { cursor: default; }
+div.row:hover { border-color: var(--line-soft); }
+.row .rhead { display: flex; align-items: baseline; gap: 7px; }
+.row .rhead i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--c); align-self: center; }
+.row .rhead i.dimmed { opacity: 0.45; }
+.row .rsub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.row .rel { color: var(--fact); font-weight: 600; }
+
+/* bottom: legend and status strip */
+#bottom { display: flex; flex-direction: column; align-items: flex-start; }
+#legend { align-self: stretch; background: rgba(30, 30, 30, 0.94); border-top: 1px solid var(--line); padding: 5px 12px 6px; }
+#legend summary { cursor: pointer; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.02em; list-style: none; display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+#legend summary::-webkit-details-marker { display: none; }
+#legend summary::before { content: ""; width: 0; height: 0; border-left: 5px solid var(--muted); border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform 0.12s; }
+#legend[open] summary::before { transform: rotate(90deg); }
+#legend ul { list-style: none; margin: 5px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 3px 18px; }
+#legend li { display: flex; align-items: center; gap: 6px; }
+#legend svg { flex: none; width: 24px; height: 16px; }
+#legend .hint { margin-top: 4px; color: var(--faint); font-size: 12px; line-height: 1.4; }
+#strip {
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  padding: 6px 12px;
+  background: rgba(30, 30, 30, 0.94);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+#strip .bad { color: var(--red); }
+#strip .amber { color: var(--amber); }
+#strip .amber::before { content: "! "; font-weight: 700; }
+#strip .live { display: inline-flex; align-items: center; gap: 6px; }
+#strip .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--faint)); }
+
+/* centered message and tooltip */
+#msg { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; pointer-events: none; padding: 0 24px; }
+#msg.show { display: flex; }
+#msgtext { max-width: 460px; color: var(--muted); font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+#msgtext strong { display: block; color: var(--text); font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+#tip { position: fixed; left: 0; top: 0; max-width: 320px; padding: 6px 9px; background: #2d2d2d; border: 1px solid #4a4a4a; border-radius: 7px; color: var(--text); pointer-events: none; display: none; overflow-wrap: anywhere; z-index: 5; }
+#tip b { color: var(--fact); }
+</style>
+</head>
+<body>
+<canvas id="cv" tabindex="0" role="img" aria-label="Memory graph"></canvas>
+
+<div id="ui">
+  <div id="top">
+    <div id="bar">
+      <span class="pill" id="nschip">Namespace <b id="nsname"></b></span>
+      <input class="pill" id="search" type="search" placeholder="Search nodes" aria-label="Search nodes" autocomplete="off" spellcheck="false">
+      <span id="matches" aria-live="polite"></span>
+      <button class="pill chip" id="t-memory" type="button" aria-pressed="true" style="--c: var(--memory)"><span class="dot"></span>Memories <b id="c-memory">0</b></button>
+      <button class="pill chip" id="t-fact" type="button" aria-pressed="true" style="--c: var(--fact)"><span class="dot"></span>Facts <b id="c-fact">0</b></button>
+      <button class="pill chip" id="t-entity" type="button" aria-pressed="true" style="--c: var(--entity)"><span class="dot"></span>Entities <b id="c-entity">0</b></button>
+      <button class="pill" id="fit" type="button">Fit</button>
+    </div>
+    <div id="err" role="alert"></div>
+  </div>
+
+  <div id="mid">
+    <aside id="details" aria-label="Node details">
+      <div id="dhead">
+        <span id="dtitle">Details</span>
+        <button id="dtoggle" type="button" title="Collapse or expand details" aria-expanded="true" aria-label="Collapse details"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 5l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button id="dclose" type="button" title="Close details" aria-label="Close details"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      </div>
+      <div id="dbody"></div>
+    </aside>
+  </div>
+
+  <div id="bottom">
+    <details id="legend" open>
+      <summary>Legend</summary>
+      <ul>
+        <li><svg viewBox="0 0 24 16"><circle cx="12" cy="8" r="5" style="fill: var(--memory)"/></svg>Memory: what was said</li>
+        <li><svg viewBox="0 0 24 16"><circle cx="12" cy="8" r="5" style="fill: var(--fact)"/></svg>Fact: extracted from memories</li>
+        <li><svg viewBox="0 0 24 16"><path d="M12 1.5 18.5 8 12 14.5 5.5 8Z" style="fill: var(--fact)"/></svg>Observation: derived fact</li>
+        <li><svg viewBox="0 0 24 16"><circle cx="12" cy="8" r="4.5" style="fill: var(--fact); opacity: .45"/><circle cx="12" cy="8" r="7" fill="none" stroke-width="1" stroke-dasharray="2 2" style="stroke: var(--fact); opacity: .8"/></svg>Superseded, retracted, stale or expired</li>
+        <li><svg viewBox="0 0 24 16"><circle cx="12" cy="8" r="5" style="fill: var(--entity)"/></svg>Entity: what facts mention</li>
+        <li><svg viewBox="0 0 24 16"><circle cx="12" cy="8" r="4" style="fill: var(--memory)"/><circle cx="12" cy="8" r="7" fill="none" stroke-width="1.5" style="stroke: var(--amber)"/></svg>Memory whose extraction failed</li>
+        <li><svg viewBox="0 0 24 16"><circle cx="12" cy="8" r="4" style="fill: var(--memory)"/><circle cx="12" cy="8" r="7" fill="none" stroke-width="1.5" stroke-dasharray="2 2" style="stroke: var(--amber)"/></svg>Memory blocked behind a failed extraction</li>
+        <li><svg viewBox="0 0 24 16"><line x1="1" y1="8" x2="23" y2="8" stroke-width="1.5" style="stroke: var(--memory); opacity: .75"/></svg>Evidence for a fact</li>
+        <li><svg viewBox="0 0 24 16"><line x1="1" y1="8" x2="23" y2="8" stroke-width="1.5" style="stroke: #aab0bc; opacity: .75"/></svg>Fact mentions entity</li>
+        <li><svg viewBox="0 0 24 16"><line x1="1" y1="8" x2="19" y2="8" stroke-width="1.5" style="stroke: var(--fact)"/><path d="M23 8 17 4.6V11.4Z" style="fill: var(--fact)"/></svg>Fact to fact (hover for relation)</li>
+      </ul>
+      <div class="hint">Scroll to zoom, drag the background to pan. Drag a node to pin it, double click to release.</div>
+    </details>
+    <div id="strip" role="status" aria-live="polite"></div>
+  </div>
+</div>
+
+<div id="msg" role="status"><div id="msgtext"></div></div>
+<div id="tip"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- page parameters ---------- */
+  const params = new URLSearchParams(location.search);
+  const NS = params.get('namespace');
+  const hasNs = NS !== null && NS.trim() !== '';
+  const pageNotes = [];
+
+  function intParam(name, lo, hi) {
+    const raw = params.get(name);
+    if (raw === null || raw === '') return null;
+    const n = Number(raw);
+    if (Number.isInteger(n) && n >= lo && n <= hi) return n;
+    pageNotes.push('Ignoring invalid "' + name + '" value "' + raw + '" (expected an integer from ' + lo + ' to ' + hi + ').');
+    return null;
+  }
+  const POLL_MIN_MS = 500;
+  const pollParam = intParam('poll', 0, 3600000);
+  if (pollParam !== null && pollParam > 0 && pollParam < POLL_MIN_MS) pageNotes.push('poll is raised from ' + pollParam + ' ms to the minimum of ' + POLL_MIN_MS + ' ms.');
+  const POLL_MS = pollParam === null ? 2000 : pollParam === 0 ? 0 : Math.max(POLL_MIN_MS, pollParam);
+  const LIMIT_PROJECTION = intParam('limit', 1, 2000);
+  const LIMIT_MEMORIES = intParam('memory_limit', 1, 1000);
+  const REQUEST_TIMEOUT_MS = 15000;
+
+  const $ = (id) => document.getElementById(id);
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const cvs = $('cv');
+  const ctx = cvs.getContext('2d', { alpha: false });
+  const rootStyle = getComputedStyle(document.documentElement);
+  const cssVar = (n) => rootStyle.getPropertyValue(n).trim();
+  const FONT_FAMILY = getComputedStyle(document.body).fontFamily;
+  const LABEL_FONT = '13px ' + FONT_FAMILY;
+  const REL_FONT = '13px ' + FONT_FAMILY;
+  const COL = { memory: cssVar('--memory'), fact: cssVar('--fact'), entity: cssVar('--entity'), bg: cssVar('--bg'), amber: cssVar('--amber') };
+  const CLASSES = ['memory', 'fact', 'entity'];
+  const TAU = Math.PI * 2;
+
+  /* ---------- DOM helper: never uses innerHTML, all data goes through text nodes ---------- */
+  function h(tag, props, ...kids) {
+    const e = document.createElement(tag);
+    if (props) {
+      for (const k of Object.keys(props)) {
+        const v = props[k];
+        if (v === null || v === undefined || v === false) continue;
+        if (k === 'class') e.className = v;
+        else if (k === 'text') e.textContent = v;
+        else if (k === 'style') e.style.cssText = v;
+        else if (typeof v === 'function') e.addEventListener(k.slice(2), v);
+        else e.setAttribute(k, v === true ? '' : String(v));
+      }
+    }
+    for (const c of kids) {
+      if (c === null || c === undefined || c === false) continue;
+      e.append(typeof c === 'object' ? c : document.createTextNode(String(c)));
+    }
+    return e;
+  }
+
+  const fmtTime = (s) => {
+    if (s === null || s === undefined || s === '') return null;
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return String(s);
+    return d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+  const fmtClock = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour12: false });
+  const shortId = (id) => String(id).slice(0, 8);
+  const squash = (s) => String(s === null || s === undefined ? '' : s).replace(/\s+/g, ' ').trim();
+  const cut = (s, n) => { s = squash(s); return s.length <= n ? s : s.slice(0, n - 1) + '…'; };
+
+  /* ---------- state ---------- */
+  const state = {
+    projection: null, // last good /projection payload
+    memories: null,   // last good /memories payload
+    errors: { projection: null, memories: null },
+    lastText: { projection: null, memories: null },
+    lastFullRefresh: 0,
+    okAt: { projection: 0, memories: 0 },
+    cycleOk: null,
+    loaded: false,
+  };
+  const layerSeen = { projection: false, memories: false };
+  const classVisible = { memory: true, fact: true, entity: true };
+  let info = { unknownNodes: 0, badRelationships: 0, danglingSupports: 0 };
+
+  const nodes = new Map();   // key -> node
+  const links = new Map();   // key -> link
+  let nodeList = [];         // all nodes, including fading ones
+  let linkList = [];
+  let simNodes = [];         // nodes taking part in the layout
+  let simLinks = [];
+  let relLinks = [];         // live fact to fact links
+  let drawOrder = [];        // nodes by radius, big first so small nodes stay on top
+  let labelOrder = [];       // nodes by degree, important first
+  let evidence = new Map();  // fact id -> Map(memory key -> [quote])
+  let selected = null;       // node key
+  let hover = null;          // node
+  let hoverLink = null;
+  let searchTerm = '';
+  let focusDirty = true;
+  let focusActive = false;
+  let drag = null;           // {type: 'pan' | 'node', node, sx, sy, vx0, vy0, moved}
+  let viewChanging = false;
+
+  /* ---------- view transform ---------- */
+  const view = { x: 0, y: 0, k: 1 };
+  const viewT = { x: 0, y: 0, k: 1 };
+  const K_MIN = 0.04, K_MAX = 8;
+  let W = innerWidth, H = innerHeight, dpr = 1;
+  let autoFit = true;
+  let kp = 1; // node radius zoom factor
+  const insets = { top: 60, bottom: 40, left: 14, right: 14 };
+
+  /* ---------- simulation constants ---------- */
+  const sim = { alpha: 1, alphaTarget: 0, active: false, acc: 0, nanResets: 0, spread: 1 };
+  const ALPHA_MIN = 0.001;
+  const ALPHA_DECAY = 1 - Math.pow(ALPHA_MIN, 1 / 300);
+  const VELOCITY_DECAY = 0.6;
+  const STEP_MS = 1000 / 60;
+  const THETA2 = 0.81;
+  const MAX_DIST2 = 700 * 700;
+  const MIN_DIST2 = 36;
+  const GRAVITY = 0.14;
+  const LINK_DIST = { mention: 58, ev: 52, rel: 84 };
+
+  /* ---------- link colours, bucketed by alpha so each bucket is one path ---------- */
+  const LINK_RGB = { mention: [170, 176, 190], ev: [109, 211, 160], rel: [167, 139, 250], hl: [208, 196, 255] };
+  const LINK_ALPHA = { mention: 0.4, ev: 0.42, rel: 0.62 };
+  const LQ = 16;
+  const BUCKET_TYPE = ['mention', 'ev', 'rel', 'hl'];
+  const LINK_BUCKET = { mention: 0, ev: 1, rel: 2 };
+  const LINK_STYLE = {};
+  for (const t of BUCKET_TYPE) {
+    LINK_STYLE[t] = [];
+    for (let i = 0; i <= LQ; i++) LINK_STYLE[t].push('rgba(' + LINK_RGB[t].join(',') + ',' + (i / LQ).toFixed(3) + ')');
+  }
+  const linkBuckets = [];
+  for (let i = 0; i < BUCKET_TYPE.length * (LQ + 1); i++) linkBuckets.push([]);
+
+  /* ---------- nodes and links ---------- */
+  function makeNode(key, cls, id, now) {
+    return {
+      key, cls, id, d: null, label: '', fullLabel: '', lw: 0, hay: '',
+      x: 0, y: 0, vx: 0, vy: 0, fx: null, fy: null, placed: false,
+      r: 5, q: 60, deg: 0, adj: [], ext: null, lpos: 1, ly: 0,
+      born: now, pulse: false,
+      v: 0, vt: 1, a: 1, ta: 1, la: 0, lt: 0, inFocus: false, useFull: false,
+      observation: false, dimStatus: false, validToMs: null, match: true, dying: false,
+    };
+  }
+
+  function setNodeData(n, d) {
+    n.d = d;
+    if (n.cls === 'memory') {
+      n.label = cut(d.text, 34);
+      n.fullLabel = cut(d.text, 70);
+      n.ext = d.extraction ? d.extraction.status : null;
+      n.hay = (squash(d.text) + ' ' + (d.role || '') + ' ' + (d.processing_state || '') + ' extraction ' + (n.ext || '')).toLowerCase();
+    } else if (n.cls === 'fact') {
+      const name = d.name || d.statement || shortId(d.id);
+      n.label = cut(name, 34);
+      n.fullLabel = cut(d.statement || name, 70);
+      n.hay = (squash(d.statement) + ' ' + squash(d.name) + ' ' + (d.status || '') + ' ' + (d.assertion_kind || '')).toLowerCase();
+      n.observation = d.assertion_kind === 'observation';
+      const t = d.valid_to ? Date.parse(d.valid_to) : NaN;
+      n.validToMs = Number.isNaN(t) ? null : t;
+    } else {
+      const name = d.name || shortId(d.id);
+      n.label = cut(name, 34);
+      n.fullLabel = cut(name, 70);
+      n.hay = (squash(name) + ' ' + (d.entity_type || '')).toLowerCase();
+    }
+    n.lw = 0;
+    n.match = !searchTerm || n.hay.includes(searchTerm);
+  }
+
+  function isDim(n, wall) {
+    if (n.cls !== 'fact') return false;
+    const st = n.d.status;
+    if (st === 'superseded' || st === 'retracted' || st === 'stale') return true;
+    return n.validToMs !== null && n.validToMs <= wall;
+  }
+
+  function buildWanted() {
+    const wn = new Map();
+    const wl = new Map();
+    const inf = { unknownNodes: 0, badRelationships: 0, danglingSupports: 0 };
+    const proj = state.projection;
+    const mem = state.memories;
+    if (proj) {
+      for (const n of proj.nodes) {
+        const cls = n.kind === 'assertion' ? 'fact' : n.kind === 'entity' ? 'entity' : null;
+        if (!cls || typeof n.id !== 'string') { inf.unknownNodes++; continue; }
+        wn.set((cls === 'fact' ? 'f:' : 'e:') + n.id, { cls, id: n.id, d: n });
+      }
+      for (const r of proj.relationships) {
+        let type, fk, tk;
+        if (r.type === 'MENTIONS') { type = 'mention'; fk = 'f:' + r.from; tk = 'e:' + r.to; }
+        else if (r.type === 'SUPPORTS') { type = 'rel'; fk = 'f:' + r.from; tk = 'f:' + r.to; }
+        else { inf.badRelationships++; continue; }
+        if (!wn.has(fk) || !wn.has(tk)) { inf.badRelationships++; continue; }
+        wl.set(type + '|' + fk + '|' + tk + '|' + (r.relation || ''), { type, from: fk, to: tk, relation: r.relation || null, explanation: r.explanation || null });
+      }
+    }
+    if (mem) {
+      const dangling = new Set(); // one entry per memory and fact, however many quotes link them
+      for (const m of mem.memories) {
+        if (typeof m.id !== 'string') { inf.unknownNodes++; continue; }
+        const mk = 'm:' + m.id;
+        wn.set(mk, { cls: 'memory', id: m.id, d: m });
+        for (const s of m.supports || []) {
+          if (!proj) continue; // the projection is unavailable, the error banner already says so
+          const fk = 'f:' + s.assertion_id;
+          if (wn.has(fk)) wl.set('ev|' + mk + '|' + fk + '|', { type: 'ev', from: mk, to: fk, relation: null, explanation: null });
+          else dangling.add(mk + '|' + fk);
+        }
+      }
+      inf.danglingSupports = dangling.size;
+    }
+    return { wn, wl, inf };
+  }
+
+  function reconcile() {
+    const now = performance.now();
+    const wall = Date.now();
+    const { wn, wl, inf } = buildWanted();
+    info = inf;
+    const pulseOK = { memory: layerSeen.memories, fact: layerSeen.projection, entity: layerSeen.projection };
+    const added = [];
+    let changed = false;
+
+    for (const [key, w] of wn) {
+      let n = nodes.get(key);
+      if (!n) {
+        n = makeNode(key, w.cls, w.id, now);
+        n.pulse = pulseOK[w.cls];
+        nodes.set(key, n);
+        added.push(n);
+      } else if (n.dying) {
+        n.dying = false;
+        changed = true;
+      }
+      setNodeData(n, w.d);
+    }
+    for (const [key, n] of nodes) {
+      if (!wn.has(key) && !n.dying) { n.dying = true; changed = true; }
+    }
+
+    for (const [key, w] of wl) {
+      let l = links.get(key);
+      const s = nodes.get(w.from);
+      const t = nodes.get(w.to);
+      if (!l) {
+        l = { key, type: w.type, s, t, relation: w.relation, explanation: w.explanation, v: 0, vt: 1, h: 0, ht: 0, dead: false, strength: 1, bias: 0.5, dist: 60 };
+        links.set(key, l);
+        changed = true;
+      } else {
+        if (l.dead) changed = true;
+        l.s = s; l.t = t; l.relation = w.relation; l.explanation = w.explanation; l.dead = false;
+      }
+    }
+    for (const [key, l] of links) {
+      if (!wl.has(key) && !l.dead) { l.dead = true; changed = true; }
+    }
+
+    evidence = new Map();
+    for (const w of wn.values()) {
+      if (w.cls !== 'memory') continue;
+      const mk = 'm:' + w.id;
+      for (const s of w.d.supports || []) {
+        let byMemory = evidence.get(s.assertion_id);
+        if (!byMemory) evidence.set(s.assertion_id, byMemory = new Map());
+        if (!byMemory.has(mk)) byMemory.set(mk, []);
+        byMemory.get(mk).push(s.quote);
+      }
+    }
+
+    rebuildTopology();
+    placeNew(added);
+    for (const n of nodeList) n.dimStatus = isDim(n, wall);
+    layerSeen.projection = layerSeen.projection || !!state.projection;
+    layerSeen.memories = layerSeen.memories || !!state.memories;
+
+    if (added.length || changed) reheat(Math.min(1, 0.22 + added.length / 100));
+    if (selected && (!nodes.has(selected) || nodes.get(selected).dying)) selected = null;
+    updateCounts();
+    for (const n of nodeList) n.match = !searchTerm || n.hay.includes(searchTerm);
+    updateMatchCount();
+    focusDirty = true;
+    refreshDetails();
+    invalidate();
+  }
+
+  function applyVisibility() {
+    for (const n of nodeList) n.vt = (!n.dying && classVisible[n.cls]) ? 1 : 0;
+    for (const l of linkList) l.vt = (!l.dead && !l.s.dying && !l.t.dying && classVisible[l.s.cls] && classVisible[l.t.cls]) ? 1 : 0;
+    simNodes = nodeList.filter((n) => n.vt === 1);
+    simLinks = linkList.filter((l) => l.vt === 1);
+    /* small graphs get longer links so they do not collapse into a blob */
+    sim.spread = 1 + 0.9 * clamp(1 - (simNodes.length - 6) / 60, 0, 1);
+  }
+
+  function rebuildTopology() {
+    nodeList = Array.from(nodes.values());
+    linkList = Array.from(links.values());
+    for (const n of nodeList) n.adj = [];
+    relLinks = [];
+    for (const l of linkList) {
+      if (l.dead || l.s.dying || l.t.dying) continue;
+      l.s.adj.push(l);
+      l.t.adj.push(l);
+      if (l.type === 'rel') relLinks.push(l);
+    }
+    for (const n of nodeList) {
+      n.deg = n.adj.length;
+      n.r = Math.min(16, n.cls === 'entity' ? 4.6 + 2.1 * Math.sqrt(n.deg) : 3.5 + 1.7 * Math.sqrt(n.deg));
+      n.q = 48 + 13 * Math.sqrt(n.deg);
+    }
+    for (const l of linkList) {
+      const ds = l.s.deg || 1, dt = l.t.deg || 1;
+      l.strength = 1 / Math.min(ds, dt);
+      l.bias = ds / (ds + dt);
+      l.dist = LINK_DIST[l.type];
+    }
+    drawOrder = nodeList.slice().sort((a, b) => b.r - a.r);
+    labelOrder = nodeList.slice().sort((a, b) => b.deg - a.deg);
+    applyVisibility();
+  }
+
+  /* new nodes appear next to a linked neighbour, or near the centre when they have none */
+  function placeNew(added) {
+    if (!added.length) return;
+    const existing = nodeList.some((n) => n.placed);
+    const pending = new Set(added);
+    const queue = [];
+    let seeds = 0;
+    const put = (n, x, y) => { n.x = x; n.y = y; n.vx = 0; n.vy = 0; n.placed = true; pending.delete(n); queue.push(n); };
+    const nearAnchor = (n, a) => {
+      const ang = Math.random() * TAU;
+      const dist = 26 + Math.random() * 22;
+      put(n, a.x + Math.cos(ang) * dist, a.y + Math.sin(ang) * dist);
+    };
+    const other = (l, n) => (l.s === n ? l.t : l.s);
+    for (const n of added) {
+      const a = n.adj.map((l) => other(l, n)).find((o) => o.placed && o !== n);
+      if (a) nearAnchor(n, a);
+    }
+    const drain = () => {
+      while (queue.length) {
+        const a = queue.shift();
+        for (const l of a.adj) {
+          const o = other(l, a);
+          if (pending.has(o)) nearAnchor(o, a);
+        }
+      }
+    };
+    drain();
+    while (pending.size) {
+      let best = null;
+      for (const n of pending) if (!best || n.deg > best.deg) best = n;
+      let x = 0, y = 0;
+      if (existing || seeds > 0) {
+        const rad = 42 * Math.sqrt(seeds + (existing ? 0 : 0.5));
+        const ang = seeds * 2.399963;
+        x = Math.cos(ang) * rad + (Math.random() - 0.5) * 16;
+        y = Math.sin(ang) * rad + (Math.random() - 0.5) * 16;
+      }
+      seeds++;
+      put(best, x, y);
+      drain();
+    }
+  }
+
+  function reheat(a) {
+    if (sim.alpha < a) sim.alpha = a;
+    sim.active = true;
+  }
+
+  function updateCounts() {
+    const c = { memory: 0, fact: 0, entity: 0 };
+    for (const n of nodeList) if (!n.dying) c[n.cls]++;
+    for (const k of CLASSES) $('c-' + k).textContent = String(c[k]);
+    cvs.setAttribute('aria-label', 'Memory graph with ' + c.memory + ' memories, ' + c.fact + ' facts and ' + c.entity + ' entities');
+  }
+
+  /* ---------- force simulation: Barnes-Hut charge, link springs, gravity, collision ---------- */
+  let cap = 0, px, py, pw, qCap = 0;
+  let qx0, qy0, qs, qm, qmx, qmy, qn, qpt, qleaf, qk, qStack;
+  let qCount = 0;
+  let hashNext, hashGx, hashGy;
+  const HASH_SIZE = 1 << 14;
+  const hashHead = new Int32Array(HASH_SIZE);
+
+  function ensureCap(n) {
+    if (n <= cap) return;
+    cap = Math.max(256, Math.ceil(n * 1.5));
+    px = new Float64Array(cap); py = new Float64Array(cap); pw = new Float64Array(cap);
+    hashNext = new Int32Array(cap); hashGx = new Int32Array(cap); hashGy = new Int32Array(cap);
+    growQuad(cap * 3 + 32);
+  }
+
+  function growQuad(c) {
+    const f64 = (old) => { const a = new Float64Array(c); if (old) a.set(old); return a; };
+    const i32 = (old, mul) => { const a = new Int32Array(c * mul); if (old) a.set(old); return a; };
+    qx0 = f64(qx0); qy0 = f64(qy0); qs = f64(qs); qm = f64(qm); qmx = f64(qmx); qmy = f64(qmy);
+    qn = i32(qn, 1); qpt = i32(qpt, 1); qk = i32(qk, 4);
+    const lf = new Uint8Array(c); if (qleaf) lf.set(qleaf); qleaf = lf;
+    qStack = new Int32Array(Math.max(256, Math.ceil(c / 2)));
+    qCap = c;
+  }
+
+  function newCell(x0, y0, s) {
+    if (qCount >= qCap) growQuad(qCap * 2);
+    const c = qCount++;
+    qx0[c] = x0; qy0[c] = y0; qs[c] = s;
+    qm[c] = 0; qmx[c] = 0; qmy[c] = 0; qn[c] = 0; qpt[c] = -1; qleaf[c] = 1;
+    const b = c * 4;
+    qk[b] = -1; qk[b + 1] = -1; qk[b + 2] = -1; qk[b + 3] = -1;
+    return c;
+  }
+
+  function quadInsert(i) {
+    const x = px[i], y = py[i], w = pw[i];
+    let c = 0, depth = 0;
+    for (;;) {
+      qm[c] += w; qmx[c] += x * w; qmy[c] += y * w; qn[c]++;
+      if (qleaf[c]) {
+        if (qn[c] === 1) { qpt[c] = i; return; }
+        const p = qpt[c];
+        if (depth >= 22 || p < 0 || (px[p] === x && py[p] === y)) { qpt[c] = -2; return; }
+        qleaf[c] = 0; qpt[c] = -1;
+        const half = qs[c] / 2;
+        const jp = (px[p] >= qx0[c] + half ? 1 : 0) | (py[p] >= qy0[c] + half ? 2 : 0);
+        const child = newCell(qx0[c] + (jp & 1 ? half : 0), qy0[c] + (jp & 2 ? half : 0), half);
+        qk[c * 4 + jp] = child;
+        qm[child] = pw[p]; qmx[child] = px[p] * pw[p]; qmy[child] = py[p] * pw[p]; qn[child] = 1; qpt[child] = p;
+      }
+      const half = qs[c] / 2;
+      const j = (x >= qx0[c] + half ? 1 : 0) | (y >= qy0[c] + half ? 2 : 0);
+      let child = qk[c * 4 + j];
+      if (child < 0) {
+        child = newCell(qx0[c] + (j & 1 ? half : 0), qy0[c] + (j & 2 ? half : 0), half);
+        qk[c * 4 + j] = child;
+      }
+      c = child; depth++;
+    }
+  }
+
+  function buildQuad(n) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const x = px[i], y = py[i];
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    qCount = 0;
+    newCell(minX - 1, minY - 1, Math.max(maxX - minX, maxY - minY) + 2);
+    for (let i = 0; i < n; i++) quadInsert(i);
+  }
+
+  function repel(i, alpha) {
+    const x = px[i], y = py[i];
+    let fx = 0, fy = 0, sp = 0;
+    qStack[sp++] = 0;
+    while (sp > 0) {
+      const c = qStack[--sp];
+      const m = qm[c];
+      if (m === 0) continue;
+      let dx = qmx[c] / m - x, dy = qmy[c] / m - y;
+      let d2 = dx * dx + dy * dy;
+      if (qleaf[c]) {
+        if (qpt[c] === i) continue;
+        if (d2 === 0) { dx = (Math.random() - 0.5) * 0.1; dy = (Math.random() - 0.5) * 0.1; d2 = dx * dx + dy * dy + 1e-6; }
+      } else if (qs[c] * qs[c] >= THETA2 * d2) {
+        const b = c * 4;
+        for (let j = 0; j < 4; j++) { const k = qk[b + j]; if (k >= 0) qStack[sp++] = k; }
+        continue;
+      }
+      if (d2 > MAX_DIST2) continue;
+      if (d2 < MIN_DIST2) d2 = MIN_DIST2;
+      const w = m * alpha / d2;
+      fx -= dx * w; fy -= dy * w;
+    }
+    const nd = simNodes[i];
+    nd.vx += fx; nd.vy += fy;
+  }
+
+  function collide() {
+    const n = simNodes.length;
+    const cell = 46;
+    hashHead.fill(-1);
+    for (let i = 0; i < n; i++) {
+      const nd = simNodes[i];
+      const gx = Math.floor(nd.x / cell), gy = Math.floor(nd.y / cell);
+      hashGx[i] = gx; hashGy[i] = gy;
+      const hs = ((gx * 73856093) ^ (gy * 19349663)) & (HASH_SIZE - 1);
+      hashNext[i] = hashHead[hs];
+      hashHead[hs] = i;
+    }
+    for (let i = 0; i < n; i++) {
+      const a = simNodes[i];
+      const ra = a.r + 6;
+      const gx = hashGx[i], gy = hashGy[i];
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          const cx = gx + ox, cy = gy + oy;
+          let j = hashHead[((cx * 73856093) ^ (cy * 19349663)) & (HASH_SIZE - 1)];
+          for (; j >= 0; j = hashNext[j]) {
+            if (j <= i || hashGx[j] !== cx || hashGy[j] !== cy) continue;
+            const b = simNodes[j];
+            const rr = ra + b.r + 6;
+            let dx = a.x + a.vx - b.x - b.vx, dy = a.y + a.vy - b.y - b.vy;
+            let l = dx * dx + dy * dy;
+            if (l >= rr * rr) continue;
+            if (l === 0) { dx = (Math.random() - 0.5) * 0.1; dy = (Math.random() - 0.5) * 0.1; l = dx * dx + dy * dy + 1e-6; }
+            l = Math.sqrt(l);
+            const f = (rr - l) / l * 0.7;
+            dx *= f; dy *= f;
+            const ra2 = a.r * a.r, rb2 = b.r * b.r;
+            const share = rb2 / (ra2 + rb2);
+            a.vx += dx * share; a.vy += dy * share;
+            b.vx -= dx * (1 - share); b.vy -= dy * (1 - share);
+          }
+        }
+      }
+    }
+  }
+
+  function tick() {
+    const n = simNodes.length;
+    if (!n) { sim.active = false; return; }
+    sim.alpha += (sim.alphaTarget - sim.alpha) * ALPHA_DECAY;
+    const alpha = sim.alpha;
+    ensureCap(n);
+    for (let i = 0; i < n; i++) { const nd = simNodes[i]; px[i] = nd.x; py[i] = nd.y; pw[i] = nd.q; }
+
+    for (let i = 0, m = simLinks.length; i < m; i++) {
+      const l = simLinks[i], s = l.s, t = l.t;
+      let dx = t.x + t.vx - s.x - s.vx, dy = t.y + t.vy - s.y - s.vy;
+      if (dx === 0 && dy === 0) { dx = (Math.random() - 0.5) * 0.1; dy = (Math.random() - 0.5) * 0.1; }
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const f = (len - l.dist * sim.spread) / len * alpha * l.strength;
+      dx *= f; dy *= f;
+      t.vx -= dx * l.bias; t.vy -= dy * l.bias;
+      s.vx += dx * (1 - l.bias); s.vy += dy * (1 - l.bias);
+    }
+
+    buildQuad(n);
+    for (let i = 0; i < n; i++) repel(i, alpha);
+
+    const g = GRAVITY * alpha;
+    for (let i = 0; i < n; i++) { const nd = simNodes[i]; nd.vx -= nd.x * g; nd.vy -= nd.y * g; }
+
+    collide();
+
+    for (let i = 0; i < n; i++) {
+      const nd = simNodes[i];
+      if (nd.fx !== null) { nd.x = nd.fx; nd.y = nd.fy; nd.vx = 0; nd.vy = 0; continue; }
+      nd.vx *= VELOCITY_DECAY; nd.vy *= VELOCITY_DECAY;
+      nd.x += nd.vx; nd.y += nd.vy;
+      if (!(nd.x === nd.x && nd.y === nd.y)) {
+        if (sim.nanResets++ === 0) console.error('graph layout produced a non-finite position, resetting that node');
+        nd.x = (Math.random() - 0.5) * 20; nd.y = (Math.random() - 0.5) * 20; nd.vx = 0; nd.vy = 0;
+      }
+    }
+    if (sim.alpha < ALPHA_MIN && sim.alphaTarget === 0) sim.active = false;
+  }
+
+  /* ---------- picking ---------- */
+  const pointer = { x: -1, y: -1, inside: false, moved: false };
+
+  function screenRadius(n) { return Math.max(2.4, n.r * kp); }
+
+  function pickNode(x, y) {
+    kp = Math.pow(view.k, 0.6);
+    for (let i = drawOrder.length - 1; i >= 0; i--) {
+      const n = drawOrder[i];
+      if (n.v < 0.3) continue;
+      const dx = view.x + n.x * view.k - x, dy = view.y + n.y * view.k - y;
+      const r = screenRadius(n) + 4;
+      if (dx * dx + dy * dy <= r * r) return n;
+    }
+    return null;
+  }
+
+  function pickLink(x, y) {
+    let best = null, bestD = 36;
+    for (const l of relLinks) {
+      if (l.v < 0.3 || l.s.v < 0.3 || l.t.v < 0.3) continue;
+      const ax = view.x + l.s.x * view.k, ay = view.y + l.s.y * view.k;
+      const bx = view.x + l.t.x * view.k, by = view.y + l.t.y * view.k;
+      const vx = bx - ax, vy = by - ay;
+      const len2 = vx * vx + vy * vy;
+      const t = len2 ? clamp(((x - ax) * vx + (y - ay) * vy) / len2, 0, 1) : 0;
+      const dx = ax + vx * t - x, dy = ay + vy * t - y;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = l; }
+    }
+    return best;
+  }
+
+  /* ---------- focus: hover highlight and search dimming ---------- */
+  function updateFocus() {
+    focusDirty = false;
+    let set = null;
+    if (hover) {
+      set = new Set([hover]);
+      for (const l of hover.adj) set.add(l.s === hover ? l.t : l.s);
+    } else if (hoverLink) {
+      set = new Set([hoverLink.s, hoverLink.t]);
+    }
+    focusActive = !!set;
+    for (const n of nodeList) {
+      let t = 1;
+      if (set && !set.has(n)) t = 0.1;
+      if (searchTerm && !n.match) t = Math.min(t, 0.14);
+      if (n === hover) t = 1;
+      n.ta = t;
+      n.inFocus = set ? set.has(n) : false;
+    }
+    for (const l of linkList) l.ht = ((hover && (l.s === hover || l.t === hover)) || l === hoverLink) ? 1 : 0;
+  }
+
+  /* ---------- drawing ---------- */
+  const DASH = [2.5, 2.5];
+  const NODASH = [];
+  const LABEL_TEXT_H = 15;
+  const rectBuf = new Float32Array(4 * 600);
+  let rectCount = 0;
+  const frameStats = { times: new Float32Array(240), idx: 0, count: 0, intervals: new Float32Array(240), iIdx: 0, iCount: 0 };
+
+  function easeOutBack(t) { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
+
+  function nodePath(n, sx, sy, r) {
+    if (n.observation) {
+      const d = r * 1.28;
+      ctx.moveTo(sx, sy - d); ctx.lineTo(sx + d, sy); ctx.lineTo(sx, sy + d); ctx.lineTo(sx - d, sy); ctx.closePath();
+    } else {
+      ctx.moveTo(sx + r, sy);
+      ctx.arc(sx, sy, r, 0, TAU);
+    }
+  }
+
+  /* zoom level at which a node label starts to fade in: hubs first, and later when the graph is dense */
+  function labelThreshold(n, density) {
+    /* never below 0.3, so labels fade out when zooming far out, whatever the graph size or the degree */
+    return Math.max(0.3, (n.cls === 'memory' ? 1.4 : n.cls === 'entity' ? 0.9 : 1.0) + density - 0.1 * Math.min(n.deg, 10));
+  }
+
+  function visRadius(n) { return screenRadius(n) * (n.observation ? 1.28 : 1); }
+
+  /* screen circles of the nodes, on a coarse grid, so a label can avoid covering another node */
+  const CIRC_CELL = 32;
+  let circBuf = new Float32Array(3 * 512), circNext = new Int32Array(512), circHead = new Int32Array(0);
+  let circCols = 0, circRows = 0, circMaxR = 0;
+
+  function buildCircleGrid() {
+    circCols = Math.ceil(W / CIRC_CELL) + 1;
+    circRows = Math.ceil(H / CIRC_CELL) + 1;
+    if (circCols * circRows > circHead.length) circHead = new Int32Array(circCols * circRows);
+    circHead.fill(-1, 0, circCols * circRows);
+    if (drawOrder.length > circNext.length) {
+      circNext = new Int32Array(Math.ceil(drawOrder.length * 1.5));
+      circBuf = new Float32Array(3 * circNext.length);
+    }
+    circMaxR = 0;
+    let count = 0;
+    for (let i = 0; i < drawOrder.length; i++) {
+      const n = drawOrder[i];
+      if (n.v < 0.3) continue;
+      const sx = view.x + n.x * view.k, sy = view.y + n.y * view.k;
+      if (sx < 0 || sx >= W || sy < 0 || sy >= H) continue;
+      const r = visRadius(n) + 1.5;
+      if (r > circMaxR) circMaxR = r;
+      circBuf[count * 3] = sx; circBuf[count * 3 + 1] = sy; circBuf[count * 3 + 2] = r;
+      const cell = Math.floor(sy / CIRC_CELL) * circCols + Math.floor(sx / CIRC_CELL);
+      circNext[count] = circHead[cell];
+      circHead[cell] = count++;
+    }
+  }
+
+  /* true when no node other than the one at (ox, oy) touches the rectangle */
+  function circlesFree(x0, y0, x1, y1, ox, oy) {
+    const c0 = Math.max(0, Math.floor((x0 - circMaxR) / CIRC_CELL)), c1 = Math.min(circCols - 1, Math.floor((x1 + circMaxR) / CIRC_CELL));
+    const r0 = Math.max(0, Math.floor((y0 - circMaxR) / CIRC_CELL)), r1 = Math.min(circRows - 1, Math.floor((y1 + circMaxR) / CIRC_CELL));
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        for (let i = circHead[r * circCols + c]; i >= 0; i = circNext[i]) {
+          const cx = circBuf[i * 3], cy = circBuf[i * 3 + 1], cr = circBuf[i * 3 + 2];
+          if (cx === ox && cy === oy) continue;
+          const dx = cx - (cx < x0 ? x0 : cx > x1 ? x1 : cx), dy = cy - (cy < y0 ? y0 : cy > y1 ? y1 : cy);
+          if (dx * dx + dy * dy < cr * cr) return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function rectFree(x0, y0, x1, y1) {
+    for (let i = 0; i < rectCount; i++) {
+      const o = i * 4;
+      if (x0 < rectBuf[o + 2] && x1 > rectBuf[o] && y0 < rectBuf[o + 3] && y1 > rectBuf[o + 1]) return false;
+    }
+    return true;
+  }
+
+  function linkAlpha(l) {
+    const mv = Math.min(l.s.v, l.t.v);
+    const normal = LINK_ALPHA[l.type] * Math.min(l.s.a, l.t.a) * mv * l.v;
+    return normal * (1 - l.h) + 0.9 * l.h * l.v * mv;
+  }
+
+  function draw(now, dt) {
+    const k = view.k;
+    kp = Math.pow(k, 0.6);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = COL.bg;
+    ctx.fillRect(0, 0, W, H);
+
+    for (let i = 0; i < linkBuckets.length; i++) linkBuckets[i].length = 0;
+    for (const l of linkList) {
+      if (l.v < 0.01) continue;
+      const x1 = view.x + l.s.x * k, y1 = view.y + l.s.y * k, x2 = view.x + l.t.x * k, y2 = view.y + l.t.y * k;
+      if ((x1 < -20 && x2 < -20) || (x1 > W + 20 && x2 > W + 20) || (y1 < -20 && y2 < -20) || (y1 > H + 20 && y2 > H + 20)) continue;
+      const al = linkAlpha(l);
+      if (al < 0.01) continue;
+      const cat = l.h > 0.5 ? 3 : LINK_BUCKET[l.type];
+      linkBuckets[cat * (LQ + 1) + Math.min(LQ, Math.round(al * LQ))].push(l);
+    }
+    for (let b = 0; b < linkBuckets.length; b++) {
+      const list = linkBuckets[b];
+      if (!list.length) continue;
+      const cat = (b / (LQ + 1)) | 0;
+      ctx.strokeStyle = LINK_STYLE[BUCKET_TYPE[cat]][b % (LQ + 1)];
+      ctx.lineWidth = cat === 3 ? 1.5 : 1;
+      ctx.beginPath();
+      for (let i = 0; i < list.length; i++) {
+        const l = list[i];
+        ctx.moveTo(view.x + l.s.x * k, view.y + l.s.y * k);
+        ctx.lineTo(view.x + l.t.x * k, view.y + l.t.y * k);
+      }
+      ctx.stroke();
+    }
+
+    /* arrowheads on fact to fact links, direction matters for relations such as supersedes */
+    for (const l of relLinks) {
+      if (l.v < 0.05) continue;
+      const al = linkAlpha(l);
+      if (al < 0.04) continue;
+      const x1 = view.x + l.s.x * k, y1 = view.y + l.s.y * k, x2 = view.x + l.t.x * k, y2 = view.y + l.t.y * k;
+      const dx = x2 - x1, dy = y2 - y1;
+      const len = Math.hypot(dx, dy);
+      if (len < 18) continue;
+      const ux = dx / len, uy = dy / len;
+      const tipD = screenRadius(l.t) * (l.t.observation ? 1.28 : 1) + 2;
+      const tx = x2 - ux * tipD, ty = y2 - uy * tipD;
+      ctx.globalAlpha = Math.min(1, al * 1.4);
+      ctx.fillStyle = l.h > 0.5 ? LINK_STYLE.hl[LQ] : LINK_STYLE.rel[LQ];
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx - ux * 7 - uy * 3.4, ty - uy * 7 + ux * 3.4);
+      ctx.lineTo(tx - ux * 7 + uy * 3.4, ty - uy * 7 - ux * 3.4);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    for (let i = 0; i < drawOrder.length; i++) {
+      const n = drawOrder[i];
+      if (n.v < 0.01) continue;
+      const sx = view.x + n.x * k, sy = view.y + n.y * k;
+      if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) continue;
+      const age = now - n.born;
+      const r = screenRadius(n) * (age >= 420 ? 1 : age <= 0 ? 0 : easeOutBack(age / 420));
+      if (r <= 0) continue;
+      const al = n.v * n.a * (n.dimStatus ? 0.42 : 1);
+      ctx.globalAlpha = al;
+      ctx.fillStyle = COL[n.cls];
+      ctx.beginPath();
+      nodePath(n, sx, sy, r);
+      ctx.fill();
+      if (n.dimStatus) {
+        ctx.setLineDash(DASH);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = COL[n.cls];
+        ctx.globalAlpha = Math.min(1, al * 1.9);
+        ctx.beginPath();
+        ctx.arc(sx, sy, r + 3.6, 0, TAU);
+        ctx.stroke();
+        ctx.setLineDash(NODASH);
+      }
+      if (n.ext === 'failed' || n.ext === 'blocked') {
+        ctx.setLineDash(n.ext === 'blocked' ? DASH : NODASH);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = COL.amber;
+        ctx.globalAlpha = Math.min(1, al * 1.2);
+        ctx.beginPath();
+        ctx.arc(sx, sy, r + 3.6, 0, TAU);
+        ctx.stroke();
+        ctx.setLineDash(NODASH);
+      }
+      if (n.fx !== null) {
+        ctx.globalAlpha = al * 0.9;
+        ctx.fillStyle = COL.bg;
+        ctx.beginPath();
+        ctx.arc(sx, sy, Math.max(0.9, r * 0.22), 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    ctx.lineWidth = 2;
+    for (let i = 0; i < nodeList.length; i++) {
+      const n = nodeList[i];
+      if (!n.pulse) continue;
+      const age = now - n.born;
+      if (age < 0 || age > 1100) continue;
+      const p = age / 1100;
+      ctx.globalAlpha = (1 - p) * (1 - p) * 0.85 * n.v;
+      ctx.strokeStyle = COL[n.cls];
+      ctx.beginPath();
+      ctx.arc(view.x + n.x * k, view.y + n.y * k, screenRadius(n) + 4 + p * 26, 0, TAU);
+      ctx.stroke();
+    }
+
+    const ring = (n, extra, color, w, a) => {
+      ctx.globalAlpha = a * n.v;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.arc(view.x + n.x * k, view.y + n.y * k, screenRadius(n) + extra, 0, TAU);
+      ctx.stroke();
+    };
+    if (hover && hover.v > 0.1) ring(hover, 3, '#ffffff', 1, 0.55);
+    const sn = selected ? nodes.get(selected) : null;
+    if (sn && sn.v > 0.1) ring(sn, 4.5, '#ffffff', 1.5, 0.9);
+    ctx.globalAlpha = 1;
+
+    drawLabels(dt);
+    drawRelationLabels();
+  }
+
+  function drawLabels(dt) {
+    ctx.font = LABEL_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    rectCount = 0;
+    buildCircleGrid();
+    const k = view.k;
+    let visibleCount = 0;
+    for (const n of nodeList) { n.lt = 0; if (n.vt === 1) visibleCount++; }
+    const density = visibleCount > 40 ? 0.4 * clamp((visibleCount - 40) / 250, 0, 1) : -10;
+
+    /* a label goes under its node, or above it when that spot is taken by another label or a node */
+    const place = (n, force, fade) => {
+      if (n.v < 0.2) return;
+      const sx = view.x + n.x * k, sy = view.y + n.y * k;
+      if (sx < -80 || sx > W + 80 || sy < -30 || sy > H + 30) return;
+      if (!n.lw) n.lw = ctx.measureText(n.label).width;
+      const w = force && n.fullLabel !== n.label ? ctx.measureText(n.fullLabel).width : n.lw;
+      const vr = visRadius(n);
+      const x0 = sx - w / 2 - 3, x1 = sx + w / 2 + 3;
+      const first = n.lpos === -1 ? -1 : 1;
+      for (let t = 0; t < 2; t++) {
+        const side = t === 0 ? first : -first;
+        const y = side === 1 ? sy + vr + 4 : sy - vr - 4 - LABEL_TEXT_H;
+        const y0 = y - 1, y1 = y + 17;
+        if (!force && !(rectFree(x0, y0, x1, y1) && circlesFree(x0, y0, x1, y1, sx, sy))) continue;
+        if (rectCount < 600) {
+          const o = rectCount++ * 4;
+          rectBuf[o] = x0; rectBuf[o + 1] = y0; rectBuf[o + 2] = x1; rectBuf[o + 3] = y1;
+        }
+        n.lt = fade;
+        n.useFull = force;
+        n.lpos = side;
+        n.ly = y - sy;
+        return;
+      }
+    };
+
+    /* priority labels first: hovered node, selected node, then the rest by importance */
+    if (hover) place(hover, true, 1);
+    const sn = selected ? nodes.get(selected) : null;
+    if (sn && sn !== hover) place(sn, true, 1);
+    if (focusActive) {
+      for (const n of nodeList) if (n.inFocus && n.lt === 0) place(n, false, 1);
+    } else if (searchTerm) {
+      let c = 0;
+      for (const n of labelOrder) if (n.match && n.lt === 0 && c < 150 && classVisible[n.cls]) { place(n, false, 1); c++; }
+    } else {
+      for (const n of labelOrder) {
+        if (n.lt !== 0) continue;
+        const f = clamp((k - labelThreshold(n, density)) / 0.22, 0, 1);
+        if (f > 0.02) place(n, false, f);
+      }
+    }
+
+    const ease = 1 - Math.exp(-dt / 90);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3.5;
+    for (const n of nodeList) {
+      if (n.la !== n.lt) {
+        n.la += (n.lt - n.la) * ease;
+        if (Math.abs(n.la - n.lt) < 0.01) n.la = n.lt;
+      }
+      if (n.la < 0.02) continue;
+      const sx = view.x + n.x * k, sy = view.y + n.y * k;
+      const text = n.useFull && n.lt === 1 ? n.fullLabel : n.label;
+      const y = sy + n.ly;
+      const a = n.la * n.v * Math.max(0.35, n.a) * (n.dimStatus && n !== hover ? 0.65 : 1);
+      ctx.globalAlpha = a * 0.85;
+      ctx.strokeStyle = COL.bg;
+      ctx.strokeText(text, sx, y);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = n === hover ? '#ffffff' : '#c9c9c9';
+      ctx.fillText(text, sx, y);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawRelationLabels() {
+    ctx.font = REL_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const placed = [];
+    const order = relLinks.filter((l) => l.h >= 0.5 && l.relation).sort((a, b) => (b === hoverLink) - (a === hoverLink));
+    for (const l of order) {
+      const w = ctx.measureText(l.relation).width + 14;
+      let spot = null;
+      for (const t of [0.5, 0.35, 0.65, 0.25, 0.75]) {
+        const mx = view.x + (l.s.x + (l.t.x - l.s.x) * t) * view.k, my = view.y + (l.s.y + (l.t.y - l.s.y) * t) * view.k;
+        if (!placed.some((p) => Math.abs(p[0] - mx) < (p[2] + w) / 2 && Math.abs(p[1] - my) < 24)) { spot = [mx, my, w]; break; }
+      }
+      if (!spot) continue;
+      placed.push(spot);
+      ctx.globalAlpha = l.h;
+      ctx.fillStyle = '#2b2740';
+      ctx.strokeStyle = 'rgba(167,139,250,0.75)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(spot[0] - w / 2, spot[1] - 11, w, 22, 11); else ctx.rect(spot[0] - w / 2, spot[1] - 11, w, 22);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#e4dcff';
+      ctx.fillText(l.relation, spot[0], spot[1] + 0.5);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---------- frame loop: runs only while something moves ---------- */
+  let raf = 0, lastT = 0;
+
+  function invalidate() { if (!raf) raf = requestAnimationFrame(frame); }
+
+  function frame(t) {
+    raf = 0;
+    const w0 = performance.now();
+    if (window.devicePixelRatio !== dpr || innerWidth !== W || innerHeight !== H) resize();
+    const dt = clamp(lastT ? t - lastT : 16.7, 1, 64);
+    if (lastT) {
+      frameStats.intervals[frameStats.iIdx] = t - lastT;
+      frameStats.iIdx = (frameStats.iIdx + 1) % 240;
+      frameStats.iCount = Math.min(240, frameStats.iCount + 1);
+    }
+    lastT = t;
+    const now = performance.now();
+    const wall = Date.now();
+    let busy = false;
+
+    /* drop nodes and links that have finished fading out */
+    let removed = false;
+    for (const [key, n] of nodes) {
+      if (n.dying && n.v < 0.02) { nodes.delete(key); removed = true; }
+    }
+    for (const [key, l] of links) {
+      if ((l.dead || !nodes.has(l.s.key) || !nodes.has(l.t.key)) && l.v < 0.02) { links.delete(key); removed = true; }
+    }
+    if (removed) {
+      rebuildTopology();
+      updateCounts();
+      if (hover && !nodes.has(hover.key)) hover = null;
+      focusDirty = true;
+    }
+    for (const n of nodeList) n.dimStatus = isDim(n, wall);
+
+    if (sim.active) {
+      sim.acc += dt;
+      let steps = 0;
+      while (sim.acc >= STEP_MS && steps < 3 && sim.active) { tick(); sim.acc -= STEP_MS; steps++; }
+      if (sim.acc > STEP_MS * 3) sim.acc = 0;
+      busy = sim.active;
+    }
+
+    if (!drag && pointer.inside && (pointer.moved || sim.active || viewChanging)) {
+      pointer.moved = false;
+      const hit = pickNode(pointer.x, pointer.y);
+      const hl = hit ? null : pickLink(pointer.x, pointer.y);
+      if (hit !== hover || hl !== hoverLink) {
+        hover = hit; hoverLink = hl; focusDirty = true;
+        cvs.style.cursor = hit ? 'pointer' : 'default';
+        showLinkTip(hl);
+      }
+    }
+    if (focusDirty) updateFocus();
+
+    const eNode = 1 - Math.exp(-dt / 70);
+    const eVis = 1 - Math.exp(-dt / 110);
+    const eLink = 1 - Math.exp(-dt / 80);
+    for (const n of nodeList) {
+      if (n.a !== n.ta) { n.a += (n.ta - n.a) * eNode; if (Math.abs(n.a - n.ta) < 0.01) n.a = n.ta; busy = true; }
+      if (n.v !== n.vt) { n.v += (n.vt - n.v) * eVis; if (Math.abs(n.v - n.vt) < 0.01) n.v = n.vt; busy = true; }
+      if (n.la !== n.lt || now - n.born < (n.pulse ? 1150 : 450)) busy = true;
+    }
+    for (const l of linkList) {
+      if (l.v !== l.vt) { l.v += (l.vt - l.v) * eVis; if (Math.abs(l.v - l.vt) < 0.01) l.v = l.vt; busy = true; }
+      if (l.h !== l.ht) { l.h += (l.ht - l.h) * eLink; if (Math.abs(l.h - l.ht) < 0.01) l.h = l.ht; busy = true; }
+    }
+
+    if (autoFit && sim.active) fitView(false);
+    viewChanging = false;
+    const dk = viewT.k - view.k, dx = viewT.x - view.x, dy = viewT.y - view.y;
+    if (Math.abs(dk) > 0.0005 || Math.abs(dx) > 0.15 || Math.abs(dy) > 0.15) {
+      const e = 1 - Math.exp(-dt / 85);
+      view.k += dk * e; view.x += dx * e; view.y += dy * e;
+      viewChanging = true; busy = true;
+    } else { view.k = viewT.k; view.x = viewT.x; view.y = viewT.y; }
+
+    draw(now, dt);
+
+    frameStats.times[frameStats.idx] = performance.now() - w0;
+    frameStats.idx = (frameStats.idx + 1) % 240;
+    frameStats.count = Math.min(240, frameStats.count + 1);
+
+    if (busy || drag || viewChanging) raf = requestAnimationFrame(frame);
+    else lastT = 0;
+  }
+
+  /* ---------- canvas size and fitting ---------- */
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    W = innerWidth; H = innerHeight;
+    cvs.width = Math.max(1, Math.round(W * dpr));
+    cvs.height = Math.max(1, Math.round(H * dpr));
+    measureInsets();
+    if (autoFit) fitView(false);
+    invalidate();
+  }
+
+  function measureInsets() {
+    const top = $('top').getBoundingClientRect();
+    const bottom = $('bottom').getBoundingClientRect();
+    insets.top = top.bottom + 14;
+    insets.bottom = Math.max(0, H - bottom.top) + 14;
+    insets.left = 14;
+    insets.right = 14;
+    const d = $('details');
+    if (d.classList.contains('show')) insets.right = Math.max(14, W - d.getBoundingClientRect().left + 14);
+  }
+
+  function fitView(snap) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of simNodes) {
+      if (n.x - n.r < minX) minX = n.x - n.r;
+      if (n.x + n.r > maxX) maxX = n.x + n.r;
+      if (n.y - n.r < minY) minY = n.y - n.r;
+      if (n.y + n.r + 18 > maxY) maxY = n.y + n.r + 18;
+    }
+    if (!simNodes.length) return;
+    const aw = Math.max(80, W - insets.left - insets.right);
+    const ah = Math.max(80, H - insets.top - insets.bottom);
+    const bw = Math.max(40, maxX - minX), bh = Math.max(40, maxY - minY);
+    const cap = 1.5 + 1.0 * clamp(1 - (simNodes.length - 6) / 150, 0, 1);
+    const k = clamp(Math.min(aw / bw, ah / bh) * 0.96, K_MIN, cap);
+    viewT.k = k;
+    viewT.x = insets.left + aw / 2 - ((minX + maxX) / 2) * k;
+    viewT.y = insets.top + ah / 2 - ((minY + maxY) / 2) * k;
+    if (snap) { view.k = viewT.k; view.x = viewT.x; view.y = viewT.y; }
+  }
+
+  function centerOn(n) {
+    const k = Math.max(viewT.k, 0.8);
+    viewT.k = k;
+    viewT.x = insets.left + (W - insets.left - insets.right) / 2 - n.x * k;
+    viewT.y = insets.top + (H - insets.top - insets.bottom) / 2 - n.y * k;
+    autoFit = false;
+    invalidate();
+  }
+
+  /* ---------- pointer interaction ---------- */
+  /* A double click is found here, not with the dblclick event: the first click opens the details
+     panel and may move the view, so the second click can land on neither the node nor the canvas.
+     The second press counts when it is close to the first click in time and place, whatever is
+     under it now. */
+  const DBL_MS = 450, DBL_PX = 10;
+  let lastClick = null;      // {key, x, y, t} of the last click on a node
+  let settleTimer = 0;
+
+  function endSettle() {
+    clearTimeout(settleTimer);
+    details.classList.remove('settle');
+  }
+
+  function releaseNode(n) {
+    if (n.fx === null) return;
+    n.fx = null; n.fy = null;
+    reheat(0.3);
+    invalidate();
+  }
+
+  cvs.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    cvs.setPointerCapture(e.pointerId);
+    pointer.x = e.clientX; pointer.y = e.clientY; pointer.inside = true;
+    autoFit = false;
+    showLinkTip(null);
+    if (lastClick && performance.now() - lastClick.t <= DBL_MS && Math.hypot(e.clientX - lastClick.x, e.clientY - lastClick.y) <= DBL_PX) {
+      const n = nodes.get(lastClick.key);
+      lastClick = null;
+      if (n && !n.dying) releaseNode(n);
+      drag = { type: 'double', node: null, sx: e.clientX, sy: e.clientY, vx0: view.x, vy0: view.y, moved: false };
+      invalidate();
+      return;
+    }
+    const hit = pickNode(e.clientX, e.clientY);
+    drag = { type: hit ? 'node' : 'pan', node: hit, sx: e.clientX, sy: e.clientY, vx0: view.x, vy0: view.y, moved: false };
+    invalidate();
+  });
+
+  cvs.addEventListener('pointermove', (e) => {
+    pointer.x = e.clientX; pointer.y = e.clientY; pointer.inside = true; pointer.moved = true;
+    /* a pointer that has left the click spot is not heading for a second click, so the panel takes events again */
+    if (lastClick && Math.hypot(e.clientX - lastClick.x, e.clientY - lastClick.y) > DBL_PX) endSettle();
+    if (drag && drag.type === 'double') return;
+    if (drag) {
+      const mx = e.clientX - drag.sx, my = e.clientY - drag.sy;
+      if (!drag.moved && mx * mx + my * my > 9) {
+        drag.moved = true;
+        cvs.style.cursor = 'grabbing';
+        if (drag.type === 'node') { sim.alphaTarget = 0.3; sim.active = true; }
+      }
+      if (drag.moved) {
+        if (drag.type === 'pan') {
+          view.x = viewT.x = drag.vx0 + mx;
+          view.y = viewT.y = drag.vy0 + my;
+        } else {
+          const n = drag.node;
+          n.fx = (e.clientX - view.x) / view.k;
+          n.fy = (e.clientY - view.y) / view.k;
+          n.x = n.fx; n.y = n.fy;
+        }
+      }
+    } else {
+      moveTip(e.clientX, e.clientY);
+    }
+    invalidate();
+  });
+
+  function endDrag(cancelled) {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    sim.alphaTarget = 0;
+    cvs.style.cursor = hover ? 'pointer' : 'default';
+    if (d.type !== 'double') {
+      lastClick = null;
+      if (!d.moved && !cancelled) {
+        select(d.node ? d.node.key : null, false);
+        if (d.node) {
+          lastClick = { key: d.node.key, x: d.sx, y: d.sy, t: performance.now() };
+          details.classList.add('settle');
+          clearTimeout(settleTimer);
+          settleTimer = setTimeout(endSettle, DBL_MS);
+        }
+      }
+    }
+    pointer.moved = true;
+    invalidate();
+  }
+  cvs.addEventListener('pointerup', () => endDrag(false));
+  cvs.addEventListener('pointercancel', () => endDrag(true));
+  cvs.addEventListener('pointerleave', () => {
+    pointer.inside = false;
+    if (!drag && (hover || hoverLink)) {
+      hover = null; hoverLink = null; focusDirty = true;
+      cvs.style.cursor = 'default';
+      showLinkTip(null);
+      invalidate();
+    }
+  });
+  cvs.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    autoFit = false;
+    const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+    const k2 = clamp(viewT.k * Math.exp(-delta * (e.ctrlKey ? 0.01 : 0.0016)), K_MIN, K_MAX);
+    const wx = (e.clientX - viewT.x) / viewT.k, wy = (e.clientY - viewT.y) / viewT.k;
+    viewT.k = k2;
+    viewT.x = e.clientX - wx * k2;
+    viewT.y = e.clientY - wy * k2;
+    invalidate();
+  }, { passive: false });
+
+  /* ---------- tooltip for relation links ---------- */
+  const tip = $('tip');
+  function showLinkTip(l) {
+    if (!l || !(l.relation || l.explanation)) { tip.style.display = 'none'; return; }
+    tip.replaceChildren(h('b', { text: l.relation || 'related' }), l.explanation ? ': ' + l.explanation : '');
+    tip.style.display = 'block';
+    moveTip(pointer.x, pointer.y);
+  }
+  function moveTip(x, y) {
+    if (tip.style.display === 'none') return;
+    tip.style.transform = 'translate(' + Math.max(8, Math.min(x + 14, W - 340)) + 'px,' + (y + 16) + 'px)';
+  }
+
+  /* ---------- selection and details panel ---------- */
+  const details = $('details');
+  const dbody = $('dbody');
+  const dtitle = $('dtitle');
+  let lastModelSig = null;
+  let lastDetailKey = null;
+  let panelCollapsed = false;
+
+  function select(key, center) {
+    selected = key;
+    if (key) {
+      panelCollapsed = false;
+      if (center) { const n = nodes.get(key); if (n) centerOn(n); }
+    }
+    refreshDetails();
+    if (key && !center) { const n = nodes.get(key); if (n) revealNode(n); }
+    invalidate();
+  }
+
+  /* The panel overlays the right side. When it opens over the node that was just clicked, or over
+     its label, pan the view left by the least amount that frees the node. */
+  function revealNode(n) {
+    const r = details.getBoundingClientRect();
+    if (!r.width) return;
+    const sx = viewT.x + n.x * viewT.k, sy = viewT.y + n.y * viewT.k;
+    if (sy < r.top - 24 || sy > r.bottom + 24) return;
+    ctx.font = LABEL_FONT;
+    const half = Math.max(visRadius(n), Math.min(220, ctx.measureText(n.fullLabel).width / 2)) + 8;
+    const room = r.left - 14;
+    if (sx + half <= room) return;
+    const want = Math.max(room - half, insets.left + visRadius(n) + 4);
+    if (want >= sx) return;
+    viewT.x += want - sx;
+    autoFit = false;
+  }
+
+  function applyPanelState() {
+    details.classList.toggle('show', !!selected);
+    details.classList.toggle('collapsed', panelCollapsed);
+    $('dtoggle').setAttribute('aria-expanded', String(!panelCollapsed));
+    $('dtoggle').setAttribute('aria-label', panelCollapsed ? 'Expand details' : 'Collapse details');
+    measureInsets();
+  }
+
+  $('dtoggle').addEventListener('click', () => { panelCollapsed = !panelCollapsed; applyPanelState(); });
+  $('dclose').addEventListener('click', () => select(null, false));
+
+  function summary(n) {
+    const label = n.cls === 'memory' ? cut(n.d.text, 90) : n.cls === 'fact' ? cut(n.d.statement || n.d.name, 90) : cut(n.d.name, 90);
+    return { key: n.key, cls: n.cls, label, dim: n.dimStatus, observation: n.observation, status: n.cls === 'fact' ? n.d.status || null : null };
+  }
+
+  function buildModel(n) {
+    const d = n.d;
+    if (n.cls === 'memory') {
+      /* one entry per fact: the server sends one row per quote */
+      const byFact = new Map();
+      for (const s of d.supports || []) {
+        let g = byFact.get(s.assertion_id);
+        if (!g) {
+          const f = nodes.get('f:' + s.assertion_id);
+          g = { fact: f && !f.dying ? summary(f) : null, assertionId: s.assertion_id, quotes: [] };
+          byFact.set(s.assertion_id, g);
+        }
+        g.quotes.push(s.quote);
+      }
+      return { cls: 'memory', title: 'Memory', role: d.role || null, when: d.occurred_at || null, state: d.processing_state === undefined ? null : d.processing_state,
+        extraction: d.extraction || null, session: d.session_id || null, id: d.id, text: d.text, truncated: !!d.text_truncated, supports: Array.from(byFact.values()) };
+    }
+    if (n.cls === 'fact') {
+      const ev = Array.from(evidence.get(d.id) || [], ([memoryKey, quotes]) => {
+        const m = nodes.get(memoryKey);
+        return { memory: m && !m.dying ? { key: m.key, role: m.d.role, when: m.d.occurred_at, text: cut(m.d.text, 120) } : null, quotes };
+      });
+      const ents = [], rels = [];
+      for (const l of n.adj) {
+        const o = l.s === n ? l.t : l.s;
+        if (l.type === 'mention' && l.s === n) ents.push(summary(o));
+        else if (l.type === 'rel') rels.push({ other: summary(o), relation: l.relation, explanation: l.explanation, outgoing: l.s === n });
+      }
+      return { cls: 'fact', title: n.observation ? 'Observation' : 'Fact', statement: d.statement, status: d.status, kind: d.assertion_kind, validFrom: d.valid_from,
+        validTo: d.valid_to, revision: d.revision, expired: n.validToMs !== null && n.validToMs <= Date.now(), id: d.id, evidence: ev, entities: ents, relations: rels,
+        observation: n.observation, dim: n.dimStatus, name: d.name };
+    }
+    const facts = [];
+    for (const l of n.adj) if (l.type === 'mention') facts.push(summary(l.s));
+    return { cls: 'entity', title: 'Entity', name: d.name, type: d.entity_type, id: d.id, facts };
+  }
+
+  function dot(s) {
+    return h('i', { class: (s.observation ? 'diamond ' : '') + (s.dim ? 'dimmed' : ''), style: '--c:' + COL[s.cls] });
+  }
+
+  function nodeRow(s, sub) {
+    return h('button', { class: 'row', type: 'button', onclick: () => select(s.key, true) },
+      h('div', { class: 'rhead' }, dot(s), h('span', { text: s.label })),
+      sub ? h('div', { class: 'rsub', text: sub }) : null);
+  }
+
+  function kv(pairs) {
+    const dl = h('dl', { class: 'kv' });
+    for (const [k, v, mono] of pairs) dl.append(h('dt', { text: k }), h('dd', { class: mono ? 'mono' : '', text: v }));
+    return dl;
+  }
+
+  const EXTRACTION_WORD = { pending: 'queued', running: 'running', failed: 'failed', blocked: 'blocked' };
+
+  /* what the extract job of a memory did, in words; the server error text is shown as sent */
+  function extractionText(x) {
+    if (!x) return 'unknown';
+    const tries = x.attempts !== null && x.attempts !== undefined && x.max_attempts ? ' (attempt ' + x.attempts + ' of ' + x.max_attempts + ')' : '';
+    switch (x.status) {
+      case 'succeeded': return 'succeeded';
+      case 'none': return 'no extraction job exists for this memory';
+      case 'running': return 'running' + tries;
+      case 'pending': return x.error ? 'queued for a retry' + tries + ', last error: ' + x.error : 'queued';
+      case 'failed': return 'failed after ' + x.attempts + ' of ' + x.max_attempts + ' attempts, last error: ' + (x.error || 'none recorded');
+      case 'blocked': return 'blocked behind a failed extraction of this namespace' + (x.error ? ' (' + x.error + ')' : '') + '. The worker does not skip it, so this memory waits until that job is retried.';
+      default: return String(x.status);
+    }
+  }
+
+  /* why a memory has no facts, as a note for the details panel */
+  function noFactsNote(m) {
+    const x = m.extraction;
+    const status = x ? x.status : null;
+    if (status === 'failed') return h('div', { class: 'note bad', text: 'No facts: extraction failed' + (x.error ? '. ' + x.error : '.') });
+    if (status === 'blocked') return h('div', { class: 'note', text: 'No facts yet: extraction is blocked behind a failed extraction in this namespace.' });
+    if (status === 'running') return h('div', { class: 'empty', text: 'Extraction is running.' });
+    if (status === 'pending') return h('div', { class: 'empty', text: 'Not extracted yet, it is queued.' });
+    if (m.state === 'failed') return h('div', { class: 'note bad', text: 'Extraction failed for this memory.' });
+    if (m.state === 'pending') return h('div', { class: 'empty', text: 'Not extracted yet.' });
+    return h('div', { class: 'empty', text: 'No fact cites this memory.' });
+  }
+
+  function renderModel(m) {
+    const frag = document.createDocumentFragment();
+    frag.append(h('div', { class: 'kindpill' + (m.observation ? ' diamond' : ''), style: '--c:' + COL[m.cls] }, h('i'), m.title));
+    if (m.cls === 'memory') {
+      const badges = h('div', { class: 'badges' });
+      if (m.role) badges.append(h('span', { class: 'badge', text: m.role }));
+      badges.append(h('span', { class: 'badge ' + (m.state === 'processed' ? 'good' : m.state === 'failed' ? 'warn' : ''), text: m.state === null ? 'processing state unknown' : m.state }));
+      const xs = m.extraction ? m.extraction.status : null;
+      if (EXTRACTION_WORD[xs]) badges.append(h('span', { class: 'badge ' + (xs === 'failed' ? 'bad' : xs === 'blocked' ? 'warn' : ''), text: 'extraction ' + EXTRACTION_WORD[xs] }));
+      frag.append(badges);
+      frag.append(kv([['When', fmtTime(m.when) || 'unknown'], ['Session', m.session ? shortId(m.session) : 'none', true], ['Id', shortId(m.id), true], ['Extraction', extractionText(m.extraction)]]));
+      frag.append(h('h4', { text: 'Text' }), h('div', { class: 'fulltext', text: m.text }));
+      if (m.truncated) frag.append(h('div', { class: 'note', text: 'The server truncated this text to 600 characters.' }));
+      frag.append(h('h4', { text: 'Facts it supports (' + m.supports.length + ')' }));
+      if (!m.supports.length) {
+        frag.append(noFactsNote(m));
+      } else {
+        const list = h('div', { class: 'list' });
+        for (const s of m.supports) {
+          const quotes = s.quotes.map((q) => h('div', { class: 'quote', text: q }));
+          if (s.fact) {
+            const row = nodeRow(s.fact);
+            row.append(...quotes);
+            list.append(row);
+          } else {
+            list.append(h('div', { class: 'row' }, h('span', { text: 'Fact ' + shortId(s.assertionId) + ' is not in the Neo4j projection' }), ...quotes));
+          }
+        }
+        frag.append(list);
+      }
+    } else if (m.cls === 'fact') {
+      frag.append(h('div', { class: 'statement', text: m.statement || m.name || '' }));
+      const badges = h('div', { class: 'badges' });
+      badges.append(h('span', { class: 'badge ' + (m.status === 'active' ? 'good' : m.dim ? 'warn' : ''), text: m.status || 'status unknown' }));
+      if (m.kind) badges.append(h('span', { class: 'badge', text: m.kind }));
+      if (m.expired && m.status !== 'superseded') badges.append(h('span', { class: 'badge warn', text: 'expired' }));
+      frag.append(badges);
+      frag.append(kv([
+        ['Status', m.status || 'unknown'], ['Kind', m.kind || 'unknown'],
+        ['Valid from', fmtTime(m.validFrom) || 'not set'], ['Valid to', fmtTime(m.validTo) || 'none (still valid)'],
+        ['Revision', m.revision === null || m.revision === undefined ? 'unknown' : String(m.revision)], ['Id', shortId(m.id), true]]));
+      frag.append(h('h4', { text: 'Evidence (' + m.evidence.length + ')' }));
+      if (!m.evidence.length) frag.append(h('div', { class: 'empty', text: 'No loaded memory cites this fact.' }));
+      else {
+        const list = h('div', { class: 'list' });
+        for (const e of m.evidence) {
+          const quotes = e.quotes.map((q) => h('div', { class: 'quote', text: q }));
+          if (e.memory) {
+            list.append(h('button', { class: 'row', type: 'button', onclick: () => select(e.memory.key, true) },
+              h('div', { class: 'rhead' }, h('i', { style: '--c:' + COL.memory }), h('span', { text: (e.memory.role || 'memory') + ', ' + (fmtTime(e.memory.when) || 'unknown time') })),
+              h('div', { class: 'rsub', text: e.memory.text }), ...quotes));
+          } else list.append(h('div', { class: 'row' }, h('span', { text: 'Memory not loaded' }), ...quotes));
+        }
+        frag.append(list);
+      }
+      frag.append(h('h4', { text: 'Mentions (' + m.entities.length + ')' }));
+      if (!m.entities.length) frag.append(h('div', { class: 'empty', text: 'No entities.' }));
+      else { const list = h('div', { class: 'list' }); for (const s of m.entities) list.append(nodeRow(s)); frag.append(list); }
+      if (m.relations.length) {
+        frag.append(h('h4', { text: 'Relations (' + m.relations.length + ')' }));
+        const list = h('div', { class: 'list' });
+        for (const r of m.relations) {
+          const rel = h('span', { class: 'rel', text: r.relation || 'relates to' });
+          const line = r.outgoing ? h('span', {}, 'This fact ', rel, ' ' + r.other.label) : h('span', {}, r.other.label + ' ', rel, ' this fact');
+          const row = h('button', { class: 'row', type: 'button', onclick: () => select(r.other.key, true) }, h('div', { class: 'rhead' }, dot(r.other), line));
+          if (r.explanation) row.append(h('div', { class: 'rsub', text: r.explanation }));
+          list.append(row);
+        }
+        frag.append(list);
+      }
+    } else {
+      frag.append(h('div', { class: 'statement', text: m.name || '' }));
+      if (m.type) frag.append(h('div', { class: 'badges' }, h('span', { class: 'badge', text: m.type })));
+      frag.append(kv([['Type', m.type || 'unknown'], ['Id', shortId(m.id), true]]));
+      frag.append(h('h4', { text: 'Mentioned by ' + m.facts.length + (m.facts.length === 1 ? ' fact' : ' facts') }));
+      if (!m.facts.length) frag.append(h('div', { class: 'empty', text: 'No fact mentions this entity.' }));
+      else { const list = h('div', { class: 'list' }); for (const s of m.facts) list.append(nodeRow(s, s.status)); frag.append(list); }
+    }
+    return frag;
+  }
+
+  function refreshDetails() {
+    applyPanelState();
+    const n = selected ? nodes.get(selected) : null;
+    if (!n) { lastModelSig = null; lastDetailKey = null; dbody.replaceChildren(); dtitle.textContent = 'Details'; return; }
+    const model = buildModel(n);
+    const sig = JSON.stringify(model);
+    if (sig === lastModelSig && n.key === lastDetailKey) return;
+    const keepScroll = n.key === lastDetailKey ? dbody.scrollTop : 0;
+    lastModelSig = sig;
+    lastDetailKey = n.key;
+    dtitle.textContent = n.cls === 'memory' ? 'Memory: ' + cut(n.d.text, 40) : n.cls === 'fact' ? model.title + ': ' + cut(n.d.name || n.d.statement, 40) : 'Entity: ' + cut(n.d.name, 40);
+    dbody.replaceChildren(renderModel(model));
+    dbody.scrollTop = keepScroll;
+  }
+
+  /* ---------- controls ---------- */
+  const search = $('search');
+  function updateMatchCount() {
+    let c = 0;
+    if (searchTerm) for (const n of nodeList) if (n.match && !n.dying && classVisible[n.cls]) c++;
+    $('matches').textContent = searchTerm ? c + (c === 1 ? ' match' : ' matches') : '';
+  }
+  search.addEventListener('input', () => {
+    searchTerm = search.value.trim().toLowerCase();
+    for (const n of nodeList) n.match = !searchTerm || n.hay.includes(searchTerm);
+    updateMatchCount();
+    focusDirty = true;
+    invalidate();
+  });
+  for (const cls of CLASSES) {
+    $('t-' + cls).addEventListener('click', () => {
+      classVisible[cls] = !classVisible[cls];
+      $('t-' + cls).setAttribute('aria-pressed', String(classVisible[cls]));
+      applyVisibility();
+      if (hover && !classVisible[hover.cls]) hover = null;
+      updateMatchCount();
+      reheat(0.3);
+      focusDirty = true;
+      invalidate();
+    });
+  }
+  $('fit').addEventListener('click', () => { autoFit = true; fitView(false); invalidate(); });
+  addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement !== search && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); search.focus(); }
+    else if (e.key === 'Escape') {
+      if (document.activeElement === search || searchTerm) { search.value = ''; search.dispatchEvent(new Event('input')); search.blur(); }
+      else if (selected) select(null, false);
+    }
+  });
+  addEventListener('resize', resize);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) invalidate(); });
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => { measureInsets(); if (autoFit) fitView(false); invalidate(); });
+    ro.observe($('top')); ro.observe($('bottom')); ro.observe(details);
+  }
+
+  /* ---------- data loading ---------- */
+  const ENDPOINTS = {
+    projection: { label: 'Neo4j projection', url: () => '/api/v2/graph/projection?' + new URLSearchParams(LIMIT_PROJECTION === null ? { namespace: NS } : { namespace: NS, limit: LIMIT_PROJECTION }) },
+    memories: { label: 'Postgres memories', url: () => '/api/v2/graph/memories?' + new URLSearchParams(LIMIT_MEMORIES === null ? { namespace: NS } : { namespace: NS, limit: LIMIT_MEMORIES }) },
+  };
+
+  function serverMessage(text) {
+    try {
+      const j = JSON.parse(text);
+      if (j && typeof j.error === 'string') return j.error;
+      if (j && typeof j.message === 'string') return j.message;
+    } catch (_) { /* the body was not JSON, report the raw text below */ }
+    return cut(text, 300) || 'empty response body';
+  }
+
+  async function fetchJson(name) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), REQUEST_TIMEOUT_MS);
+    let res, text;
+    try {
+      res = await fetch(ENDPOINTS[name].url(), { cache: 'no-store', signal: ctl.signal, headers: { accept: 'application/json' } });
+      text = await res.text();
+    } catch (err) {
+      if (err && err.name === 'AbortError') throw new Error('no response within ' + REQUEST_TIMEOUT_MS / 1000 + ' s');
+      throw new Error('could not reach the server (' + (err && err.message ? err.message : err) + ')');
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + serverMessage(text));
+    let json;
+    try { json = JSON.parse(text); } catch (_) { throw new Error('the response was not valid JSON'); }
+    return { text, json };
+  }
+
+  function validate(name, j) {
+    if (!j || typeof j !== 'object') throw new Error('unexpected response shape');
+    if (name === 'projection' && !(Array.isArray(j.nodes) && Array.isArray(j.relationships))) throw new Error('unexpected response shape: the nodes and relationships arrays are missing');
+    if (name === 'memories' && !Array.isArray(j.memories)) throw new Error('unexpected response shape: the memories array is missing');
+    if (name === 'memories') {
+      const c = j.counts;
+      if (!(c && Number.isInteger(c.assertions) && Number.isInteger(c.supported) && c.assertions_by_status && typeof c.assertions_by_status === 'object' && c.jobs && typeof c.jobs === 'object')) {
+        throw new Error('unexpected response shape: counts.assertions, counts.supported, counts.assertions_by_status or counts.jobs is missing');
+      }
+      if (!j.memories.every((m) => m && m.extraction && typeof m.extraction.status === 'string')) throw new Error('unexpected response shape: a memory has no extraction status');
+    }
+  }
+
+  async function cycle() {
+    const names = ['projection', 'memories'];
+    const results = await Promise.allSettled(names.map((n) => fetchJson(n)));
+    let dirty = false;
+    results.forEach((r, i) => {
+      const name = names[i];
+      try {
+        if (r.status === 'rejected') throw r.reason;
+        validate(name, r.value.json);
+        state.errors[name] = null;
+        state.okAt[name] = Date.now();
+        if (r.value.text === state.lastText[name]) return;
+        state.lastText[name] = r.value.text;
+        state[name] = r.value.json;
+        dirty = true;
+      } catch (err) {
+        state.errors[name] = { message: err && err.message ? err.message : String(err) };
+      }
+    });
+    state.loaded = true;
+    state.cycleOk = !names.some((n) => state.errors[n]);
+    if (!state.errors.projection && !state.errors.memories) state.lastFullRefresh = Date.now();
+    if (dirty) reconcile();
+    renderErrors();
+    renderStatus();
+    renderMessage();
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  /* nobody sees a hidden tab, so it does not poll; the next request goes out when it is shown again */
+  function whenVisible() {
+    if (!document.hidden) return Promise.resolve();
+    return new Promise((resolve) => {
+      const onChange = () => {
+        if (document.hidden) return;
+        document.removeEventListener('visibilitychange', onChange);
+        resolve();
+      };
+      document.addEventListener('visibilitychange', onChange);
+    });
+  }
+  async function pollLoop() {
+    for (;;) {
+      await whenVisible();
+      try {
+        await cycle();
+      } catch (err) {
+        console.error('graph refresh failed unexpectedly', err);
+        state.errors.projection = { message: 'internal error while refreshing: ' + (err && err.message ? err.message : err) };
+        renderErrors();
+      }
+      if (!POLL_MS) return;
+      await sleep(POLL_MS);
+    }
+  }
+
+  /* ---------- error banner, status strip, centered message ---------- */
+  let lastErrSig = null;
+  function renderErrors() {
+    const box = $('err');
+    const parts = [];
+    for (const name of Object.keys(state.errors)) {
+      if (state.errors[name]) parts.push([ENDPOINTS[name].label, state.errors[name].message]);
+    }
+    const sig = parts.length ? JSON.stringify([parts, state.okAt, POLL_MS]) : 'ok';
+    if (sig === lastErrSig) return;
+    lastErrSig = sig;
+    box.replaceChildren();
+    if (!parts.length) { box.classList.remove('show'); measureInsets(); return; }
+    for (const [label, message] of parts) box.append(h('div', {}, h('strong', { text: label + ' request failed: ' }), message));
+    const tail = [];
+    for (const [name, label] of [['projection', 'Neo4j'], ['memories', 'Postgres']]) {
+      if (!state.errors[name]) continue;
+      tail.push(state[name] ? 'Showing earlier ' + label + ' data from ' + fmtClock(state.okAt[name]) + ', it may be out of date.' : 'No ' + label + ' data has been loaded yet.');
+    }
+    tail.push(POLL_MS ? 'Retrying every ' + POLL_MS / 1000 + ' s.' : 'Live updates are off, reload the page to retry.');
+    box.append(h('div', { text: tail.join(' ') }));
+    box.classList.add('show');
+    measureInsets();
+  }
+
+  let lastStatusSig = null;
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  const sumCounts = (by) => Object.keys(by).reduce((t, k) => t + by[k], 0);
+  const sameCounts = (a, b) => {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const k of keys) if ((a[k] || 0) !== (b[k] || 0)) return false;
+    return true;
+  };
+  const describeStatuses = (by) => {
+    const keys = Object.keys(by).filter((k) => by[k] > 0).sort();
+    return plural(sumCounts(by), 'assertion', 'assertions') + (keys.length ? ' (' + keys.map((k) => by[k] + ' ' + k).join(', ') + ')' : '');
+  };
+
+  function renderStatus() {
+    const parts = [];
+    const p = state.projection, m = state.memories;
+    if (p) {
+      const c = p.counts || {};
+      parts.push({ cls: '', text: 'Neo4j: ' + (Number.isFinite(c.nodes) ? c.nodes : p.nodes.length) + ' nodes, ' + (Number.isFinite(c.relationships) ? c.relationships : p.relationships.length) + ' relationships.' });
+    } else {
+      parts.push({ cls: state.errors.projection ? 'bad' : '', text: state.errors.projection ? 'Neo4j: unavailable.' : 'Neo4j: loading.' });
+    }
+    if (m) {
+      const c = m.counts;
+      parts.push({ cls: '', text: 'Postgres: ' + (Number.isFinite(c.memories) ? c.memories : m.memories.length) + ' memories (' + c.supported + ' supporting facts).' });
+      const queued = c.jobs.extract_pending + c.jobs.extract_running;
+      if (queued) parts.push({ cls: '', text: 'Extraction: ' + c.jobs.extract_pending + ' queued, ' + c.jobs.extract_running + ' running.' });
+    } else {
+      parts.push({ cls: state.errors.memories ? 'bad' : '', text: state.errors.memories ? 'Postgres: unavailable.' : 'Postgres: loading.' });
+    }
+    const mode = POLL_MS ? 'live, every ' + POLL_MS / 1000 + ' s' : 'live updates off';
+    parts.push({
+      cls: 'live',
+      text: state.lastFullRefresh ? 'Updated ' + fmtClock(state.lastFullRefresh) + ', ' + mode : state.loaded ? 'Not refreshed, ' + mode : 'Loading',
+      color: state.cycleOk === false ? 'var(--red)' : !POLL_MS ? 'var(--faint)' : 'var(--memory)',
+    });
+
+    const notes = pageNotes.slice();
+    if (p && p.truncated) notes.push('Neo4j result truncated at ' + p.nodes.length + ' nodes, the graph is incomplete' + (LIMIT_PROJECTION === null ? '. Add &limit=2000 to the page URL to raise the limit.' : '.'));
+    if (m && m.truncated) notes.push('Postgres memories truncated at ' + m.memories.length + ' of the namespace. Memories that no fact cites yet and the most recent ones are kept first, the rest are not shown' + (LIMIT_MEMORIES === null ? '. Add &memory_limit=1000 to the page URL to raise the limit.' : '.'));
+    if (p && m && !p.truncated) {
+      const neo = {};
+      for (const n of p.nodes) if (n.kind === 'assertion') { const st = n.status || 'unknown'; neo[st] = (neo[st] || 0) + 1; }
+      const pg = m.counts.assertions_by_status;
+      if (!sameCounts(neo, pg)) notes.push((sumCounts(neo) < sumCounts(pg) ? 'Projection behind: ' : 'Projection out of step: ') + 'Neo4j has ' + describeStatuses(neo) + ' but Postgres has ' + describeStatuses(pg) + '.');
+    }
+    if (m) {
+      const j = m.counts.jobs;
+      if (j.extract_failed) {
+        notes.push(plural(j.extract_failed, 'extraction job', 'extraction jobs') + ' failed' + (j.extract_blocked ? ' and ' + plural(j.extract_blocked, 'queued job is', 'queued jobs are') + ' blocked behind ' + (j.extract_failed === 1 ? 'it' : 'them') : '') +
+          '. Their memories get no facts until the failed ' + (j.extract_failed === 1 ? 'job is' : 'jobs are') + ' retried.');
+      }
+      if (j.project_failed) notes.push(plural(j.project_failed, 'projection job', 'projection jobs') + ' failed, so Neo4j stays behind Postgres until ' + (j.project_failed === 1 ? 'it is' : 'they are') + ' retried.');
+      else if (j.project_pending + j.project_running) notes.push('Projection catching up: ' + plural(j.project_pending + j.project_running, 'job', 'jobs') + ' still to run, Neo4j may be behind Postgres.');
+    }
+    if (info.danglingSupports) notes.push(info.danglingSupports + (info.danglingSupports === 1 ? ' evidence link points' : ' evidence links point') + ' to a fact that is missing from the Neo4j projection, so it is not drawn.');
+    if (info.unknownNodes) notes.push(info.unknownNodes + (info.unknownNodes === 1 ? ' node' : ' nodes') + ' with an unknown kind or id ignored.');
+    if (info.badRelationships) notes.push(info.badRelationships + (info.badRelationships === 1 ? ' relationship' : ' relationships') + ' with an unknown type or a missing endpoint ignored.');
+    for (const note of notes) parts.push({ cls: 'amber', text: note });
+
+    const sig = JSON.stringify(parts);
+    if (sig === lastStatusSig) return;
+    lastStatusSig = sig;
+    $('strip').replaceChildren(...parts.map((pt) => h('span', { class: pt.cls, text: pt.text, style: pt.color ? '--c:' + pt.color : null })));
+    measureInsets();
+  }
+
+  let lastMsgSig = null;
+  function renderMessage() {
+    let body = null;
+    if (!state.loaded) body = 'Loading the graph for ' + NS + '.';
+    else if (!state.errors.projection && !state.errors.memories && !nodeList.some((n) => !n.dying)) body = 'No memories yet for ' + NS + '.' + (POLL_MS ? ' Waiting.' : '');
+    if (body === lastMsgSig) return;
+    lastMsgSig = body;
+    if (!body) { $('msg').classList.remove('show'); return; }
+    $('msgtext').replaceChildren(body);
+    $('msg').classList.add('show');
+  }
+
+  /* ---------- read-only hook for tests and debugging ---------- */
+  window.__graphView = {
+    stats() {
+      return { nodes: nodeList.filter((n) => !n.dying).length, links: linkList.filter((l) => !l.dead).length, simNodes: simNodes.length, alpha: sim.alpha, active: sim.active,
+        k: view.k, selected, hover: hover ? hover.key : null, dpr, W, H, nanResets: sim.nanResets, autoFit };
+    },
+    perf() {
+      const n = frameStats.count;
+      const a = Array.from(frameStats.times.slice(0, n)).sort((x, y) => x - y);
+      const iv = Array.from(frameStats.intervals.slice(0, frameStats.iCount));
+      return { frames: n, workAvgMs: a.reduce((s, v) => s + v, 0) / (n || 1), workP95Ms: a[Math.floor(n * 0.95)] || 0, workMaxMs: a[n - 1] || 0,
+        intervalAvgMs: iv.reduce((s, v) => s + v, 0) / (iv.length || 1), intervalMaxMs: Math.max(0, ...iv) };
+    },
+    nodes() {
+      return nodeList.map((n) => ({ key: n.key, cls: n.cls, label: n.label, x: n.x, y: n.y, sx: view.x + n.x * view.k, sy: view.y + n.y * view.k,
+        r: screenRadius(n), deg: n.deg, v: n.v, pinned: n.fx !== null, pulse: n.pulse, born: n.born, dying: n.dying, dim: n.dimStatus, la: n.la }));
+    },
+    rels() { return relLinks.map((l) => ({ relation: l.relation, x1: view.x + l.s.x * view.k, y1: view.y + l.s.y * view.k, x2: view.x + l.t.x * view.k, y2: view.y + l.t.y * view.k })); },
+    labelRects() { const out = []; for (let i = 0; i < rectCount; i++) out.push([rectBuf[i * 4], rectBuf[i * 4 + 1], rectBuf[i * 4 + 2], rectBuf[i * 4 + 3]]); return out; },
+    reheat() { reheat(1); invalidate(); },
+  };
+
+  /* ---------- start ---------- */
+  function start() {
+    $('nsname').textContent = hasNs ? NS : 'none';
+    if (hasNs) $('nschip').title = NS;
+    document.title = hasNs ? 'Memory Graph: ' + NS : 'Memory Graph';
+    resize();
+    view.x = viewT.x = W / 2;
+    view.y = viewT.y = H / 2;
+    if (!hasNs) {
+      $('msgtext').replaceChildren(h('strong', { text: 'Namespace required' }), 'Open this page with a namespace, for example /graph?namespace=user:haz3');
+      $('msg').classList.add('show');
+      $('strip').replaceChildren(h('span', { class: 'amber', text: 'No namespace in the URL, nothing is being loaded.' }));
+      return;
+    }
+    renderStatus();
+    renderMessage();
+    pollLoop();
+  }
+  start();
+})();
+</script>
+</body>
+</html>
