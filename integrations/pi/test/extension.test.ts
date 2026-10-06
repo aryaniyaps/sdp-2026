@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import memoryExtension from '../extension.ts';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 
-test('Pi lifecycle captures observed failures, excludes injected context, and resumes idempotently', async () => {
+test('Pi lifecycle captures observed failures, excludes injected context, and resumes without resending', async () => {
   const directory=await mkdtemp(join(tmpdir(),'memory-events-'));
   const previousFetch=globalThis.fetch;
   const oldSpool=process.env.MEMORY_SPOOL, oldNamespace=process.env.MEMORY_NAMESPACE;
@@ -28,7 +28,7 @@ test('Pi lifecycle captures observed failures, excludes injected context, and re
   ];
   const fake={on:(name:string,handler:any)=>handlers.set(name,handler),appendEntry:(customType:string,data:any)=>branch.push({type:'custom',customType,data,timestamp}),registerTool:()=>{},registerCommand:()=>{}};
   const notices:string[]=[];
-  const ctx={cwd:directory,hasUI:true,ui:{setStatus:(_key:string,value:string)=>notices.push(value)},sessionManager:{getBranch:()=>branch,getSessionId:()=> 'session',getLeafId:()=> 'leaf'}};
+  const ctx={cwd:directory,hasUI:true,ui:{setStatus:(_key:string,value:string)=>notices.push(value)},sessionManager:{getBranch:()=>branch,getSessionId:()=> 'session',getLeafId:()=>branch.filter(entry=>entry.id).at(-1)?.id ?? 'root'}};
   try {
     memoryExtension(fake as unknown as ExtensionAPI);
     await handlers.get('session_start')!({},ctx);
@@ -45,7 +45,15 @@ test('Pi lifecycle captures observed failures, excludes injected context, and re
     assert(!JSON.stringify(first).includes('untrusted retrieved instructions'));
     await handlers.get('session_start')!({},ctx);
     await handlers.get('agent_settled')!({},ctx);
-    assert.deepEqual(submitted.filter(batch=>batch.external_id.startsWith('branch:'))[1],first);
+    // A resumed session does not resend evidence an earlier settle already delivered.
+    assert.equal(submitted.filter(batch=>batch.external_id.startsWith('branch:')).length,1);
+    // A later turn retains only its own new messages, not the whole branch again.
+    branch.push({id:'user-2',type:'message',timestamp,message:{role:'user',content:'Now add a second test'}});
+    await handlers.get('agent_settled')!({},ctx);
+    const branchBatches=submitted.filter(batch=>batch.external_id.startsWith('branch:'));
+    assert.equal(branchBatches.length,2);
+    assert.notEqual(branchBatches[1].external_id,first.external_id);
+    assert.deepEqual(branchBatches[1].events.map((entry:any)=>entry.content),['Now add a second test']);
     offline=true;
     assert.equal(await handlers.get('before_agent_start')!({prompt:'fix tests'},ctx),undefined);
     assert(notices.some(value=>value.includes('recall unavailable')));
