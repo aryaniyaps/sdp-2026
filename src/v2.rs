@@ -1,5 +1,9 @@
 use crate::{
-    AppError, AppState, knowledge::*, model::cached_generate, observability::TraceBuilder,
+    AppError, AppState,
+    graph::{ProjectionNode, ProjectionRelationship},
+    knowledge::*,
+    model::cached_generate,
+    observability::TraceBuilder,
 };
 use axum::{
     Json, Router,
@@ -12,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::Row;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
     time::Instant,
 };
@@ -21,7 +25,19 @@ use uuid::Uuid;
 #[derive(utoipa::OpenApi)]
 #[openapi(
     paths(
-        retain, recall, reflect, jobs, job, retry, status, assertion, retract, graph, rebuild
+        retain,
+        recall,
+        reflect,
+        jobs,
+        job,
+        retry,
+        status,
+        assertion,
+        retract,
+        graph,
+        graph_projection,
+        graph_memories,
+        rebuild
     ),
     components(schemas(
         RetainRequest,
@@ -39,7 +55,17 @@ use uuid::Uuid;
         RecallRequest,
         RecallResponse,
         RecallHit,
-        Namespace
+        Namespace,
+        ProjectionResponse,
+        ProjectionNode,
+        ProjectionRelationship,
+        ProjectionCounts,
+        MemoriesResponse,
+        Memory,
+        MemorySupport,
+        MemoryExtraction,
+        MemoryJobCounts,
+        MemoriesCounts
     ))
 )]
 pub struct ApiDoc;
@@ -56,6 +82,8 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/api/v2/assertions/{id}", get(assertion))
         .route("/api/v2/assertions/{id}/retract", post(retract))
         .route("/api/v2/graph", get(graph))
+        .route("/api/v2/graph/projection", get(graph_projection))
+        .route("/api/v2/graph/memories", get(graph_memories))
         .route("/api/v2/graph/rebuild", post(rebuild))
 }
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -197,6 +225,296 @@ async fn graph(
         json!({"entities":entities,"assertions":assertions,"edges":edges,"status":namespace_status(&s,&q.namespace).await?}),
     ))
 }
+const PROJECTION_DEFAULT_LIMIT: usize = 400;
+const PROJECTION_MAX_LIMIT: usize = 2000;
+const MEMORIES_DEFAULT_LIMIT: usize = 200;
+const MEMORIES_MAX_LIMIT: usize = 1000;
+/// Characters of chunk text returned per memory.
+const MEMORY_TEXT_CHARS: i32 = 600;
+/// Reads `namespace` and `limit` for the graph view endpoints. Problems are reported as JSON
+/// errors rather than corrected: a missing namespace or an out of range limit is a 400.
+fn graph_params(
+    query: &HashMap<String, String>,
+    default_limit: usize,
+    max_limit: usize,
+) -> Result<(String, usize), AppError> {
+    let namespace = query
+        .get("namespace")
+        .filter(|namespace| !namespace.trim().is_empty())
+        .ok_or_else(|| AppError::Validation("namespace is required".into()))?
+        .clone();
+    let limit = match query.get("limit") {
+        None => default_limit,
+        Some(raw) => raw
+            .parse::<usize>()
+            .ok()
+            .filter(|limit| (1..=max_limit).contains(limit))
+            .ok_or_else(|| {
+                AppError::Validation(format!("limit must be an integer from 1 to {max_limit}"))
+            })?,
+    };
+    Ok((namespace, limit))
+}
+#[derive(Serialize, utoipa::ToSchema)]
+struct ProjectionCounts {
+    nodes: usize,
+    relationships: usize,
+}
+#[derive(Serialize, utoipa::ToSchema)]
+struct ProjectionResponse {
+    namespace: String,
+    source: &'static str,
+    nodes: Vec<ProjectionNode>,
+    relationships: Vec<ProjectionRelationship>,
+    counts: ProjectionCounts,
+    truncated: bool,
+}
+/// The namespace as the Neo4j projection holds it. Unlike `/api/v2/graph`, which reads
+/// PostgreSQL, this shows what the graph database serves to recall, so a projection that
+/// lags behind PostgreSQL is visible. Neo4j failures are a 503, never an empty graph.
+#[utoipa::path(get,path="/api/v2/graph/projection",responses((status=200,body=ProjectionResponse),(status=400),(status=503)),tag="Evidence memory",params(("namespace"=String,Query),("limit"=Option<usize>,Query,description="Maximum nodes, 1 to 2000, default 400. A value outside the range is rejected with 400, it is never clamped")))]
+async fn graph_projection(
+    State(s): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Result<Json<ProjectionResponse>, AppError> {
+    let (namespace, limit) = graph_params(&query, PROJECTION_DEFAULT_LIMIT, PROJECTION_MAX_LIMIT)?;
+    let graph = s
+        .graph
+        .as_ref()
+        .ok_or_else(|| AppError::Unavailable("Neo4j projection is not configured".into()))?;
+    let projection = graph
+        .projection(&namespace, limit)
+        .await
+        .map_err(|e| AppError::Unavailable(format!("Neo4j: {e}")))?;
+    Ok(Json(ProjectionResponse {
+        namespace,
+        source: "neo4j",
+        counts: ProjectionCounts {
+            nodes: projection.nodes.len(),
+            relationships: projection.relationships.len(),
+        },
+        nodes: projection.nodes,
+        relationships: projection.relationships,
+        truncated: projection.truncated,
+    }))
+}
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
+struct MemorySupport {
+    assertion_id: Uuid,
+    quote: String,
+}
+/// How far extraction of a memory has got, read from the extract job of its episode.
+#[derive(Serialize, utoipa::ToSchema)]
+struct MemoryExtraction {
+    /// "succeeded", "pending" (queued), "running", "failed" (all attempts used), "blocked"
+    /// (queued behind a failed extract job of the namespace, which the worker never skips) or
+    /// "none" (no extract job, as for events written through the V1 API).
+    status: &'static str,
+    /// Last error of a failed or retrying job. For "blocked" it is the error of the failed job
+    /// that is in the way.
+    error: Option<String>,
+    attempts: Option<i32>,
+    max_attempts: Option<i32>,
+}
+#[derive(Serialize, utoipa::ToSchema)]
+struct Memory {
+    /// The source chunk id.
+    id: Uuid,
+    session_id: Option<Uuid>,
+    role: String,
+    occurred_at: DateTime<Utc>,
+    /// The chunk content cut to 600 characters.
+    text: String,
+    text_truncated: bool,
+    /// The state PostgreSQL keeps on the raw event. Only a successful extraction changes it,
+    /// so a failed extraction still reads "pending" here. Use `extraction` to tell them apart.
+    processing_state: Option<String>,
+    extraction: MemoryExtraction,
+    /// Assertions of the namespace that cite this chunk, one entry per quote. Empty until
+    /// extraction has run.
+    supports: Vec<MemorySupport>,
+}
+/// Open background jobs of the namespace. `extract_pending` does not include the jobs that
+/// are `extract_blocked`.
+#[derive(Serialize, Default, utoipa::ToSchema)]
+struct MemoryJobCounts {
+    extract_pending: usize,
+    extract_running: usize,
+    extract_failed: usize,
+    extract_blocked: usize,
+    project_pending: usize,
+    project_running: usize,
+    project_failed: usize,
+}
+#[derive(Serialize, utoipa::ToSchema)]
+struct MemoriesCounts {
+    memories: usize,
+    supported: usize,
+    /// Every assertion PostgreSQL holds for the namespace, so a viewer can tell when the
+    /// Neo4j projection is behind. Not limited by `limit`.
+    assertions: usize,
+    /// The same assertions by status, to spot a projection that lags with an equal total.
+    assertions_by_status: BTreeMap<String, usize>,
+    jobs: MemoryJobCounts,
+}
+#[derive(Serialize, utoipa::ToSchema)]
+struct MemoriesResponse {
+    namespace: String,
+    source: &'static str,
+    memories: Vec<Memory>,
+    counts: MemoriesCounts,
+    truncated: bool,
+}
+/// Chunks of a namespace are its cited chunks plus the user and assistant chunks of its
+/// episodes. A quarter of `limit` is reserved for chunks that no assertion cites, unprocessed
+/// ones first and then the newest, so a memory that was just retained is listed however many
+/// chunks are cited. The rest goes to cited chunks, newest first, then to any chunk left.
+/// One more row than `limit` is read to learn whether the list was cut. The page of chunks is
+/// chosen from ids and times only, content and citations are read for the chosen rows.
+const MEMORIES_SQL: &str = "\
+WITH cited AS MATERIALIZED (SELECT DISTINCT s.chunk_id FROM assertion_sources s JOIN assertions a ON a.id=s.assertion_id WHERE a.namespace=$1), \
+pool AS MATERIALIZED (SELECT c.id,e.occurred_at,e.processing_state,ci.chunk_id IS NOT NULL AS cited \
+ FROM (SELECT chunk_id FROM cited UNION SELECT es.chunk_id FROM episode_sources es JOIN episodes ep ON ep.id=es.episode_id WHERE ep.namespace=$1) w \
+ JOIN chunks c ON c.id=w.chunk_id JOIN raw_events e ON e.id=c.raw_event_id LEFT JOIN cited ci ON ci.chunk_id=c.id \
+ WHERE ci.chunk_id IS NOT NULL OR e.role IN ('user','assistant')), \
+reserved AS (SELECT id FROM pool WHERE NOT cited ORDER BY processing_state<>'processed' DESC,occurred_at DESC,id LIMIT $4), \
+picked AS (SELECT p.id,(r.id IS NOT NULL) AS held,p.cited,p.occurred_at FROM pool p LEFT JOIN reserved r ON r.id=p.id \
+ ORDER BY (r.id IS NOT NULL) DESC,p.cited DESC,p.occurred_at DESC,p.id LIMIT $2), \
+ranked AS (SELECT id,row_number() OVER (ORDER BY held DESC,cited DESC,occurred_at DESC,id) AS rank FROM picked) \
+SELECT r.id,r.rank,e.session_id,e.role,e.occurred_at,left(c.content,$3) AS text,char_length(c.content)>$3 AS text_truncated,e.processing_state,\
+x.status AS job_status,x.error AS job_error,x.attempts AS job_attempts,x.max_attempts AS job_max_attempts,x.blocked AS job_blocked,x.blocked_error AS job_blocked_error,\
+(SELECT coalesce(jsonb_agg(jsonb_build_object('assertion_id',s.assertion_id,'quote',s.quote) ORDER BY s.assertion_id,s.quote),'[]') FROM assertion_sources s JOIN assertions a ON a.id=s.assertion_id WHERE s.chunk_id=r.id AND a.namespace=$1) AS supports \
+FROM ranked r JOIN chunks c ON c.id=r.id JOIN raw_events e ON e.id=c.raw_event_id \
+LEFT JOIN LATERAL (SELECT j.status,left(j.error,500) AS error,j.attempts,j.max_attempts,\
+ (j.status='pending' AND EXISTS(SELECT 1 FROM memory_jobs f WHERE f.namespace=j.namespace AND f.kind='extract' AND f.status='failed' AND (f.created_at,f.id)<(j.created_at,j.id))) AS blocked,\
+ (SELECT left(f.error,500) FROM memory_jobs f WHERE j.status='pending' AND f.namespace=j.namespace AND f.kind='extract' AND f.status='failed' AND (f.created_at,f.id)<(j.created_at,j.id) ORDER BY f.created_at,f.id LIMIT 1) AS blocked_error \
+ FROM episode_sources es JOIN memory_jobs j ON j.dedupe_key='extract:'||es.episode_id::text \
+ WHERE es.chunk_id=r.id AND j.kind='extract' AND j.namespace=$1 \
+ ORDER BY CASE j.status WHEN 'failed' THEN 0 WHEN 'running' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END LIMIT 1) x ON true \
+ORDER BY e.occurred_at DESC,r.id";
+fn memory_extraction(row: &sqlx::postgres::PgRow) -> Result<MemoryExtraction, AppError> {
+    let status: Option<String> = row.try_get("job_status")?;
+    let blocked: Option<bool> = row.try_get("job_blocked")?;
+    let (status, error) = match status.as_deref() {
+        None => ("none", None),
+        Some("succeeded") => ("succeeded", None),
+        Some("running") => ("running", row.try_get("job_error")?),
+        Some("failed") => ("failed", row.try_get("job_error")?),
+        Some("pending") if blocked == Some(true) => ("blocked", row.try_get("job_blocked_error")?),
+        Some("pending") => ("pending", row.try_get("job_error")?),
+        Some(other) => {
+            return Err(AppError::Database(sqlx::Error::Decode(
+                format!("unknown extract job status {other:?}").into(),
+            )));
+        }
+    };
+    Ok(MemoryExtraction {
+        status,
+        error,
+        attempts: row.try_get("job_attempts")?,
+        max_attempts: row.try_get("job_max_attempts")?,
+    })
+}
+/// The source text a namespace holds, read from PostgreSQL. A chunk belongs to a namespace
+/// through its episode. Every chunk cited by an assertion of the namespace is a candidate,
+/// plus the user and assistant chunks of its episodes. When `limit` cuts the result, a quarter
+/// of it is kept for the chunks no assertion cites yet (unprocessed first, then newest), so
+/// evidence that extraction has not reached still appears with an empty `supports` list, and
+/// `truncated` is true. Each memory says how its extraction went, and `counts` carries what
+/// a viewer needs to tell a lagging projection or a stuck extraction from a quiet namespace.
+#[utoipa::path(get,path="/api/v2/graph/memories",responses((status=200,body=MemoriesResponse),(status=400),(status=500)),tag="Evidence memory",params(("namespace"=String,Query),("limit"=Option<usize>,Query,description="Maximum memories, 1 to 1000, default 200. A value outside the range is rejected with 400, it is never clamped")))]
+async fn graph_memories(
+    State(s): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Result<Json<MemoriesResponse>, AppError> {
+    let (namespace, limit) = graph_params(&query, MEMORIES_DEFAULT_LIMIT, MEMORIES_MAX_LIMIT)?;
+    let reserved = (limit / 4).max(1).min(limit.saturating_sub(1));
+    let rows = sqlx::query(MEMORIES_SQL)
+        .bind(&namespace)
+        .bind(limit as i64 + 1)
+        .bind(MEMORY_TEXT_CHARS)
+        .bind(reserved as i64)
+        .fetch_all(&s.store.pool)
+        .await?;
+    let mut truncated = false;
+    let mut memories = Vec::with_capacity(rows.len());
+    for row in &rows {
+        if row.try_get::<i64, _>("rank")? > limit as i64 {
+            truncated = true;
+            continue;
+        }
+        let supports: sqlx::types::Json<Vec<MemorySupport>> = row.try_get("supports")?;
+        memories.push(Memory {
+            id: row.try_get("id")?,
+            session_id: row.try_get("session_id")?,
+            role: row.try_get("role")?,
+            occurred_at: row.try_get("occurred_at")?,
+            text: row.try_get("text")?,
+            text_truncated: row.try_get("text_truncated")?,
+            processing_state: row.try_get("processing_state")?,
+            extraction: memory_extraction(row)?,
+            supports: supports.0,
+        });
+    }
+    let mut assertions_by_status = BTreeMap::new();
+    for row in sqlx::query(
+        "SELECT status,count(*) AS n FROM assertions WHERE namespace=$1 GROUP BY status",
+    )
+    .bind(&namespace)
+    .fetch_all(&s.store.pool)
+    .await?
+    {
+        assertions_by_status.insert(
+            row.try_get::<String, _>("status")?,
+            row.try_get::<i64, _>("n")? as usize,
+        );
+    }
+    let mut jobs = MemoryJobCounts::default();
+    for row in sqlx::query(
+        "SELECT j.kind,j.status,count(*) AS n,\
+         count(*) FILTER (WHERE j.kind='extract' AND j.status='pending' AND EXISTS(SELECT 1 FROM memory_jobs f WHERE f.namespace=j.namespace AND f.kind='extract' AND f.status='failed' AND (f.created_at,f.id)<(j.created_at,j.id))) AS blocked \
+         FROM memory_jobs j WHERE j.namespace=$1 AND j.kind IN ('extract','project') AND j.status IN ('pending','running','failed') GROUP BY j.kind,j.status",
+    )
+    .bind(&namespace)
+    .fetch_all(&s.store.pool)
+    .await?
+    {
+        let kind: String = row.try_get("kind")?;
+        let status: String = row.try_get("status")?;
+        let n = row.try_get::<i64, _>("n")? as usize;
+        let blocked = row.try_get::<i64, _>("blocked")? as usize;
+        match (kind.as_str(), status.as_str()) {
+            ("extract", "pending") => {
+                jobs.extract_pending = n - blocked;
+                jobs.extract_blocked = blocked;
+            }
+            ("extract", "running") => jobs.extract_running = n,
+            ("extract", "failed") => jobs.extract_failed = n,
+            ("project", "pending") => jobs.project_pending = n,
+            ("project", "running") => jobs.project_running = n,
+            ("project", "failed") => jobs.project_failed = n,
+            other => {
+                return Err(AppError::Database(sqlx::Error::Decode(
+                    format!("unexpected job count row {other:?}").into(),
+                )));
+            }
+        }
+    }
+    let supported = memories.iter().filter(|m| !m.supports.is_empty()).count();
+    Ok(Json(MemoriesResponse {
+        namespace,
+        source: "postgres",
+        counts: MemoriesCounts {
+            memories: memories.len(),
+            supported,
+            assertions: assertions_by_status.values().sum(),
+            assertions_by_status,
+            jobs,
+        },
+        truncated,
+        memories,
+    }))
+}
 fn default_true() -> bool {
     true
 }
@@ -236,6 +554,21 @@ pub struct RecallRequest {
     pub max_tokens: usize,
     #[serde(default = "default_top")]
     pub top_k: usize,
+    /// Relevance floor for vector candidates, as a cosine distance greater than 0 and at most
+    /// 2 (0 is identical, 1 unrelated, 2 opposite). When set, a candidate whose embedding is
+    /// farther than this from the query embedding is dropped before fusion, in the fact vector
+    /// channel, the raw text vector channel, the source text passes that `include_raw` adds,
+    /// and the graph expansion. A source text match or a graph fact that has an embedding
+    /// farther than this is dropped, one with no embedding yet is kept. The candidates that
+    /// remain keep the ranks they had without the floor, so it removes candidates and never
+    /// reorders the rest. Exact word matches on facts are never dropped. Without a query
+    /// embedding no distance can be measured, so the candidates that have an embedding are
+    /// left out and the response says so. When nothing is close enough the response is empty,
+    /// not an error. Omitted, recall is unchanged. Distances depend on the embedding model, so
+    /// the value needs calibrating per model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(exclusive_minimum = 0.0, maximum = 2.0)]
+    pub max_distance: Option<f64>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RecallHit {
@@ -261,6 +594,11 @@ pub struct RecallResponse {
     pub degraded_reasons: Vec<String>,
     pub elapsed_ms: u128,
     pub temporal_plan: Value,
+    /// The relevance floor this response was computed with, echoed from the request. A client
+    /// that asked for one and does not see it here is talking to a service that predates the
+    /// field, which ignores it. Absent when the request set none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_distance: Option<f64>,
 }
 const FILTER: &str = "a.namespace=$1 AND (a.kind<>'observation' OR $5) AND a.status IN ('active','contested','superseded') AND (($2::timestamptz IS NULL AND a.status IN ('active','contested')) OR ($2 IS NOT NULL AND a.valid_from<=$2 AND (a.valid_to IS NULL OR a.valid_to>$2))) AND ($3::timestamptz IS NULL OR coalesce(a.event_at,a.valid_from)>=$3) AND ($4::timestamptz IS NULL OR coalesce(a.event_at,a.valid_from)<$4)";
 async fn candidates(
@@ -282,10 +620,17 @@ async fn candidates(
         };
     }
     let raw = r.raw_only;
+    // With max_distance, vector candidates farther than it are dropped in the statement, before
+    // LIMIT, so the slots go to rows that can be used. Without it the statements are the ones
+    // every request has always run.
+    let gate = |column: &str| match r.max_distance {
+        Some(_) => format!(" AND {column} <=> $7 <= $8::float8"),
+        None => String::new(),
+    };
     let sql = if raw {
         match strategy {
             "lexical"=>"SELECT c.id,c.content statement FROM chunks c JOIN raw_events e ON e.id=c.raw_event_id JOIN sessions se ON se.id=e.session_id WHERE se.namespace=$1 AND ($2::timestamptz IS NULL OR e.occurred_at<=$2) AND ($3::timestamptz IS NULL OR e.occurred_at>=$3) AND ($4::timestamptz IS NULL OR e.occurred_at<$4) AND ($5 OR NOT $5) AND c.search_vector @@ websearch_to_tsquery('english',$6) ORDER BY ts_rank_cd(c.search_vector,websearch_to_tsquery('english',$6)) DESC,c.id LIMIT 40".to_string(),
-            "semantic"=>"SELECT c.id,c.content statement FROM chunks c JOIN raw_events e ON e.id=c.raw_event_id JOIN sessions se ON se.id=e.session_id WHERE se.namespace=$1 AND ($2::timestamptz IS NULL OR e.occurred_at<=$2) AND ($3::timestamptz IS NULL OR e.occurred_at>=$3) AND ($4::timestamptz IS NULL OR e.occurred_at<$4) AND ($5 OR NOT $5) AND ($6::text IS NOT NULL) AND c.embedding IS NOT NULL ORDER BY c.embedding <=> $7,c.id LIMIT 40".to_string(),
+            "semantic"=>format!("SELECT c.id,c.content statement FROM chunks c JOIN raw_events e ON e.id=c.raw_event_id JOIN sessions se ON se.id=e.session_id WHERE se.namespace=$1 AND ($2::timestamptz IS NULL OR e.occurred_at<=$2) AND ($3::timestamptz IS NULL OR e.occurred_at>=$3) AND ($4::timestamptz IS NULL OR e.occurred_at<$4) AND ($5 OR NOT $5) AND ($6::text IS NOT NULL) AND c.embedding IS NOT NULL{} ORDER BY c.embedding <=> $7,c.id LIMIT 40",gate("c.embedding")),
             _=>return Ok(vec![]),
         }
     } else {
@@ -294,7 +639,8 @@ async fn candidates(
                 "SELECT a.id,a.statement FROM assertions a WHERE {FILTER} AND a.search_vector @@ websearch_to_tsquery('english',$6) ORDER BY ts_rank_cd(a.search_vector,websearch_to_tsquery('english',$6)) DESC,a.id LIMIT 40"
             ),
             "semantic" => format!(
-                "SELECT a.id,a.statement FROM assertions a WHERE {FILTER} AND ($6::text IS NOT NULL) AND a.embedding IS NOT NULL ORDER BY a.embedding <=> $7,a.id LIMIT 40"
+                "SELECT a.id,a.statement FROM assertions a WHERE {FILTER} AND ($6::text IS NOT NULL) AND a.embedding IS NOT NULL{} ORDER BY a.embedding <=> $7,a.id LIMIT 40",
+                gate("a.embedding")
             ),
             "temporal" => format!(
                 "SELECT a.id,a.statement FROM assertions a WHERE {FILTER} AND ($6::text IS NOT NULL) ORDER BY coalesce(a.event_at,a.valid_from) DESC,a.id LIMIT 40"
@@ -311,6 +657,9 @@ async fn candidates(
         .bind(&r.query);
     if strategy == "semantic" {
         q = q.bind(embedding.map(Vector::from));
+        if let Some(distance) = r.max_distance {
+            q = q.bind(distance);
+        }
     }
     Ok(q.fetch_all(&s.store.pool)
         .await?
@@ -358,11 +707,18 @@ enum RawScope {
     /// Every retained chunk in the namespace.
     All,
 }
-/// Raw-text candidates for requests assertions cannot answer alone. `search_all`
-/// lets the lexical pass cover already interpreted evidence too; `semantic`
-/// selects the evidence a vector pass covers, if any. `any_word` ORs the query words;
-/// without it the query keeps the all-words semantics every request had before, so a
-/// request that does not ask for the new behaviour retrieves exactly what it did.
+/// Raw-text candidates for requests assertions cannot answer alone, each with its rank in its
+/// own list, best first. `search_all` lets the lexical pass cover already interpreted
+/// evidence too; `semantic` selects the evidence a vector pass covers, if any. `any_word` ORs
+/// the query words; without it the query keeps the all-words semantics every request had
+/// before, so a request that does not ask for the new behaviour retrieves exactly what it did.
+/// With `max_distance` both passes drop chunks whose embedding is farther than it from the
+/// query embedding. The lexical pass keeps a chunk that has no embedding yet, so fresh
+/// evidence still appears. A chunk keeps the rank it has without the bound, so dropping far
+/// chunks leaves gaps and does not promote the chunks that remain over facts, whose ranks
+/// come from lists the bound does not reorder. The vector pass is ordered by distance, so
+/// what it keeps is a prefix and its ranks are unchanged anyway. Without a query embedding
+/// no distance exists: the lexical pass then keeps only chunks that have no embedding.
 async fn raw_fallback_candidates(
     s: &AppState,
     r: &RecallRequest,
@@ -370,7 +726,7 @@ async fn raw_fallback_candidates(
     any_word: bool,
     semantic: Option<RawScope>,
     embedding: Option<&Vec<f32>>,
-) -> Result<(Vec<Uuid>, Vec<Uuid>), AppError> {
+) -> Result<(Vec<(Uuid, usize)>, Vec<(Uuid, usize)>), AppError> {
     const BASE: &str = "FROM chunks c JOIN raw_events e ON e.id=c.raw_event_id JOIN sessions se ON se.id=e.session_id WHERE se.namespace=$1 AND ($2::timestamptz IS NULL OR e.occurred_at<=$2) AND ($3::timestamptz IS NULL OR e.occurred_at>=$3) AND ($4::timestamptz IS NULL OR e.occurred_at<$4)";
     let words = if any_word {
         any_word_query(&r.query)
@@ -384,17 +740,41 @@ async fn raw_fallback_candidates(
         } else {
             UNPROCESSED_CHUNK
         };
-        let sql = format!(
-            "SELECT c.id {BASE} AND {scope} AND c.search_vector @@ websearch_to_tsquery('english',$5) ORDER BY ts_rank_cd(c.search_vector,websearch_to_tsquery('english',$5)) DESC,c.id LIMIT 40"
-        );
-        lexical = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.as_str()))
+        let matching =
+            format!("{BASE} AND {scope} AND c.search_vector @@ websearch_to_tsquery('english',$5)");
+        let rank = "ts_rank_cd(c.search_vector,websearch_to_tsquery('english',$5)) DESC,c.id";
+        let sql = match (r.max_distance, embedding) {
+            (None, _) => format!("SELECT c.id {matching} ORDER BY {rank} LIMIT 40"),
+            // The window numbers every match before the bound removes any, so a kept chunk
+            // keeps its place in the unbounded order.
+            (Some(_), Some(_)) => format!(
+                "SELECT id,rn FROM (SELECT c.id,row_number() OVER (ORDER BY {rank}) rn,(c.embedding IS NULL OR c.embedding <=> $6 <= $7::float8) near {matching}) t WHERE near ORDER BY rn LIMIT 40"
+            ),
+            (Some(_), None) => format!(
+                "SELECT id,rn FROM (SELECT c.id,row_number() OVER (ORDER BY {rank}) rn,(c.embedding IS NULL) near {matching}) t WHERE near ORDER BY rn LIMIT 40"
+            ),
+        };
+        let query = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()))
             .bind(&r.namespace)
             .bind(r.as_of)
             .bind(r.from)
             .bind(r.to)
-            .bind(&words)
-            .fetch_all(&s.store.pool)
-            .await?;
+            .bind(&words);
+        let query = match (r.max_distance, embedding) {
+            (Some(bound), Some(vector)) => query.bind(Vector::from(vector.clone())).bind(bound),
+            _ => query,
+        };
+        let rows = query.fetch_all(&s.store.pool).await?;
+        lexical = if r.max_distance.is_none() {
+            rows.iter()
+                .enumerate()
+                .map(|(i, row)| (row.get("id"), i + 1))
+                .collect()
+        } else {
+            rows.iter()
+                .map(|row| (row.get("id"), row.get::<i64, _>("rn") as usize))
+                .collect()
+        };
     }
     let mut nearest = Vec::new();
     if let (Some(scope), Some(vector)) = (semantic, embedding) {
@@ -403,17 +783,30 @@ async fn raw_fallback_candidates(
         } else {
             UNPROCESSED_CHUNK
         };
+        let gate = if r.max_distance.is_some() {
+            " AND c.embedding <=> $5 <= $6::float8"
+        } else {
+            ""
+        };
         let sql = format!(
-            "SELECT c.id {BASE} AND {scope} AND c.embedding IS NOT NULL ORDER BY c.embedding <=> $5,c.id LIMIT 10"
+            "SELECT c.id {BASE} AND {scope} AND c.embedding IS NOT NULL{gate} ORDER BY c.embedding <=> $5,c.id LIMIT 10"
         );
-        nearest = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.as_str()))
+        let mut query = sqlx::query_scalar::<_, Uuid>(sqlx::AssertSqlSafe(sql.as_str()))
             .bind(&r.namespace)
             .bind(r.as_of)
             .bind(r.from)
             .bind(r.to)
-            .bind(Vector::from(vector.clone()))
+            .bind(Vector::from(vector.clone()));
+        if let Some(bound) = r.max_distance {
+            query = query.bind(bound);
+        }
+        nearest = query
             .fetch_all(&s.store.pool)
-            .await?;
+            .await?
+            .into_iter()
+            .enumerate()
+            .map(|(i, id)| (id, i + 1))
+            .collect();
     }
     Ok((lexical, nearest))
 }
@@ -441,6 +834,19 @@ pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallR
     }
     if r.from.zip(r.to).is_some_and(|(a, b)| a >= b) {
         return Err(AppError::Validation("from must precede to".into()));
+    }
+    if let Some(distance) = r.max_distance {
+        // Written so that NaN fails too.
+        if !(distance > 0.0 && distance <= 2.0) {
+            return Err(AppError::Validation(format!(
+                "max_distance must be a cosine distance greater than 0 and at most 2, got {distance}"
+            )));
+        }
+        if r.legacy_only {
+            return Err(AppError::Validation(
+                "max_distance is not supported with legacy_only".into(),
+            ));
+        }
     }
     let start = Instant::now();
     let mut trace = TraceBuilder::new("recall_v2", &r.namespace, None, json!(r));
@@ -490,6 +896,12 @@ pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallR
         Ok(v) => candidates(s, &r, "semantic", Some(v.clone())).await?,
         Err(e) => {
             degraded.push(format!("semantic unavailable: {e}"));
+            if r.max_distance.is_some() {
+                degraded.push(
+                    "max_distance cannot be measured without the query embedding: retained source text and graph facts that have an embedding are left out"
+                        .into(),
+                );
+            }
             vec![]
         }
     };
@@ -506,6 +918,8 @@ pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallR
     );
     let mut paths: HashMap<Uuid, Vec<Vec<String>>> = HashMap::new();
     let mut graph_ids = Vec::new();
+    let mut graph_ranked: Vec<(Uuid, usize)> = Vec::new();
+    let mut graph_dropped: Vec<Uuid> = Vec::new();
     if r.graph && !r.raw_only {
         let mut seeds: Vec<Uuid> = lexical
             .iter()
@@ -565,22 +979,63 @@ pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallR
         graph_ids.retain(|id| valid.contains(id));
         let mut seen = HashSet::new();
         graph_ids.retain(|id| seen.insert(*id));
+        graph_ranked = graph_ids.iter().copied().zip(1..).collect();
+        if let Some(bound) = r.max_distance {
+            // A fact only the graph reached has to be about the question too, or the graph
+            // fills the context with whatever its seeds happen to touch. A fact with no
+            // embedding yet is kept, as source text is. The ranks stay those of the order
+            // before this gate, so it leaves gaps and reorders nothing.
+            let sql = match &embedding {
+                Ok(_) => format!(
+                    "SELECT a.id FROM assertions a WHERE {FILTER} AND a.id=ANY($6) AND (a.embedding IS NULL OR a.embedding <=> $7 <= $8::float8)"
+                ),
+                Err(_) => format!(
+                    "SELECT a.id FROM assertions a WHERE {FILTER} AND a.id=ANY($6) AND a.embedding IS NULL"
+                ),
+            };
+            let query = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.as_str()))
+                .bind(&r.namespace)
+                .bind(r.as_of)
+                .bind(r.from)
+                .bind(r.to)
+                .bind(r.observations)
+                .bind(&graph_ids);
+            let query = match &embedding {
+                Ok(vector) => query.bind(Vector::from(vector.clone())).bind(bound),
+                Err(_) => query,
+            };
+            let near: HashSet<Uuid> = query.fetch_all(&s.store.pool).await?.into_iter().collect();
+            graph_dropped = graph_ranked
+                .iter()
+                .filter(|(id, _)| !near.contains(id))
+                .map(|(id, _)| *id)
+                .collect();
+            graph_ranked.retain(|(id, _)| near.contains(id));
+            paths.retain(|id, _| near.contains(id));
+        }
+    }
+    let mut graph_step = json!({"candidate_ids":graph_ranked.iter().map(|(id,_)|*id).collect::<Vec<_>>(),"paths":paths});
+    if r.max_distance.is_some() {
+        graph_step["dropped_by_max_distance"] = json!(graph_dropped);
     }
     trace.step(
         "graph_expansion",
         "ok",
         retrieval_start.elapsed(),
-        json!({"candidate_ids":graph_ids,"paths":paths}),
+        graph_step,
     );
     let mut ranks: HashMap<Uuid, HashMap<String, usize>> = HashMap::new();
-    for (strategy, ids) in [
-        ("lexical", lexical.iter().map(|x| x.0).collect::<Vec<_>>()),
-        ("semantic", semantic.iter().map(|x| x.0).collect()),
-        ("temporal", temporal.iter().map(|x| x.0).collect()),
-        ("graph", graph_ids),
+    let in_order = |found: &[(Uuid, String)]| -> Vec<(Uuid, usize)> {
+        found.iter().map(|x| x.0).zip(1..).collect()
+    };
+    for (strategy, ranked) in [
+        ("lexical", in_order(&lexical)),
+        ("semantic", in_order(&semantic)),
+        ("temporal", in_order(&temporal)),
+        ("graph", graph_ranked),
     ] {
-        for (i, id) in ids.into_iter().enumerate() {
-            ranks.entry(id).or_default().insert(strategy.into(), i + 1);
+        for (id, rank) in ranked {
+            ranks.entry(id).or_default().insert(strategy.into(), rank);
         }
     }
     // Retained evidence remains searchable before extraction has interpreted it,
@@ -610,13 +1065,13 @@ pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallR
                 embedding.as_ref().ok(),
             )
             .await?;
-            for (strategy, ids) in [
+            for (strategy, ranked) in [
                 ("raw_fallback", lexical),
                 ("raw_fallback_semantic", semantic),
             ] {
-                for (i, id) in ids.into_iter().enumerate() {
+                for (id, rank) in ranked {
                     fallback_ids.insert(id);
-                    ranks.entry(id).or_default().insert(strategy.into(), i + 1);
+                    ranks.entry(id).or_default().insert(strategy.into(), rank);
                 }
             }
         }
@@ -752,6 +1207,7 @@ pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallR
         degraded_reasons: degraded,
         elapsed_ms,
         temporal_plan: plan,
+        max_distance: r.max_distance,
     })
 }
 pub fn estimate_tokens(text: &str) -> usize {

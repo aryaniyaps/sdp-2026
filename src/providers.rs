@@ -1,4 +1,4 @@
-use crate::{AppError, domain::ExtractedMemory};
+use crate::{AppError, domain::ExtractedMemory, model::OllamaLimits};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -25,6 +25,7 @@ pub struct OllamaExtractor {
     client: Client,
     base: String,
     model: String,
+    limits: OllamaLimits,
 }
 #[derive(Clone)]
 pub struct OllamaEmbedder {
@@ -34,7 +35,7 @@ pub struct OllamaEmbedder {
 }
 
 impl OllamaExtractor {
-    pub fn new(base: String, model: String) -> Self {
+    pub fn new(base: String, model: String, limits: OllamaLimits) -> Self {
         Self {
             client: Client::builder()
                 .timeout(Duration::from_secs(120))
@@ -42,6 +43,7 @@ impl OllamaExtractor {
                 .unwrap(),
             base,
             model,
+            limits,
         }
     }
 }
@@ -94,12 +96,13 @@ impl Extractor for OllamaExtractor {
                     "Repair this invalid response to exactly match the schema. Invalid response:\n{last}"
                 )
             };
+            self.limits.preflight(&prompt)?;
             let body = GenerateRequest {
                 model: &self.model,
                 prompt,
                 stream: false,
                 format: extraction_schema(),
-                options: json!({"temperature":0}),
+                options: self.limits.options(Some(0)),
             };
             let response = self
                 .client
@@ -108,8 +111,11 @@ impl Extractor for OllamaExtractor {
                 .send()
                 .await?
                 .error_for_status()?
-                .json::<GenerateResponse>()
+                .json::<serde_json::Value>()
                 .await?;
+            self.limits.check_response(&response)?;
+            let response = serde_json::from_value::<GenerateResponse>(response)
+                .map_err(|e| AppError::Provider(format!("Ollama response absent: {e}")))?;
             last = response.response;
             if let Ok(parsed) = serde_json::from_str::<ExtractionEnvelope>(&last) {
                 validate_memories(&parsed.memories)?;
@@ -121,7 +127,7 @@ impl Extractor for OllamaExtractor {
         ))
     }
     async fn ready(&self) -> bool {
-        self.client.post(format!("{}/api/generate", self.base)).json(&json!({"model":self.model,"prompt":"ready","stream":false,"keep_alive":"10m","options":{"num_predict":1}})).send().await.map(|r| r.status().is_success()).unwrap_or(false)
+        self.client.post(format!("{}/api/generate", self.base)).json(&json!({"model":self.model,"prompt":"ready","stream":false,"keep_alive":"10m","options":{"num_ctx":self.limits.num_ctx,"num_predict":1}})).send().await.map(|r| r.status().is_success()).unwrap_or(false)
     }
     fn version(&self) -> &str {
         &self.model
