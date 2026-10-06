@@ -207,9 +207,12 @@ pub fn validate_claim(c: &ClaimInput, events: &[EvidenceEvent]) -> Result<(), cr
         return Err(Validation("invalid directly extracted memory kind".into()));
     }
     if c.source_indices.is_empty() || c.source_indices.len() != c.quotes.len() {
-        return Err(Validation(
-            "every claim needs paired source indices and exact quotes".into(),
-        ));
+        return Err(Validation(format!(
+            "every claim needs paired source indices and exact quotes: claim \"{}\" has {} source_indices and {} quotes; they are parallel arrays of equal length, so repeat an event index once per quote when two quotes come from the same event",
+            c.statement,
+            c.source_indices.len(),
+            c.quotes.len()
+        )));
     }
     for (i, q) in c.source_indices.iter().zip(&c.quotes) {
         if q.trim().is_empty() || events.get(*i).is_none_or(|e| !e.content.contains(q)) {
@@ -219,6 +222,46 @@ pub fn validate_claim(c: &ClaimInput, events: &[EvidenceEvent]) -> Result<(), cr
         }
     }
     Ok(())
+}
+#[cfg(test)]
+mod claim_validation_tests {
+    use super::*;
+    fn event(content: &str) -> EvidenceEvent {
+        EvidenceEvent {
+            role: "user".into(),
+            content: content.into(),
+            occurred_at: Utc::now(),
+            metadata: serde_json::json!({}),
+        }
+    }
+    fn claim(indices: Vec<usize>, quotes: Vec<&str>) -> ClaimInput {
+        serde_json::from_value(serde_json::json!({
+            "subject":{"name":"Ada","entity_type":"person","aliases":[]},
+            "predicate":"uses","value":"Rust","statement":"Ada uses Rust","cardinality":"single",
+            "kind":"fact","confidence":0.9,"source_indices":indices,"quotes":quotes,
+            "entities":[],"correction":false,"explanation":"x","related":[]
+        }))
+        .unwrap()
+    }
+    #[test]
+    fn two_quotes_from_one_event_need_a_repeated_index() {
+        let events = [event("Ada uses Rust and deploys on Fridays")];
+        assert!(
+            validate_claim(
+                &claim(vec![0, 0], vec!["Ada uses Rust", "deploys on Fridays"]),
+                &events
+            )
+            .is_ok()
+        );
+        let error = validate_claim(
+            &claim(vec![0], vec!["Ada uses Rust", "deploys on Fridays"]),
+            &events,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("1 source_indices and 2 quotes"), "{error}");
+        assert!(error.contains("repeat an event index"), "{error}");
+    }
 }
 
 #[cfg(test)]
