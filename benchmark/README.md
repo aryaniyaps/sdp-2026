@@ -76,8 +76,7 @@ curl -fsS http://127.0.0.1:8080/healthz
 ```
 
 Check database and embedder readiness, worker identity, embedding model and worker
-concurrency. The optional V1 extractor can be unavailable: this experiment uses the
-Pi worker, not that extractor. A model identity mismatch stops ingestion. The normal
+concurrency. This experiment uses the Pi worker. A model identity mismatch stops ingestion. The normal
 runtime is `run-memory.sh`; the Compose `full` API profile uses a different Ollama
 worker configuration and is not the pinned subscription experiment.
 
@@ -113,12 +112,14 @@ questions before starting its own retrieval phase. Do not run duplicate writers 
 the same run/condition/repeat. The optional independent full-history reader can run
 early, but the simplest reproducible workflow is the single `all` process above.
 
+The original resolver baseline was retired with the V1 API. Existing runs remain
+historical artifacts; start a new run for the current three-condition protocol.
+
 ## 4. What is being compared
 
 | Condition | Retrieval / context | Answer count |
 |---|---|---:|
 | `raw_hybrid` | Lexical/vector search over retained source chunks | 500 + 100 + 100 |
-| `legacy` | Original single-valued resolver, sharing extracted triples and embeddings | 500 + 100 + 100 |
 | `enhanced` | Temporal assertions, supported observations and bounded graph expansion | 500 + 100 + 100 |
 | `full_history` | Complete timestamped histories, without memory retrieval | 500 + 100 + 100 |
 | `no_graph` | Enhanced retrieval with graph expansion disabled | 100 |
@@ -186,7 +187,7 @@ After all answers and judgments finish:
 python3 benchmark/run.py audit --run friend-review-full
 ```
 
-`audit/packet.json` must contain 400 items: the fixed 100 questions across four primary
+`audit/packet.json` must contain 300 items: the fixed 100 questions across three primary
 conditions at repeat 0. Keep `audit/key.json` with the coordinator, away from reviewers.
 Two actual people independently assess the hypothesis against its question/reference
 and category rubric. Record their decisions as JSON Booleans in `reviewer_1` and
@@ -212,7 +213,7 @@ Final completion requires:
 - 500 repeat-0 answers/judgments for each primary condition.
 - 100 answers/judgments for each primary condition at repetitions 1 and 2.
 - 100 answer/judgment artifacts for each ablation.
-- 400 independently double-reviewed audit items, with every disagreement resolved.
+- 300 independently double-reviewed audit items, with every disagreement resolved.
 - `report.json` has `primary_complete`, `repeats_complete` and `complete` equal to true.
 - Raw artifacts and model/configuration provenance support those counts; report flags
   alone do not verify every requirement in `project-requirements.json`.

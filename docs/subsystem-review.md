@@ -115,7 +115,7 @@ model identities and question set. Ingestion constructs requests from a strict
 allowlist that excludes questions, answers and evidence labels. Repeated session IDs
 retain their scoring identity but use distinct episode keys. All 500 questions use
 complete histories in isolated banks. Fresh readers compare raw hybrid, original
-legacy resolution, enhanced memory and full-history context. A fixed 100-question
+enhanced memory and full-history context. A fixed 100-question
 sample receives two extra repetitions and answer ablations; retrieval ablations cover
 all 500 questions.
 
