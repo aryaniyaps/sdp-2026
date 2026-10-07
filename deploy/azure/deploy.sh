@@ -13,55 +13,24 @@ REPO=$(git rev-parse --show-toplevel)
 TAG=$(git -C "$REPO" rev-parse --short=12 HEAD)
 # A tag that names a commit must mean that commit: mark a build of uncommitted changes.
 [ -z "$(git -C "$REPO" status --porcelain -- src migrations integrations/pi Cargo.toml Cargo.lock deploy/azure)" ] || TAG="$TAG-dirty"
+# shellcheck source=lib.sh
+. "$REPO/deploy/azure/lib.sh"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-# Runs a script on the VM as root and fails unless it reached its last line. run-command reports
-# success even when the script failed, so the script must end by printing STEP_OK.
-on_vm() {
-  local out
-  out=$(az vm run-command invoke -g "$RG" -n "$VM" --command-id RunShellScript --scripts @"$1" \
-    --query 'value[0].message' -o tsv)
-  printf '%s\n' "$out" | cut -c1-300
-  printf '%s' "$out" | grep -q '^STEP_OK$' || { echo "deploy failed on the VM (step $1)" >&2; exit 1; }
-}
-
 echo "Packing $TAG"
 ctx=$WORK/ctx
-mkdir -p "$ctx/deploy/azure" "$ctx/integrations"
-cp "$REPO/Cargo.toml" "$REPO/Cargo.lock" "$REPO/rust-toolchain.toml" "$ctx/"
-cp -r "$REPO/migrations" "$REPO/src" "$ctx/"
-cp -r "$REPO/integrations/pi" "$ctx/integrations/pi"
-rm -rf "$ctx/integrations/pi/node_modules" "$ctx/integrations/pi/test"
-cp "$REPO/deploy/azure/Dockerfile" "$ctx/Dockerfile"
-cp "$REPO/deploy/azure/pi-session.sh" "$ctx/deploy/azure/pi-session.sh"
+pack_context "$ctx"
 tar -C "$ctx" -cJf "$WORK/ctx.txz" .
-base64 -w0 "$WORK/ctx.txz" > "$WORK/ctx.b64"
 echo "Source archive: $(wc -c < "$WORK/ctx.txz") bytes"
-
-# run-command scripts are limited to 256 KB, so the archive goes over in chunks.
-split -b 150000 -d "$WORK/ctx.b64" "$WORK/chunk."
-first=1
-for c in "$WORK"/chunk.*; do
-  {
-    echo 'set -eu'
-    if [ $first = 1 ]; then echo ': > /opt/sdp/deploy-ctx.b64'; fi
-    echo "cat >> /opt/sdp/deploy-ctx.b64 <<'CHUNK'"
-    cat "$c"; echo
-    echo 'CHUNK'
-    echo 'echo STEP_OK'
-  } > "$WORK/send.sh"
-  first=0
-  echo "Uploading $(basename "$c")"
-  on_vm "$WORK/send.sh" > /dev/null
-done
+put_file "$WORK/ctx.txz" /opt/sdp/deploy-ctx.txz
 
 cat > "$WORK/build.sh" <<SH
 set -eu
 D=/opt/sdp/build-$TAG
 rm -rf "\$D" && mkdir -p "\$D"
-base64 -d /opt/sdp/deploy-ctx.b64 | tar xJ -C "\$D"
-rm -f /opt/sdp/deploy-ctx.b64 /opt/sdp/deploy-build.log
+tar xJf /opt/sdp/deploy-ctx.txz -C "\$D"
+rm -f /opt/sdp/deploy-ctx.txz /opt/sdp/deploy-build.log
 cd "\$D"
 nohup sh -c 'docker build -t sdp-memory-app:$TAG . > /opt/sdp/deploy-build.log 2>&1; echo "exit=\$?" >> /opt/sdp/deploy-build.log' >/dev/null 2>&1 &
 echo STEP_OK
