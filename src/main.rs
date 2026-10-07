@@ -1,7 +1,8 @@
 use memory_engine::{
     AppState, api,
     graph::GraphStore,
-    providers::{OllamaEmbedder, OllamaExtractor},
+    model::OllamaLimits,
+    providers::{self, OllamaEmbedder, OllamaExtractor},
     store::Store,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -32,6 +33,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let extraction =
         env::var("EXTRACTION_MODEL").unwrap_or_else(|_| "qwen2.5:14b-instruct-q4_K_M".into());
     let embedding = env::var("EMBEDDING_MODEL").unwrap_or_else(|_| "qwen3-embedding:0.6b".into());
+    let ollama_limits = OllamaLimits::from_env()?;
+    let planner = memory_engine::v2::TemporalPlanner::from_env()?;
+    memory_engine::v2::set_temporal_planner(planner);
+    tracing::info!(?planner, "temporal planner");
+    tracing::info!(
+        num_ctx = ollama_limits.num_ctx,
+        num_predict = ollama_limits.num_predict,
+        "Ollama context limits"
+    );
     let pool = PgPoolOptions::new()
         .max_connections(10)
         .connect(&db)
@@ -56,13 +66,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         store,
         worker_concurrency: concurrency,
         graph,
-        extractor: Arc::new(OllamaExtractor::new(base.clone(), extraction)),
-        embedder: Arc::new(OllamaEmbedder::new(base, embedding)),
+        extractor: Arc::new(OllamaExtractor::new(
+            base.clone(),
+            extraction,
+            ollama_limits,
+        )),
+        embedder: Arc::new(OllamaEmbedder::new(base, embedding).with_keep_alive(
+            env::var("OLLAMA_KEEP_ALIVE").unwrap_or_else(|_| providers::DEFAULT_KEEP_ALIVE.into()),
+        )),
         model: if env::var("MEMORY_MODEL_PROVIDER").as_deref() == Ok("ollama") {
             Arc::new(memory_engine::model::OllamaJsonModel {
                 base: env::var("OLLAMA_URL").unwrap_or_else(|_| "http://127.0.0.1:11434".into()),
                 model: env::var("EXTRACTION_MODEL")
                     .unwrap_or_else(|_| "qwen2.5:14b-instruct-q4_K_M".into()),
+                limits: ollama_limits,
             })
         } else {
             Arc::new(memory_engine::model::PiModel {
@@ -73,6 +90,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         },
         demo_mode: env::var("DEMO_MODE").map(|v| v == "true").unwrap_or(false),
         metrics: Arc::new(memory_engine::observability::Metrics::default()),
+    });
+    let bind_addr = match env::var("BIND_ADDR") {
+        Ok(addr) => addr,
+        Err(env::VarError::NotPresent) => "127.0.0.1:8080".into(),
+        Err(err) => return Err(format!("BIND_ADDR is not usable: {err}").into()),
+    };
+    let listener = tokio::net::TcpListener::bind(&bind_addr)
+        .await
+        .map_err(|err| format!("cannot listen on {bind_addr}: {err}"))?;
+    // Load the embedding model now, so the first recall after a start does not pay for it.
+    let warm = state.embedder.clone();
+    tokio::spawn(async move {
+        match warm.embed("warm up").await {
+            Ok(_) => tracing::info!("embedding model loaded"),
+            Err(err) => {
+                tracing::warn!(error=%err, "embedding warm-up failed; the first recall will load the model")
+            }
+        }
     });
     let mut inference_workers = Vec::new();
     for _ in 0..concurrency {
@@ -86,8 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         &["project", "rebuild", "clear_graph"],
     ));
     let app = api::router(state).layer(TraceLayer::new_for_http().make_span_with(|request:&axum::http::Request<_>|tracing::info_span!("http_request",method=%request.method(),uri=%request.uri())).on_response(|response:&axum::http::Response<_>,latency:std::time::Duration,_span:&tracing::Span|tracing::info!(status=%response.status(),latency_ms=latency.as_millis(),"response completed")));
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
-    tracing::info!("UI http://127.0.0.1:8080 — Swagger http://127.0.0.1:8080/swagger-ui/");
+    tracing::info!("UI http://{bind_addr} - Swagger http://{bind_addr}/swagger-ui/");
     axum::serve(listener, app)
         .with_graceful_shutdown(async {
             tokio::signal::ctrl_c().await.ok();

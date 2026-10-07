@@ -53,6 +53,8 @@ services:
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: password
       OLLAMA_URL: http://127.0.0.1:11434
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-16384}
+      OLLAMA_NUM_PREDICT: ${OLLAMA_NUM_PREDICT:-4096}
       EXTRACTION_MODEL: qwen2.5:14b-instruct-q4_K_M
       EMBEDDING_MODEL: qwen3-embedding:0.6b
       DEMO_MODE: "true"

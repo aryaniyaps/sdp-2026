@@ -111,6 +111,7 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
         model: Arc::new(memory_engine::model::OllamaJsonModel {
             base: "http://127.0.0.1:1".into(),
             model: "unused".into(),
+            limits: memory_engine::model::OllamaLimits::new(16384, 4096).unwrap(),
         }),
         worker_concurrency: 1,
         demo_mode: true,
@@ -230,6 +231,7 @@ async fn postgres_versioning_provenance_isolation_and_api_contracts() {
         model: Arc::new(memory_engine::model::OllamaJsonModel {
             base: "http://127.0.0.1:1".into(),
             model: "unused".into(),
+            limits: memory_engine::model::OllamaLimits::new(16384, 4096).unwrap(),
         }),
         worker_concurrency: 1,
         demo_mode: true,
