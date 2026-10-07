@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+(cd frontend && npm ci && npm run build && npm test)
 docker compose up -d postgres neo4j
 until docker compose exec -T postgres pg_isready -U memory -d memory >/dev/null 2>&1; do sleep 1; done
 until curl -fsS --max-time 3 -u neo4j:password http://127.0.0.1:7474/db/neo4j/tx/commit -H 'content-type: application/json' -d '{"statements":[{"statement":"RETURN 1"}]}' | python3 -c 'import json,sys; sys.exit(bool(json.load(sys.stdin).get("errors")))' >/dev/null 2>&1; do sleep 1; done

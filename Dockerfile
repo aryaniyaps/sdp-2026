@@ -1,6 +1,14 @@
+FROM node:22-bookworm-slim AS frontend
+WORKDIR /ui
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 FROM rust:1.96-bookworm AS builder
 WORKDIR /app
 COPY . .
+COPY --from=frontend /ui/dist ./frontend/dist
 RUN cargo build --release --locked
 
 FROM debian:bookworm-slim

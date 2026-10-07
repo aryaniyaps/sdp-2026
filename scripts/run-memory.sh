@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+(cd frontend && npm ci && npm run build)
 command -v pi >/dev/null || { echo 'Pi is required for the memory worker.' >&2; exit 1; }
 # Resolve the worker model (Pi's own default unless PI_PROVIDER and PI_MODEL are both set) and prove
 # it works before anything starts. A worker that cannot run would fail every background job.
