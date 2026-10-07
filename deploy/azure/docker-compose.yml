@@ -1,0 +1,112 @@
+name: sdp-memory
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: memory_app
+      POSTGRES_USER: memory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=60"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memory -d memory_app"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  neo4j:
+    image: neo4j:5.26
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      NEO4J_PLUGINS: '[]'
+      NEO4J_dbms_memory_pagecache_size: 256M
+      NEO4J_dbms_memory_heap_initial__size: 512M
+      NEO4J_dbms_memory_heap_max__size: 768M
+    volumes: [neo4j_data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7474 >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
+  ollama:
+    image: ollama/ollama:0.13.5
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: 24h
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    volumes: [ollama:/root/.ollama]
+
+  ollama-init:
+    image: ollama/ollama:0.13.5
+    restart: "no"
+    depends_on: [ollama]
+    environment:
+      OLLAMA_HOST: ollama:11434
+    entrypoint: ["sh", "-c", "until ollama list >/dev/null 2>&1; do sleep 2; done; ollama pull qwen3-embedding:0.6b"]
+
+  engine:
+    image: sdp-memory-app:bootstrap
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+      neo4j: {condition: service_healthy}
+      ollama: {condition: service_started}
+    command: ["memory-engine"]
+    environment:
+      BIND_ADDR: 0.0.0.0:8080
+      DATABASE_URL: postgres://memory:${POSTGRES_PASSWORD}@postgres:5432/memory_app
+      NEO4J_URI: http://neo4j:7474
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      OLLAMA_URL: http://ollama:11434
+      EMBEDDING_MODEL: qwen3-embedding:0.6b
+      PI_PROVIDER: ${PI_PROVIDER:-anthropic}
+      PI_MODEL: ${PI_MODEL:-claude-sonnet-5-5}
+      MEMORY_WORKER_CONCURRENCY: "2"
+    volumes:
+      - ${PI_AGENT_DIR:-./pi-agent}:/home/pi/.pi/agent
+
+  term:
+    image: sdp-memory-app:bootstrap
+    restart: unless-stopped
+    depends_on: [engine]
+    command:
+      - ttyd
+      - --port=7681
+      - --base-path=/term
+      - --writable
+      - --url-arg
+      - --max-clients=6
+      - --client-option
+      - fontSize=15
+      - --client-option
+      - theme={"background":"#0d1117","foreground":"#e6edf3","cursor":"#a88bff"}
+      - /usr/local/bin/pi-session
+    environment:
+      MEMORY_URL: http://engine:8080
+      PI_TOOLS: ${PI_TOOLS:-on}
+    volumes:
+      - ${PI_AGENT_DIR:-./pi-agent}:/home/pi/.pi/agent
+      - ./pi-session.sh:/usr/local/bin/pi-session:ro
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [term, engine]
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  neo4j_data:
+  ollama:
+  caddy_data:
+  caddy_config:
