@@ -38,7 +38,7 @@ export class MemoryClient {
     if (!response.ok) throw new Error(`memory service HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
     return await response.json() as T;
   }
-  /** `temporal: false` skips the server's LLM date planner, which can take many seconds. `include_raw` keeps recent source text in play when extraction missed or misread it. `maxDistance` is a cosine distance beyond which the server drops vector matches; leave it out for a deliberate question, where the nearest memory is wanted however far it is. */
+  /** `temporal: false` skips the server's date planning. The default planner is rule based and cheap; it only waits on a model when the server runs with TEMPORAL_PLANNER=model. `include_raw` keeps recent source text in play when extraction missed or misread it. `maxDistance` is a cosine distance beyond which the server drops vector matches; leave it out for a deliberate question, where the nearest memory is wanted however far it is. */
   async recall(namespace: string, query: string, options: { temporal?: boolean; maxDistance?: number; timeout?: number; signal?: AbortSignal } = {}): Promise<RecallResult> {
     const { maxDistance } = options;
     // JSON turns NaN into null, which the server reads as "not set": refuse here instead of silently recalling everything.
