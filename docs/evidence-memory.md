@@ -16,6 +16,8 @@ pi -e /absolute/path/to/sdp-2026/integrations/pi/extension.ts
 
 `PI_PROVIDER` and `PI_MODEL` select the worker; set both or neither, in which case Pi's own default model is used and verified by `scripts/check-worker.py` before the service starts. `MEMORY_URL`, `MEMORY_NAMESPACE`, and `MEMORY_SPOOL` configure the extension; without `MEMORY_NAMESPACE` every directory shares the namespace `user:<login name>`. The service binds localhost. The Compose credentials are development credentials.
 
+In Pi, `/memory-namespace [name]` changes the active namespace for the current extension session; with no name it prompts for one. Retention cursors are scoped to each namespace. `/memory-clear [name]` prompts you to type the target namespace exactly, clears its server data, and removes its pending local evidence batches. `/memory-status` reports processing for the active namespace.
+
 ### Running with a local model
 
 `MEMORY_MODEL_PROVIDER=ollama` sends the worker's extraction and consolidation prompts to `OLLAMA_URL` (`/api/generate`) with `EXTRACTION_MODEL`, default `qwen2.5:14b-instruct-q4_K_M`.

@@ -197,3 +197,12 @@ test("graph loads nodes and supports search and layer toggles", async ({
   );
   expect(errors).toEqual([]);
 });
+
+test("embedded graph hides actions unavailable through the demo proxy", async ({
+  page,
+}) => {
+  await page.goto("/graph?namespace=review&poll=0&readonly=1");
+  await expect(page.locator("#c-fact")).toHaveText("1");
+  await expect(page.locator("#clear")).toBeHidden();
+  await expect(page.getByRole("link", { name: "Workspace" })).toBeHidden();
+});

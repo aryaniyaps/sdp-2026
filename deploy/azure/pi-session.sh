@@ -6,6 +6,7 @@ case "$dir" in payments-api|mobile-app|scratch) ;; *) dir=payments-api ;; esac
 mkdir -p "/work/$dir" && cd "/work/$dir" || exit 1
 [ -f README.md ] || printf '# %s\n' "$dir" > README.md
 export USER=dev LOGNAME=dev
+export MEMORY_NAMESPACE="${2:-user:dev}"
 tools=()
 # Set PI_TOOLS=off on the term service to remove the shell and file tools.
 [ "${PI_TOOLS:-on}" = "off" ] && tools=(--no-builtin-tools)

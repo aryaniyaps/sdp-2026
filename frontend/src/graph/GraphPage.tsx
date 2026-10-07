@@ -8,6 +8,7 @@ const layerLabels = { memory: "Memories", fact: "Facts", entity: "Entities" };
 
 // React owns the controls; the canvas viewer owns layout, drawing, and pointer events.
 export function GraphPage() {
+  const readOnly = new URLSearchParams(location.search).get("readonly") === "1";
   const container = useRef<HTMLDivElement>(null);
   useEffect(() => {
     document.body.classList.add("graph-mode");
@@ -30,6 +31,7 @@ export function GraphPage() {
               size="sm"
               variant="outline-light"
               className="pill"
+              style={readOnly ? { display: "none" } : undefined}
             >
               Workspace
             </Button>
@@ -66,6 +68,9 @@ export function GraphPage() {
               variant="outline-danger"
               className="pill"
               id="clear"
+              hidden={readOnly}
+              disabled={readOnly}
+              style={readOnly ? { display: "none" } : undefined}
               title="Delete everything this namespace knows"
             >
               Clear

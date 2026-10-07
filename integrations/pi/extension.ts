@@ -22,7 +22,8 @@ const exec = promisify(execFile);
 export default function memoryExtension(pi: ExtensionAPI) {
   if (process.env.MEMORY_WORKER === "1") return;
   let client: MemoryClient | undefined;
-  let namespace = "";
+  let namespace = process.env.MEMORY_NAMESPACE ?? "";
+  let initialNamespace: string | undefined;
   let commit = "unknown";
   const toolEvents = new Map<string, EvidenceEvent>();
   let flushing: Promise<unknown> = Promise.resolve();
@@ -59,14 +60,10 @@ export default function memoryExtension(pi: ExtensionAPI) {
     )
       commit = (snapshot.data as { commit: string }).commit;
     else pi.appendEntry("sdp-memory-session", { commit });
-    namespace = process.env.MEMORY_NAMESPACE ?? defaultNamespace();
+    if (!namespace) namespace = defaultNamespace();
+    initialNamespace ??= namespace;
     // The spool follows the namespace, so any session can deliver another directory's queued evidence.
-    client = new MemoryClient(
-      process.env.MEMORY_URL ?? "http://127.0.0.1:8080",
-      process.env.MEMORY_SPOOL ??
-        join(homedir(), ".sdp-memory", digest(namespace).slice(0, 24)),
-      5000,
-    );
+    client ??= createClient(namespace);
     const result = await client.flush();
     if (result.errors.length)
       warn(
@@ -74,6 +71,13 @@ export default function memoryExtension(pi: ExtensionAPI) {
         `${result.pending} evidence batches queued; ${result.errors[0]}`,
       );
   };
+  const createClient = (forNamespace: string) =>
+    new MemoryClient(
+      process.env.MEMORY_URL ?? "http://127.0.0.1:8080",
+      process.env.MEMORY_SPOOL ??
+        join(homedir(), ".sdp-memory", digest(forNamespace).slice(0, 24)),
+      5000,
+    );
   pi.on("session_start", async (_event, ctx) => {
     toolEvents.clear();
     for (const entry of ctx.sessionManager.getBranch()) {
@@ -158,9 +162,18 @@ export default function memoryExtension(pi: ExtensionAPI) {
     // Retain only what earlier turns have not delivered. Resending the whole branch every turn
     // grows quadratically and makes one sentence look like many corroborating sources.
     let cursor: string | undefined;
-    for (const entry of branch)
-      if (entry.type === "custom" && entry.customType === "sdp-memory-cursor")
-        cursor = (entry.data as { upTo?: string })?.upTo;
+    for (let i = branch.length - 1; i >= 0; i--) {
+      const entry = branch[i];
+      if (entry.type !== "custom" || entry.customType !== "sdp-memory-cursor")
+        continue;
+      const data = entry.data as { namespace?: string; upTo?: string };
+      // Older cursors had no namespace. They belong to the namespace active when
+      // this extension instance first initialized.
+      if ((data.namespace ?? initialNamespace) === namespace) {
+        cursor = data.upTo;
+        break;
+      }
+    }
     // A cursor that is not on this branch (another branch was selected) leaves the whole branch unretained.
     const unretained = branch.slice(
       (cursor === undefined
@@ -222,7 +235,7 @@ export default function memoryExtension(pi: ExtensionAPI) {
         .reverse()
         .find((entry) => entry.type === "message");
       if (lastMessage)
-        pi.appendEntry("sdp-memory-cursor", { upTo: lastMessage.id });
+        pi.appendEntry("sdp-memory-cursor", { namespace, upTo: lastMessage.id });
     }
 
     const result = await client.flush();
@@ -308,6 +321,69 @@ export default function memoryExtension(pi: ExtensionAPI) {
         `/api/v2/status?namespace=${encodeURIComponent(namespace)}`,
       );
       warn(ctx, JSON.stringify({ spool, status }));
+    },
+  });
+  pi.registerCommand("memory-namespace", {
+    description: "Show or change the active memory namespace",
+    handler: async (args, ctx) => {
+      if (!client) await initialize(ctx);
+      const requested = args.trim() || (await ctx.ui.input(
+        "Change memory namespace",
+        `Current: ${namespace}. Enter the namespace to use`,
+      ));
+      const next = requested?.trim();
+      if (!next) return;
+      if (next === namespace) {
+        ctx.ui.notify(`Memory namespace is already ${namespace}`, "info");
+        return;
+      }
+
+      flushing = flushing.then(async () => {
+        const previous = namespace;
+        const queued = await client!.flush();
+        namespace = next;
+        client = createClient(namespace);
+        const delivered = await client.flush();
+        ctx.ui.notify(
+          `Memory namespace changed: ${previous} → ${namespace}` +
+            (queued.pending ? ` (${queued.pending} previous batch(es) remain queued)` : "") +
+            (delivered.errors.length
+              ? `; ${delivered.pending} batch(es) still queued: ${delivered.errors[0]}`
+              : ""),
+          delivered.errors.length ? "warning" : "info",
+        );
+      });
+      await flushing;
+    },
+  });
+  pi.registerCommand("memory-clear", {
+    description: "Delete all stored data in a namespace after typed confirmation",
+    handler: async (args, ctx) => {
+      if (!client) await initialize(ctx);
+      const target = args.trim() || namespace;
+      const typed = await ctx.ui.input(
+        `Clear memory namespace ${target}`,
+        "Type the namespace exactly to permanently delete its stored data",
+      );
+      if (typed !== target) {
+        ctx.ui.notify("Namespace did not match; nothing was cleared.", "warning");
+        return;
+      }
+      await flushing;
+      const targetClient = createClient(target);
+      try {
+        const result = await targetClient.request<{ graph?: unknown }>(
+          "/api/v2/graph/clear",
+          { namespace: target, confirm: typed },
+        );
+        const discarded = await targetClient.discardNamespace(target);
+        ctx.ui.notify(
+          `Cleared namespace ${target}; discarded ${discarded} queued batch(es). Graph: ${JSON.stringify(result.graph ?? {})}`,
+          "info",
+        );
+      } catch (error) {
+        ctx.ui.notify(`Could not clear ${target}: ${error}`, "error");
+      }
     },
   });
 }

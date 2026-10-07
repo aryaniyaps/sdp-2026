@@ -2021,6 +2021,48 @@ fn view_state(store: Store, graph: Option<GraphStore>) -> Arc<AppState> {
         worker_concurrency: 1,
     })
 }
+
+#[tokio::test]
+async fn namespace_status_counts_embedding_gaps_and_pending_evidence() {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("TEST_DATABASE_URL missing; namespace status integration skipped");
+        return;
+    };
+    let store = Store::new(
+        PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&url)
+            .await
+            .unwrap(),
+    );
+    store.migrate().await.unwrap();
+    let namespace = format!("status-{}", Uuid::new_v4());
+    let app = api::router(view_state(store.clone(), None));
+    let uri = format!("/api/v2/status?namespace={namespace}");
+    let (status, empty) = get_json(&app, &uri).await;
+    assert_eq!(status, StatusCode::OK, "{empty}");
+    assert_eq!(empty["ready"], true);
+    assert_eq!(
+        empty["embedding_gaps"],
+        json!({"source_chunks": 0, "active_assertions": 0})
+    );
+
+    retain_one(
+        &store,
+        &namespace,
+        "status-evidence",
+        "user",
+        "Ada uses Rust.",
+        Utc::now(),
+    )
+    .await;
+    let (status, pending) = get_json(&app, &uri).await;
+    assert_eq!(status, StatusCode::OK, "{pending}");
+    assert_eq!(pending["ready"], false);
+    assert_eq!(pending["outstanding_jobs"], 1);
+    assert_eq!(pending["embedding_gaps"]["source_chunks"], 1);
+    assert_eq!(pending["embedding_gaps"]["active_assertions"], 0);
+}
 /// A store whose PostgreSQL server does not exist, for requests that must fail or be rejected
 /// before any query is answered.
 fn offline_store() -> Store {

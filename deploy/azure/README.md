@@ -1,46 +1,63 @@
-# Deploying to the Azure VM
+# Pi session and live graph demo
 
-The hosted copy (Pi in a browser terminal next to the live memory graph) runs on one VM with Docker
-Compose in `/opt/sdp`. Pushing service source to `main` rebuilds it automatically.
+The demo at `/demo` is a React page with a real Pi terminal beside the memory graph. Switch between `payments-api`, `mobile-app`, and `scratch` to start fresh coding sessions that share the selected namespace. Applying another namespace restarts the terminal and opens that namespace in the graph. Pi's `/memory-namespace` and `/memory-clear` commands are available in the terminal; after changing namespaces inside Pi, select the same namespace in the page to view its graph.
 
-## What a deploy does
+The UI lives in `frontend/src/demo`: `DemoPage.tsx` owns the controls and panes, `session.ts` builds the terminal and graph URLs, and `demo.css` handles the layout. The graph retains its separate React page and canvas modules. There is no separate static landing page.
 
-`deploy.sh` is the whole procedure, and the GitHub workflow only logs in and runs it:
+## Run locally
 
-1. Packs the service source (`src`, `migrations`, `integrations/pi`, the Cargo files) and sends it to the VM with
-   `az vm run-command`. No SSH is needed, so the VM firewall can stay closed to the internet.
-2. Builds `sdp-memory-app:<commit>` on the VM from `deploy/azure/Dockerfile`. A failed build changes nothing.
-3. Points the `engine` and `term` services at the new image and waits for the engine to answer.
-4. If the engine is not healthy within two minutes, puts the previous image back and fails the run.
-5. Keeps the three newest images and removes older ones.
+With Docker Compose, Python 3, openssl, curl, and an authenticated Pi installation:
 
-The database, the graph, the proxy and the Pi login stay as they are, so the stored memory survives a deploy.
-Migrations run when the engine starts. A migration that has run cannot be undone by the rollback in step 4,
-because an older engine refuses a database that is newer than itself.
-
-Run it by hand with `az login` done and a checkout of the commit to deploy:
-
-```bash
-deploy/azure/deploy.sh
+```sh
+./deploy/azure/run-local.sh
 ```
 
-A checkout with uncommitted changes is deployed too, and its image tag ends in `-dirty`.
+Open http://127.0.0.1:18088/ and sign in as `reviewer`. The script prints the path to the access code, normally `~/.local/state/sdp-hosted-local/access.code`. It builds the frontend, backend, and Pi image, then starts the terminal, proxy, databases, and Ollama embedding model. These databases are separate from the stack started by `scripts/run-memory.sh` and the root Compose file.
 
-## One-time setup for the workflow
+The terminal and extraction worker use the provider and model in Pi's `settings.json`. Set both `PI_PROVIDER` and `PI_MODEL` to override them. `PI_AGENT_DIR` changes the source Pi login directory; `LOCAL_PORT` changes the browser port, `LOCAL_TERMINAL_PORT` changes the loopback terminal port (default 7681), `LOCAL_ENGINE_PORT` changes the loopback API port (default 18080), and `SDP_LOCAL_STATE` changes the generated state directory. Pi's coding and extraction requests use the chosen provider; Ollama supplies local embeddings.
 
-The workflow signs in to Azure with OIDC, so no password or key is stored in GitHub.
+```sh
+./deploy/azure/run-local.sh down       # stop the demo, retaining memory
+./deploy/azure/run-local.sh destroy    # delete the demo stack and its memory
+```
 
-1. Someone who can create app registrations in the tenant and assign roles runs `deploy/azure/setup-oidc.sh`.
-   It creates the app, trusts the `azure` environment of this repository, and grants Virtual Machine Contributor
-   on the one VM only. It prints three values.
-2. A repository admin creates the `azure` environment (Settings, Environments) and stores them as its secrets:
-   `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`. Required reviewers can be added to that
-   environment if a deploy should wait for an approval.
-3. Run the workflow once from the Actions tab (Deploy to Azure, Run workflow) to check it.
+For frontend development, start the demo stack and run `MEMORY_API_URL=http://127.0.0.1:18080 npm run dev` in `frontend`. Open http://127.0.0.1:5173/demo; Vite proxies the terminal and WebSocket to port 7681. The API proxy then uses the demo engine. Without `MEMORY_API_URL`, Vite targets the root backend on port 8080. `PI_TERMINAL_URL` overrides its terminal target.
 
-## Limits
+## Services and modules
 
-- The workflow runs on pushes to `main` that touch the service, `deploy/azure/` or the workflow. It does not run
-  the tests, so a change that compiles but misbehaves is still deployed.
-- `docker-compose.yml`, the proxy configuration and the access code live on the VM and are not part of a deploy.
-- The VM has no BuildKit, so the image builds without a layer cache for the Rust step (about 8 minutes).
+| Service or file | Responsibility |
+| --- | --- |
+| `term` | ttyd starts Pi with the memory extension for each browser connection. Repeated URL arguments pass the project directory and namespace to `pi-session.sh`. |
+| `engine` | Stores evidence, extracts facts with Pi, serves the React UI, and exposes graph APIs internally. |
+| `postgres`, `neo4j` | Authoritative evidence storage and graph projection. |
+| `ollama`, `ollama-init` | Serve and prepare `qwen3-embedding:0.6b`. |
+| `caddy` / `Caddyfile.template` | Access code, frontend assets, graph reads, terminal HTTP and WebSocket proxying. `/` redirects to `/demo`. |
+| `Dockerfile` | Builds the React frontend, Rust service, Pi integration, and ttyd runtime. |
+| `lib.sh` | Shared source packaging and Azure transfer helpers, including frontend sources. |
+| `run-local.sh` / `pi-settings.py` | Local orchestration and model selection from Pi's existing settings. |
+| `provision.sh` / `cloud-init.yaml` | Optional Azure VM creation and first boot setup. |
+| `deploy.sh` | Rebuilds and swaps the app on an existing Azure VM, with rollback if readiness fails. |
+| `make-seed.sh` / `reset-seed.sh` | Optional seed preparation and restoration. |
+
+The hosted proxy preserves the branch's restricted API exposure: only graph reads are forwarded. Pi reaches retain, recall, namespace clear, and jobs over the internal network. The graph's Clear button is hidden in the demo; use `/memory-clear` inside Pi with typed confirmation.
+
+## Validation
+
+`frontend/e2e/demo.spec.ts` checks session switching, shared namespaces, safe URL encoding, reload behavior, and mobile layout without model calls. `deploy/azure/e2e.js` additionally exercises two actual Pi sessions and memory extraction against a running stack, including an initially empty graph. It calls your model provider.
+
+```sh
+(cd frontend && npm test && npm run test:e2e)
+node deploy/azure/e2e.js http://127.0.0.1:18088 reviewer "$(cat ~/.local/state/sdp-hosted-local/access.code)"
+```
+
+## Azure
+
+The optional provisioning command creates a VM and copies the authenticated Pi configuration:
+
+```sh
+DNS_LABEL=my-unique-label ./deploy/azure/provision.sh
+```
+
+`DNS_LABEL` selects the page's Azure DNS name. The script supports `AZURE_RG`, `AZURE_LOC`, `AZURE_VM`, `VM_SIZE`, `PI_AGENT_DIR`, `PI_PROVIDER`, `PI_MODEL`, `SEED_DUMP`, and `SDP_CLOUD_STATE`; its header documents defaults. It opens HTTPS and HTTP, and keeps SSH closed unless `SSH_FROM` is supplied. Generated credentials live in the cloud state directory. Provisioning has not been executed as part of this integration.
+
+To update an existing VM, run `deploy/azure/deploy.sh`. Its image includes the React assets. The databases and credentials survive image updates; Compose and proxy configuration changes require updating the VM configuration too. The workflow and OIDC setup are described in `setup-oidc.sh` and `.github/workflows/deploy-azure.yml`.
