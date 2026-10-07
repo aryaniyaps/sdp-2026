@@ -4,21 +4,62 @@ A Rust memory service for programming assistants and long conversations. It reta
 
 **Benchmark execution has been handed off to the project team. No accuracy improvement is claimed yet.** The original fork was merged before this enhancement. The implementation, live pilot artifacts and pending completion requirements are distinct from a completed benchmark. See the [complete benchmark runbook](benchmark/README.md).
 
-## Run
+## Run it locally
 
-Requirements: Docker Compose, Node/npm, Python 3, and Pi with an authenticated provider. Local embeddings use Ollama `qwen3-embedding:0.6b`; the runtime script downloads the model if needed. Rust is built with host cargo when it is the pinned toolchain, otherwise in a pinned container.
+You need Docker with Compose, Python 3, [ripgrep](https://github.com/BurntSushi/ripgrep), curl, Node 22 or newer with npm, and [Pi](https://github.com/earendil-works/pi) logged in to a model provider (`pi`, then `/login`). The extraction worker runs through Pi. Rust is optional: when the host `cargo` is the pinned toolchain (`rust-toolchain.toml`) it builds with that, otherwise in a pinned container.
+
+### 1. Start the service
 
 ```sh
 ./scripts/run-memory.sh
-# Observatory: http://127.0.0.1:8080
-# Swagger:     http://127.0.0.1:8080/swagger-ui/
-# Graph view:  http://127.0.0.1:8080/graph?namespace=user:<name>
-# Clear one namespace (memory and graph):  scripts/clear-graph.sh user:<name>
 ```
 
-The extraction worker runs through Pi. Without `PI_PROVIDER` and `PI_MODEL` it uses Pi's own default model; set both to choose another (the benchmark runbook pins its own). `scripts/check-worker.py` runs first and stops with the reason if the provider is not authenticated, the model is unknown, or a small test request fails, so a misconfigured worker never starts silently. Defaults are PostgreSQL on port 55432, Neo4j HTTP on 7474, and Ollama on 11434. Override `DATABASE_URL`, `NEO4J_URI`, `OLLAMA_URL`, `MEMORY_WORKER_CONCURRENCY`, `BIND_ADDR` (default `127.0.0.1:8080`), `TEMPORAL_PLANNER` (`rules`, the default, `model` or `off`) or `OLLAMA_KEEP_ALIVE` (how long Ollama keeps the embedding model loaded, default `1h`) as needed. The API has no authentication and the graph view shows raw conversation text, so bind it to a non-loopback address only on a network you trust. The application uses a separate `memory_app` database; tests use `memory_test`. Compose credentials are for local development.
+The script checks that the worker model works (it stops with the reason if the provider is not logged in, the model is unknown or a small test request fails, so a misconfigured worker never starts silently), starts PostgreSQL and Neo4j in Docker, creates the `memory_app` database, makes sure Ollama answers on port 11434 (it starts the compose `ollama` service if nothing does) and pulls `qwen3-embedding:0.6b` (about 640 MB the first time), builds the release binary and runs it in the foreground. Ctrl-C stops the service; the data stays in Docker volumes.
 
-Set `MEMORY_MODEL_PROVIDER=ollama` to run the worker on a local Ollama model (`EXTRACTION_MODEL`, default `qwen2.5:14b-instruct-q4_K_M`) instead of Pi. Ollama silently cuts any prompt longer than its context window (4096 tokens unless told otherwise), so the service always sends `OLLAMA_NUM_CTX` (default 16384) and `OLLAMA_NUM_PREDICT` (default 4096) and refuses to run a prompt that cannot fit. See "Running with a local model" in `docs/evidence-memory.md` for the variables, the GPU memory they cost and the failure modes.
+| Address | What it is |
+|---|---|
+| http://127.0.0.1:8080 | Observatory: inspect jobs, facts and traces |
+| http://127.0.0.1:8080/swagger-ui/ | API documentation |
+| http://127.0.0.1:8080/graph?namespace=user:&lt;name&gt; | Live graph of one namespace: facts, entities and the source text behind them |
+| 127.0.0.1:55432, 127.0.0.1:7474 and 7687 | PostgreSQL (authoritative) and Neo4j (a rebuildable projection) |
+
+### 2. Connect Pi to it
+
+```sh
+pi -e "$PWD/integrations/pi/extension.ts"     # this session only
+pi install "$PWD/integrations/pi"             # every session, in any directory
+```
+
+Tell Pi a fact, start a new session in another directory and ask about it: the memory is per user (`user:<login name>`), not per directory. [Use with Pi](#use-with-pi) has the details, and the graph page fills in as the worker extracts the fact.
+
+### 3. Clear a memory
+
+```sh
+scripts/clear-graph.sh user:<name>        # asks you to type the namespace; --yes skips the question
+```
+
+The Clear button on the graph page does the same. It deletes the namespace's facts, entities, source text and jobs and empties its graph. Other namespaces are not touched.
+
+### Pi in a browser, next to the graph
+
+`deploy/azure/run-local.sh` runs the same stack that is hosted on Azure: a page with a real Pi terminal on the left and the live graph on the right, behind one access code, with its own databases. Open http://127.0.0.1:18088/ after it prints the access code. It needs Docker Compose 2.24 or newer and a logged-in Pi, and the first run compiles the service in a container. [deploy/azure/README.md](deploy/azure/README.md) covers it, and putting it on an Azure VM.
+
+### Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BIND_ADDR` | `127.0.0.1:8080` | Listen address. The API has no authentication and the graph page shows raw conversation text, so use a non-loopback address only on a network you trust |
+| `DATABASE_URL` | `postgres://memory:memory@127.0.0.1:55432/memory` | `run-memory.sh` points it at `memory_app`; tests use `memory_test` |
+| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | `http://127.0.0.1:7474`, `neo4j`, `password` | Compose credentials, for local development only |
+| `OLLAMA_URL`, `EMBEDDING_MODEL` | `http://127.0.0.1:11434`, `qwen3-embedding:0.6b` | Query and fact embeddings (1024 dimensions) |
+| `OLLAMA_KEEP_ALIVE` | `1h` | How long Ollama keeps the embedding model loaded; the service also loads it at start |
+| `TEMPORAL_PLANNER` | `rules` | How a recall finds a time window: `rules` (no model call), `model` (rules first, then a model call that costs seconds) or `off` |
+| `PI_PROVIDER`, `PI_MODEL` | Pi's own default | The worker model; set both to choose another. The benchmark runbook pins its own |
+| `MEMORY_WORKER_CONCURRENCY` | `4` | Namespaces extracted in parallel |
+| `MEMORY_MODEL_PROVIDER` | `pi` | `ollama` runs the worker on a local model (`EXTRACTION_MODEL`, default `qwen2.5:14b-instruct-q4_K_M`) |
+| `MEMORY_URL`, `MEMORY_NAMESPACE`, `MEMORY_SPOOL` | | Pi extension: where the service is, which memory to use, where unsent evidence waits |
+
+Ollama silently cuts any prompt longer than its context window (4096 tokens unless told otherwise), so the service always sends `OLLAMA_NUM_CTX` (default 16384) and `OLLAMA_NUM_PREDICT` (default 4096) and refuses to run a prompt that cannot fit. See "Running with a local model" in `docs/evidence-memory.md` for the variables, the GPU memory they cost and the failure modes. How a recall gets its speed, and what the date planner does, is in the same file under "Recall latency".
 
 ## What changed
 
@@ -47,7 +88,7 @@ Installing sends the content of every Pi session, including tool output, to the 
 
 All sessions share one memory per user (namespace `user:<login name>`), whatever directory they run in. Set `MEMORY_NAMESPACE` to keep a project's memory separate, for example from a direnv file. `MEMORY_URL` and `MEMORY_SPOOL` configure the endpoint and the local spool, which defaults to a directory derived from the namespace so any session can deliver evidence another directory queued.
 
-Automatic recall runs before the agent starts. It skips the server's LLM date planner so it stays fast, and it also searches retained source text and ranks it with the extracted assertions, so a missed or misread extraction is less likely to hide something you just said. It also sets `max_distance` 0.45 (`AUTOMATIC_RECALL_MAX_DISTANCE` in `integrations/pi/client.ts`), so vector matches farther than that cosine distance are dropped and a prompt that is off topic for what is stored injects little or nothing instead of the nearest unrelated text. Very short prompts such as "ok" or "continue" sit as near to stored memory as real questions do, so some memory still comes back for them. The explicit `memory_recall` tool sets no cutoff. Restart the service after updating the extension: a service built before the cutoff existed ignores it, and the extension then shows a warning. Evidence is queued locally before submission, and each turn retains only what is new. The extension supplies `memory_recall`, `memory_remember`, and `/memory-status`.
+Automatic recall runs before the agent starts. It asks for no date window (`temporal: false`; the server's own planner is rule based and fast, a model planner is opt-in with `TEMPORAL_PLANNER=model`), and it also searches retained source text and ranks it with the extracted assertions, so a missed or misread extraction is less likely to hide something you just said. It also sets `max_distance` 0.45 (`AUTOMATIC_RECALL_MAX_DISTANCE` in `integrations/pi/client.ts`), so vector matches farther than that cosine distance are dropped and a prompt that is off topic for what is stored injects little or nothing instead of the nearest unrelated text. Very short prompts such as "ok" or "continue" sit as near to stored memory as real questions do, so some memory still comes back for them. The explicit `memory_recall` tool sets no cutoff. Restart the service after updating the extension: a service built before the cutoff existed ignores it, and the extension then shows a warning. Evidence is queued locally before submission, and each turn retains only what is new. The extension supplies `memory_recall`, `memory_remember`, and `/memory-status`.
 
 Retention returns as soon as the evidence is durable. Its text is searchable immediately (lexical and, once the embedder has run, semantic), while extracted facts, corrections and observations appear after the worker finishes. If extraction jobs fail, recall says so in its `degraded_reasons` and `/memory-status` shows the failed jobs.
 
@@ -77,6 +118,8 @@ Retention acknowledges durable evidence; extraction is asynchronous. Inspect job
 ./scripts/test.sh
 # Live check through real Pi sessions (bills your provider; needs the service running):
 python3 scripts/pi-rpc-e2e.py
+# Recall latency of the running service (40 questions, then 10 requests a second):
+scripts/recall-latency.py user:<name>      # restart the service first: it caches query embeddings
 python3 benchmark/run.py fetch
 python3 benchmark/run.py all --run development-10 --limit 10
 # After freezing the implementation:
