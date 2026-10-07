@@ -8,7 +8,6 @@ Student runs locally on the RTX 5070 Ti (16 GB, Blackwell sm_120). 4-bit NF4 bas
 
 import argparse
 import json
-import os
 from pathlib import Path
 
 import torch
@@ -42,7 +41,9 @@ def build_dataset(tok, path: Path, split: str) -> Dataset:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": build_user_prompt(r["session_date"], r["speakers"], r["turns"]),
+                    "content": build_user_prompt(
+                        r["session_date"], r["speakers"], r["turns"]
+                    ),
                 },
             ],
             tokenize=False,
@@ -58,7 +59,9 @@ def build_dataset(tok, path: Path, split: str) -> Dataset:
         if len(ids) < len(p_ids) + 4:  # target got truncated away entirely
             continue
         labels = ([-100] * len(p_ids) + t_ids)[:MAXLEN]
-        rows.append({"input_ids": ids, "labels": labels, "attention_mask": [1] * len(ids)})
+        rows.append(
+            {"input_ids": ids, "labels": labels, "attention_mask": [1] * len(ids)}
+        )
     return Dataset.from_list(rows)
 
 
@@ -74,7 +77,9 @@ def main():
 
     assert torch.cuda.is_available(), "no CUDA device visible"
     cap = torch.cuda.get_device_capability()
-    print(f"gpu: {torch.cuda.get_device_name(0)}  sm_{cap[0]}{cap[1]}  torch {torch.__version__}")
+    print(
+        f"gpu: {torch.cuda.get_device_name(0)}  sm_{cap[0]}{cap[1]}  torch {torch.__version__}"
+    )
 
     tok = AutoTokenizer.from_pretrained(BASE)
     if tok.pad_token is None:
@@ -107,8 +112,13 @@ def main():
             bias="none",
             task_type="CAUSAL_LM",
             target_modules=[
-                "q_proj", "k_proj", "v_proj", "o_proj",
-                "gate_proj", "up_proj", "down_proj",
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
             ],
         ),
     )
@@ -142,7 +152,9 @@ def main():
         ),
         train_dataset=train_ds,
         eval_dataset=val_ds if len(val_ds) else None,
-        data_collator=DataCollatorForSeq2Seq(tok, padding=True, label_pad_token_id=-100),
+        data_collator=DataCollatorForSeq2Seq(
+            tok, padding=True, label_pad_token_id=-100
+        ),
     )
     trainer.train()
 

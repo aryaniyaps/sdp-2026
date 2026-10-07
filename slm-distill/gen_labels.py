@@ -9,7 +9,6 @@ in the memory engine, so nothing here is on the runtime path.
 import argparse
 import asyncio
 import json
-import os
 import random
 import re
 import sys
@@ -60,7 +59,11 @@ def build_windows(path: Path) -> list[dict]:
                         "session_date": date,
                         "speakers": speakers,
                         "turns": [
-                            {"dia_id": t["dia_id"], "speaker": t["speaker"], "text": t["text"]}
+                            {
+                                "dia_id": t["dia_id"],
+                                "speaker": t["speaker"],
+                                "text": t["text"],
+                            }
                             for t in chunk
                         ],
                     }
@@ -76,7 +79,9 @@ def normalise(obj: dict, valid_ids: set[str]) -> dict | None:
     for m in obj["memories"]:
         if not isinstance(m, dict):
             continue
-        if not all(m.get(k) for k in ("type", "subject", "predicate", "object", "statement")):
+        if not all(
+            m.get(k) for k in ("type", "subject", "predicate", "object", "statement")
+        ):
             continue
         if m["type"] not in {"fact", "preference", "episode", "task"}:
             continue
@@ -88,7 +93,9 @@ def normalise(obj: dict, valid_ids: set[str]) -> dict | None:
             continue
         m["evidence"] = ev
         et = m.get("event_time")
-        m["event_time"] = et if isinstance(et, str) and re.match(r"^\d{4}-\d{2}-\d{2}", et) else None
+        m["event_time"] = (
+            et if isinstance(et, str) and re.match(r"^\d{4}-\d{2}-\d{2}", et) else None
+        )
         try:
             m["confidence"] = max(0.0, min(1.0, float(m.get("confidence", 0.5))))
         except (TypeError, ValueError):
@@ -169,7 +176,10 @@ async def main():
     if args.limit:
         windows = windows[: args.limit]
     n_train = sum(1 for w in windows if w["split"] == "train")
-    print(f"windows: {len(windows)}  (train {n_train} / val {len(windows)-n_train})", flush=True)
+    print(
+        f"windows: {len(windows)}  (train {n_train} / val {len(windows)-n_train})",
+        flush=True,
+    )
 
     out_path = ROOT / args.out
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -204,8 +214,10 @@ async def main():
                     flush=True,
                 )
 
-    print(f"\ndone in {(time.time()-t0)/60:.1f}m  ok={stats['ok']} fail={stats['fail']} "
-          f"memories={stats['mem']}")
+    print(
+        f"\ndone in {(time.time()-t0)/60:.1f}m  ok={stats['ok']} fail={stats['fail']} "
+        f"memories={stats['mem']}"
+    )
     if stats["fail"]:
         print(f"last error: {stats['last_err']}", file=sys.stderr)
 

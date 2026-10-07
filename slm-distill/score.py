@@ -15,9 +15,40 @@ import json
 import re
 from pathlib import Path
 
-STOP = {"a", "an", "the", "is", "are", "was", "were", "to", "of", "in", "on", "at",
-        "for", "with", "and", "or", "his", "her", "their", "its", "he", "she",
-        "they", "that", "this", "has", "have", "had", "be", "been", "as", "by"}
+STOP = {
+    "a",
+    "an",
+    "the",
+    "is",
+    "are",
+    "was",
+    "were",
+    "to",
+    "of",
+    "in",
+    "on",
+    "at",
+    "for",
+    "with",
+    "and",
+    "or",
+    "his",
+    "her",
+    "their",
+    "its",
+    "he",
+    "she",
+    "they",
+    "that",
+    "this",
+    "has",
+    "have",
+    "had",
+    "be",
+    "been",
+    "as",
+    "by",
+}
 
 
 def words(s):
@@ -60,7 +91,9 @@ def relaxed_match(pred, gold, thresh=0.5, require_type=True):
     for sc, i, j in cands:
         if i in up or j in ug:
             continue
-        up.add(i); ug.add(j); n += 1
+        up.add(i)
+        ug.add(j)
+        n += 1
     return n
 
 
@@ -88,21 +121,25 @@ def score(rows, mode):
             sg = {subj(m) for m in gold if subj(m)}
             tp, npred, ngold = len(sp & sg), len(sp), len(sg)
         p, r, f = prf(tp, npred, ngold)
-        P += p; R += r; F += f
+        P += p
+        R += r
+        F += f
     n = len(rows)
     return P / n, R / n, F / n
 
 
 def report():
-    MODES = [("strict", "exact type + subject::predicate string"),
-             ("relaxed", "same type + subject, statement overlap >= 0.5"),
-             ("relaxed_notype", "same subject, statement overlap >= 0.5 (type ignored)"),
-             ("subject", "did it find the same entities at all")]
-    
+    MODES = [
+        ("strict", "exact type + subject::predicate string"),
+        ("relaxed", "same type + subject, statement overlap >= 0.5"),
+        ("relaxed_notype", "same subject, statement overlap >= 0.5 (type ignored)"),
+        ("subject", "did it find the same entities at all"),
+    ]
+
     files = sorted(Path("data").glob("gen_*.json"))
     if not files:
         raise SystemExit("no data/gen_*.json - run eval.py first")
-    
+
     print(f"{'variant':<16}{'mode':<17}{'prec':>8}{'rec':>8}{'F1':>8}")
     print("-" * 57)
     store = {}
@@ -115,17 +152,19 @@ def report():
             store[tag][mode] = fl
             print(f"{tag:<16}{mode:<17}{p:>8.3f}{r:>8.3f}{fl:>8.3f}")
         print()
-    
+
     print("what each mode means:")
     for mode, desc in MODES:
         print(f"  {mode:<17} {desc}")
-    
+
     if "distilled" in store and "base-zeroshot" in store:
         print("\ndistillation gain by mode:")
         for mode, _ in MODES:
             d = store["distilled"][mode] - store["base-zeroshot"][mode]
-            print(f"  {mode:<17} {store['base-zeroshot'][mode]:.3f} -> "
-                  f"{store['distilled'][mode]:.3f}   ({d:+.3f})")
+            print(
+                f"  {mode:<17} {store['base-zeroshot'][mode]:.3f} -> "
+                f"{store['distilled'][mode]:.3f}   ({d:+.3f})"
+            )
 
 
 if __name__ == "__main__":
