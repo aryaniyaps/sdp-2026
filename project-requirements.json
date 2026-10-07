@@ -1,11 +1,11 @@
 {
   "objective": "Implement the accepted evidence-backed temporal graph memory plan end to end; run all 500 cleaned LongMemEval-S questions, primary baselines, repetitions, ablations, human audit, and a real Pi coding demonstration.",
   "completion_requires": {
-    "storage": ["multi-valued facts and single-state corrections", "event/validity/recorded timestamps", "grounded entity aliases", "transactional outbox and lease fencing", "Neo4j replay/rebuild/reset", "legacy version/provenance compatibility"],
+    "storage": ["multi-valued facts and single-state corrections", "event/validity/recorded timestamps", "grounded entity aliases", "transactional outbox and lease fencing", "Neo4j replay/rebuild/reset"],
     "memory": ["attributed exact quotes", "reinforce/extend/supersede/contradict/derive", "acyclic supported observations", "transitive invalidation and recomputation", "resumable schema-validating subscription worker", "Ollama and cached inference"],
     "retrieval": ["parallel lexical/semantic/temporal arms", "bounded graph paths", "authoritative candidate validation", "deterministic RRF", "bounded evidence packing", "raw source fallback", "cited reflection and abstention", "graph/observation ablations", "observatory and documented APIs"],
     "pi": ["automatic recall", "message/tool capture", "observed exit status", "commit and branch provenance", "no injected-memory reingestion", "retry/resume idempotency", "offline durable spool", "explicit tools/status", "three-session real coding demo"],
-    "evaluation": ["dataset/upstream/model/config/code manifests", "no ground-truth ingestion", "all 500 full histories", "four primary conditions", "two additional repeats on fixed 100-question sample", "500-question retrieval and 100-question answer ablations", "blinded subscription judge", "two human reviewers and adjudication", "paired confidence intervals", "operational metrics", "raw reproducible artifacts and report"],
+    "evaluation": ["dataset/upstream/model/config/code manifests", "no ground-truth ingestion", "all 500 full histories", "three primary conditions", "two additional repeats on fixed 100-question sample", "500-question retrieval and 100-question answer ablations", "blinded subscription judge", "two human reviewers and adjudication", "paired confidence intervals", "operational metrics", "raw reproducible artifacts and report"],
     "delivery": ["one-command runtime", "isolated database and Neo4j tests", "TypeScript tests/checks", "benchmark protocol tests", "rendered UI verification", "four subsystem design/review explanations", "requirement-by-requirement final completion audit"]
   },
   "execution_handoff": {

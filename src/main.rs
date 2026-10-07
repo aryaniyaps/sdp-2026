@@ -2,12 +2,17 @@ use memory_engine::{
     AppState, api,
     graph::GraphStore,
     model::OllamaLimits,
-    providers::{self, OllamaEmbedder, OllamaExtractor},
+    providers::{self, OllamaEmbedder},
     store::Store,
 };
 use sqlx::postgres::PgPoolOptions;
 use std::{env, sync::Arc};
-use tower_http::trace::TraceLayer;
+use tower_http::{
+    LatencyUnit,
+    trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
+};
+use tracing::Level;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     dotenvy::dotenv().ok();
@@ -30,8 +35,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let graph_password = env::var("NEO4J_PASSWORD").unwrap_or_else(|_| "password".into());
     let graph_db = env::var("NEO4J_DATABASE").unwrap_or_else(|_| "neo4j".into());
     let base = env::var("OLLAMA_URL").unwrap_or_else(|_| "http://127.0.0.1:11434".into());
-    let extraction =
-        env::var("EXTRACTION_MODEL").unwrap_or_else(|_| "qwen2.5:14b-instruct-q4_K_M".into());
     let embedding = env::var("EMBEDDING_MODEL").unwrap_or_else(|_| "qwen3-embedding:0.6b".into());
     let ollama_limits = OllamaLimits::from_env()?;
     let planner = memory_engine::v2::TemporalPlanner::from_env()?;
@@ -66,17 +69,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         store,
         worker_concurrency: concurrency,
         graph,
-        extractor: Arc::new(OllamaExtractor::new(
-            base.clone(),
-            extraction,
-            ollama_limits,
-        )),
-        embedder: Arc::new(OllamaEmbedder::new(base, embedding).with_keep_alive(
-            env::var("OLLAMA_KEEP_ALIVE").unwrap_or_else(|_| providers::DEFAULT_KEEP_ALIVE.into()),
-        )),
+        embedder: Arc::new(
+            OllamaEmbedder::new(base.clone(), embedding).with_keep_alive(
+                env::var("OLLAMA_KEEP_ALIVE")
+                    .unwrap_or_else(|_| providers::DEFAULT_KEEP_ALIVE.into()),
+            ),
+        ),
         model: if env::var("MEMORY_MODEL_PROVIDER").as_deref() == Ok("ollama") {
             Arc::new(memory_engine::model::OllamaJsonModel {
-                base: env::var("OLLAMA_URL").unwrap_or_else(|_| "http://127.0.0.1:11434".into()),
+                base,
                 model: env::var("EXTRACTION_MODEL")
                     .unwrap_or_else(|_| "qwen2.5:14b-instruct-q4_K_M".into()),
                 limits: ollama_limits,
@@ -88,8 +89,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 model: env::var("PI_MODEL").unwrap_or_else(|_| "gpt-5.6-sol".into()),
             })
         },
-        demo_mode: env::var("DEMO_MODE").map(|v| v == "true").unwrap_or(false),
-        metrics: Arc::new(memory_engine::observability::Metrics::default()),
     });
     let bind_addr = match env::var("BIND_ADDR") {
         Ok(addr) => addr,
@@ -120,7 +119,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         state.clone(),
         &["project", "rebuild", "clear_graph"],
     ));
-    let app = api::router(state).layer(TraceLayer::new_for_http().make_span_with(|request:&axum::http::Request<_>|tracing::info_span!("http_request",method=%request.method(),uri=%request.uri())).on_response(|response:&axum::http::Response<_>,latency:std::time::Duration,_span:&tracing::Span|tracing::info!(status=%response.status(),latency_ms=latency.as_millis(),"response completed")));
+    let trace_layer = TraceLayer::new_for_http()
+        .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+        .on_response(
+            DefaultOnResponse::new()
+                .level(Level::INFO)
+                .latency_unit(LatencyUnit::Millis),
+        );
+    let app = api::router(state).layer(trace_layer);
     tracing::info!("UI http://{bind_addr} - Swagger http://{bind_addr}/swagger-ui/");
     axum::serve(listener, app)
         .with_graceful_shutdown(async {
