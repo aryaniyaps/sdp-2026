@@ -13,6 +13,7 @@ Requirements: Docker Compose, Node/npm, Python 3, and Pi with an authenticated p
 # Observatory: http://127.0.0.1:8080
 # Swagger:     http://127.0.0.1:8080/swagger-ui/
 # Graph view:  http://127.0.0.1:8080/graph?namespace=user:<name>
+# Clear one namespace (memory and graph):  scripts/clear-graph.sh user:<name>
 ```
 
 The extraction worker runs through Pi. Without `PI_PROVIDER` and `PI_MODEL` it uses Pi's own default model; set both to choose another (the benchmark runbook pins its own). `scripts/check-worker.py` runs first and stops with the reason if the provider is not authenticated, the model is unknown, or a small test request fails, so a misconfigured worker never starts silently. Defaults are PostgreSQL on port 55432, Neo4j HTTP on 7474, and Ollama on 11434. Override `DATABASE_URL`, `NEO4J_URI`, `OLLAMA_URL`, `MEMORY_WORKER_CONCURRENCY`, or `BIND_ADDR` (default `127.0.0.1:8080`) as needed. The API has no authentication and the graph view shows raw conversation text, so bind it to a non-loopback address only on a network you trust. The application uses a separate `memory_app` database; tests use `memory_test`. Compose credentials are for local development.
