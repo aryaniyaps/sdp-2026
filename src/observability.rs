@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
-use std::sync::atomic::{AtomicU64, Ordering};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -66,9 +65,6 @@ impl TraceBuilder {
     pub fn id(&self) -> Uuid {
         self.id
     }
-    pub fn set_event(&mut self, event_id: Uuid) {
-        self.event_id = Some(event_id);
-    }
     pub fn step(
         &mut self,
         stage: &str,
@@ -107,47 +103,5 @@ impl TraceBuilder {
             error,
             steps: self.steps,
         }
-    }
-}
-
-#[derive(Default)]
-pub struct Metrics {
-    pub ingestions: AtomicU64,
-    pub searches: AtomicU64,
-    pub failures: AtomicU64,
-    pub degraded: AtomicU64,
-    pub extracted_memories: AtomicU64,
-    pub versions_created: AtomicU64,
-    pub versions_reinforced: AtomicU64,
-    pub versions_superseded: AtomicU64,
-    pub ingestion_ms: AtomicU64,
-    pub search_ms: AtomicU64,
-}
-impl Metrics {
-    pub fn inc(&self, metric: &AtomicU64, value: u64) {
-        metric.fetch_add(value, Ordering::Relaxed);
-    }
-    pub fn prometheus(&self) -> String {
-        let get = |v: &AtomicU64| v.load(Ordering::Relaxed);
-        format!(
-            concat!(
-                "# HELP memory_engine_ingestions_total Completed ingestion operations.\n# TYPE memory_engine_ingestions_total counter\nmemory_engine_ingestions_total {}\n",
-                "# HELP memory_engine_searches_total Completed search operations.\n# TYPE memory_engine_searches_total counter\nmemory_engine_searches_total {}\n",
-                "# HELP memory_engine_failures_total Failed operations.\n# TYPE memory_engine_failures_total counter\nmemory_engine_failures_total {}\n",
-                "# HELP memory_engine_degraded_total Operations completed without embeddings.\n# TYPE memory_engine_degraded_total counter\nmemory_engine_degraded_total {}\n",
-                "memory_engine_extracted_memories_total {}\nmemory_engine_versions_created_total {}\nmemory_engine_versions_reinforced_total {}\nmemory_engine_versions_superseded_total {}\n",
-                "memory_engine_ingestion_duration_ms_sum {}\nmemory_engine_search_duration_ms_sum {}\n"
-            ),
-            get(&self.ingestions),
-            get(&self.searches),
-            get(&self.failures),
-            get(&self.degraded),
-            get(&self.extracted_memories),
-            get(&self.versions_created),
-            get(&self.versions_reinforced),
-            get(&self.versions_superseded),
-            get(&self.ingestion_ms),
-            get(&self.search_ms)
-        )
     }
 }

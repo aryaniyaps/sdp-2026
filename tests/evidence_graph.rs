@@ -10,7 +10,7 @@ use memory_engine::{
     graph::GraphStore,
     knowledge::*,
     model::JsonModel,
-    providers::{Embedder, Extractor},
+    providers::Embedder,
     store::Store,
     v2::{RecallRequest, RecallResponse, recall_engine},
 };
@@ -56,21 +56,6 @@ impl Embedder for NoProviders {
     }
     async fn ready(&self) -> bool {
         false
-    }
-    fn version(&self) -> &str {
-        "test"
-    }
-}
-#[async_trait]
-impl Extractor for NoProviders {
-    async fn extract(
-        &self,
-        _: &str,
-    ) -> Result<Vec<memory_engine::domain::ExtractedMemory>, AppError> {
-        Ok(vec![])
-    }
-    async fn ready(&self) -> bool {
-        true
     }
     fn version(&self) -> &str {
         "test"
@@ -283,12 +268,9 @@ async fn evidence_lifecycle_and_projection() {
     let mut s = AppState {
         store: store.clone(),
         graph: None,
-        extractor: Arc::new(NoProviders),
         embedder: Arc::new(NoProviders),
         model: Arc::new(NoModel),
         worker_concurrency: 1,
-        demo_mode: false,
-        metrics: Arc::new(Default::default()),
     };
     let mut query: RecallRequest = serde_json::from_value(
         json!({"namespace":ns,"query":"Python OR Rust","graph":false,"temporal":false}),
@@ -651,12 +633,9 @@ async fn unprocessed_evidence_is_recalled_before_extraction_and_failures_are_rep
     let state = AppState {
         store: store.clone(),
         graph: None,
-        extractor: Arc::new(NoProviders),
         embedder: Arc::new(ConstantEmbedder),
         model: Arc::new(NoModel),
         worker_concurrency: 1,
-        demo_mode: false,
-        metrics: Arc::new(Default::default()),
     };
     let ready = READY_EXTRACT_JOBS.read().await;
     let (episode, _, _) = store
@@ -735,12 +714,9 @@ async fn include_raw_keeps_recent_source_text_in_an_interpreted_namespace() {
     let state = AppState {
         store: store.clone(),
         graph: None,
-        extractor: Arc::new(NoProviders),
         embedder: Arc::new(NoProviders),
         model: Arc::new(NoModel),
         worker_concurrency: 1,
-        demo_mode: false,
-        metrics: Arc::new(Default::default()),
     };
     // The extractor kept one fact and missed the deployment day stated in the same message.
     extract(
@@ -794,12 +770,9 @@ async fn requests_without_include_raw_keep_all_words_semantics_when_nothing_matc
     let state = AppState {
         store: store.clone(),
         graph: None,
-        extractor: Arc::new(NoProviders),
         embedder: Arc::new(NoProviders),
         model: Arc::new(NoModel),
         worker_concurrency: 1,
-        demo_mode: false,
-        metrics: Arc::new(Default::default()),
     };
     // Extraction finished and produced no assertion, so only the raw fallback can answer.
     let ready = READY_EXTRACT_JOBS.read().await;
@@ -996,12 +969,9 @@ impl DistanceFixture {
         let state = Arc::new(AppState {
             store: store.clone(),
             graph: None,
-            extractor: Arc::new(NoProviders),
             embedder: Arc::new(TableEmbedder(table)),
             model: Arc::new(NoModel),
             worker_concurrency: 1,
-            demo_mode: false,
-            metrics: Arc::new(Default::default()),
         });
         let ns = format!("distance-facts-{}", Uuid::new_v4());
         let near_fact = embedded_fact(
@@ -1316,12 +1286,9 @@ async fn max_distance_without_a_query_vector_leaves_out_what_it_cannot_measure_a
     let offline = AppState {
         store: f.state.store.clone(),
         graph: None,
-        extractor: Arc::new(NoProviders),
         embedder: Arc::new(NoProviders),
         model: Arc::new(NoModel),
         worker_concurrency: 1,
-        demo_mode: false,
-        metrics: Arc::new(Default::default()),
     };
     let ask = |namespace: &str, query: &str, extra: Value| f.ask(namespace, query, extra);
     // Without the field the offline request is what it always was: every word match.
@@ -1472,15 +1439,6 @@ async fn max_distance_outside_zero_to_two_is_a_400_with_a_message() {
             .to_string()
             .contains("max_distance")
     );
-    // The legacy path has no distance gate, so asking for one is refused, not ignored.
-    let (status, body) = post_json(
-        &app,
-        "/api/v2/recall",
-        &json!({"namespace":"ns","query":"q","legacy_only":true,"max_distance":0.45}),
-    )
-    .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
-    assert!(body["error"].as_str().unwrap().contains("legacy_only"));
     // JSON has no NaN or infinity, a caller of the engine can still pass them.
     for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         let mut request: RecallRequest =
@@ -1862,12 +1820,9 @@ async fn max_distance_drops_facts_that_only_the_graph_reached_when_they_are_far(
     let state = Arc::new(AppState {
         store: store.clone(),
         graph: Some(Arc::new(graph.clone())),
-        extractor: Arc::new(NoProviders),
         embedder: f.state.embedder.clone(),
         model: Arc::new(NoModel),
         worker_concurrency: 1,
-        demo_mode: false,
-        metrics: Arc::new(Default::default()),
     });
     let ids = [
         f.near_fact,
@@ -1942,12 +1897,10 @@ async fn graph_distance_checks(state: Arc<AppState>, ns: String, ids: [Uuid; 5])
     let offline = AppState {
         store: state.store.clone(),
         graph: state.graph.clone(),
-        extractor: Arc::new(NoProviders),
+
         embedder: Arc::new(NoProviders),
         model: Arc::new(NoModel),
         worker_concurrency: 1,
-        demo_mode: false,
-        metrics: Arc::new(Default::default()),
     };
     let blind = recall_engine(
         &offline,
@@ -2063,12 +2016,9 @@ fn view_state(store: Store, graph: Option<GraphStore>) -> Arc<AppState> {
     Arc::new(AppState {
         store,
         graph: graph.map(Arc::new),
-        extractor: Arc::new(NoProviders),
         embedder: Arc::new(NoProviders),
         model: Arc::new(NoModel),
         worker_concurrency: 1,
-        demo_mode: false,
-        metrics: Arc::new(Default::default()),
     })
 }
 /// A store whose PostgreSQL server does not exist, for requests that must fail or be rejected
@@ -2957,7 +2907,7 @@ async fn clear_checks(store: Store, graph: GraphStore, ns: String, other: String
         )
         .await;
         project_namespace(&store, &graph, namespace).await;
-        // The worker also keeps a V1 shadow copy under "<namespace>:legacy" that cites the same chunks.
+        // Older releases stored shadow memories that share these chunks. Verify cleanup during upgrades.
         let chunk: Uuid = sqlx::query_scalar("SELECT c.id FROM chunks c JOIN raw_events re ON re.id=c.raw_event_id JOIN sessions s ON s.id=re.session_id WHERE s.namespace=$1 ORDER BY c.created_at LIMIT 1")
             .bind(namespace)
             .fetch_one(&store.pool)
@@ -3188,4 +3138,94 @@ async fn clearing_the_graph_removes_one_namespace_completely_and_leaves_the_othe
         cleanup_errors.is_empty(),
         "cleanup with clear_namespace failed: {cleanup_errors:?}"
     );
+}
+
+#[tokio::test]
+async fn frontend_assets_are_served_and_retired_routes_are_gone() {
+    let app = api::router(view_state(offline_store(), None));
+    for (path, content_type, contains) in [
+        ("/", "text/html", "id=\"root\""),
+        ("/graph?namespace=review", "text/html", "id=\"root\""),
+        ("/assets/app.js", "text/javascript", "Memory workspace"),
+        ("/assets/app.css", "text/css", "graph-mode"),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(Request::get(path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{path}");
+        assert!(
+            response.headers()["content-type"]
+                .to_str()
+                .unwrap()
+                .starts_with(content_type)
+        );
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        assert!(
+            std::str::from_utf8(&bytes).unwrap().contains(contains),
+            "{path}"
+        );
+    }
+    for (method, path) in [
+        ("POST", "/api/v1/events"),
+        ("POST", "/api/v1/sessions"),
+        ("POST", "/api/v1/search"),
+        ("POST", "/api/v1/demo/reset"),
+        ("GET", "/api/v1/memories"),
+        ("GET", "/api/v1/traces"),
+        ("GET", "/assets/missing.js"),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(method)
+                    .uri(path)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
+    }
+}
+
+#[tokio::test]
+async fn metrics_report_durable_operations_instead_of_unused_counters() {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        return;
+    };
+    let store = Store::new(PgPoolOptions::new().connect(&url).await.unwrap());
+    store.migrate().await.unwrap();
+    let operation = "reflect_v2";
+    let before: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM operations WHERE operation_type=$1 AND status='succeeded'",
+    )
+    .bind(operation)
+    .fetch_one(&store.pool)
+    .await
+    .unwrap();
+    let trace =
+        memory_engine::observability::TraceBuilder::new(operation, "metrics-test", None, json!({}))
+            .finish("succeeded", false, None, None);
+    store.record_trace(&trace).await.unwrap();
+    let app = api::router(view_state(store.clone(), None));
+    let response = app
+        .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let output = std::str::from_utf8(&bytes).unwrap();
+    assert!(output.contains(&format!(
+        "memory_engine_operations_total{{operation=\"{operation}\",status=\"succeeded\"}} {}",
+        before + 1
+    )));
+    assert!(!output.contains("memory_engine_versions_created_total"));
+    sqlx::query("DELETE FROM operations WHERE id=$1")
+        .bind(trace.id)
+        .execute(&store.pool)
+        .await
+        .unwrap();
 }

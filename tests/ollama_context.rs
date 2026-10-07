@@ -18,7 +18,7 @@ use memory_engine::{
     AppError, AppState, api,
     knowledge::{EvidenceEvent, Job, RetainRequest},
     model::{JsonModel, OllamaJsonModel, OllamaLimits, cached_generate, estimate_tokens},
-    providers::{Embedder, Extractor, OllamaExtractor},
+    providers::Embedder,
     store::Store,
 };
 use serde_json::{Value, json};
@@ -228,40 +228,6 @@ async fn cache_is_keyed_on_the_context_size() {
         .unwrap();
 }
 
-#[tokio::test]
-async fn legacy_extractor_sends_the_same_options_and_rejects_truncation() {
-    let (base, fake) = fake_ollama(
-        json!({"response":"{\"memories\":[]}","done":true,"done_reason":"stop","prompt_eval_count":50,"eval_count":6}),
-    )
-    .await;
-    let extractor = OllamaExtractor::new(base.clone(), "fake-model".into(), limits());
-    assert!(extractor.extract("I like tea").await.unwrap().is_empty());
-    assert!(extractor.ready().await);
-    let requests = fake.requests();
-    assert_eq!(requests[0]["options"]["num_ctx"], 16384);
-    assert_eq!(requests[0]["options"]["num_predict"], 4096);
-    assert_eq!(requests[1]["options"]["num_ctx"], 16384, "readiness probe");
-    assert_eq!(requests[1]["options"]["num_predict"], 1);
-
-    let error = extractor
-        .extract(&"y".repeat(40000))
-        .await
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("OLLAMA_NUM_CTX"), "{error}");
-    assert_eq!(fake.requests().len(), 2, "oversized text sent no request");
-
-    fake.reply_with(
-        json!({"response":"{\"memories\":[]}","done":true,"done_reason":"stop","prompt_eval_count":16384,"eval_count":6}),
-    );
-    let error = extractor
-        .extract("I like tea")
-        .await
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("prompt was truncated by Ollama"), "{error}");
-}
-
 struct Unused;
 #[async_trait]
 impl Embedder for Unused {
@@ -284,21 +250,14 @@ async fn healthz_reports_the_local_model_and_its_context() {
         .acquire_timeout(std::time::Duration::from_millis(300))
         .connect_lazy("postgres://nobody@127.0.0.1:1/none")
         .unwrap();
-    let extractor: Arc<dyn Extractor> = Arc::new(OllamaExtractor::new(
-        base.clone(),
-        "fake-model".into(),
-        limits(),
-    ));
     let state = |model: Arc<dyn JsonModel>| {
         Arc::new(AppState {
             store: Store::new(pool.clone()),
             graph: None,
-            extractor: extractor.clone(),
             embedder: Arc::new(Unused),
             model,
-            demo_mode: false,
+
             worker_concurrency: 1,
-            metrics: Arc::new(memory_engine::observability::Metrics::default()),
         })
     };
     let health = |state: Arc<AppState>| async move {
@@ -340,8 +299,8 @@ fn live_base() -> Option<(String, String)> {
 /// Repository text, repeated and cut to a character count.
 fn repository_text(chars: usize) -> String {
     let source = [
-        include_str!("../src/v2.rs"),
-        include_str!("../src/worker.rs"),
+        include_str!("../src/v2/recall.rs"),
+        include_str!("../src/worker/mod.rs"),
         include_str!("../src/graph.rs"),
         include_str!("../docs/evidence-memory.md"),
         include_str!("../README.md"),
@@ -541,16 +500,10 @@ async fn extract_with(
     let state = AppState {
         store: store.clone(),
         graph: None,
-        extractor: Arc::new(OllamaExtractor::new(
-            "http://127.0.0.1:1".into(),
-            "unused".into(),
-            limits(),
-        )),
         embedder: Arc::new(Unused),
         model: model.clone(),
-        demo_mode: false,
+
         worker_concurrency: 1,
-        metrics: Arc::new(memory_engine::observability::Metrics::default()),
     };
     let result = memory_engine::worker::process(&state, &job).await.unwrap();
     store.finish_job(&job, Ok(result.clone())).await.unwrap();
@@ -675,16 +628,10 @@ async fn refused_repair_prompt_forgets_the_invalid_reply_it_followed() {
     let state = AppState {
         store: store.clone(),
         graph: None,
-        extractor: Arc::new(OllamaExtractor::new(
-            "http://127.0.0.1:1".into(),
-            "unused".into(),
-            limits(),
-        )),
         embedder: Arc::new(Unused),
         model: model.clone(),
-        demo_mode: false,
+
         worker_concurrency: 1,
-        metrics: Arc::new(memory_engine::observability::Metrics::default()),
     };
     let error = memory_engine::worker::process(&state, &job)
         .await

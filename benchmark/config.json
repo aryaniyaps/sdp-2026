@@ -14,7 +14,6 @@
   "repeats": 3,
   "conditions": [
     "raw_hybrid",
-    "legacy",
     "enhanced",
     "full_history"
   ],
