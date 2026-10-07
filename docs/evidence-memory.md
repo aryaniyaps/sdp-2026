@@ -18,7 +18,7 @@ pi -e /absolute/path/to/sdp-2026/integrations/pi/extension.ts
 
 ### Running with a local model
 
-`MEMORY_MODEL_PROVIDER=ollama` sends the worker's extraction and consolidation prompts to `OLLAMA_URL` (`/api/generate`) with `EXTRACTION_MODEL`, default `qwen2.5:14b-instruct-q4_K_M`. The legacy extractor on `/api/v1/events` calls the same endpoint and follows the same limits.
+`MEMORY_MODEL_PROVIDER=ollama` sends the worker's extraction and consolidation prompts to `OLLAMA_URL` (`/api/generate`) with `EXTRACTION_MODEL`, default `qwen2.5:14b-instruct-q4_K_M`.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -49,9 +49,9 @@ OLLAMA_LIVE_TEST=1 cargo test --locked --test ollama_context live_ -- --nocaptur
 
 | Workstream | Code | Technical contribution | Review demonstration |
 |---|---|---|---|
-| Temporal storage and graph | `knowledge_store.rs`, migrations, `graph.rs` | Namespace isolation, atomic episode ingestion, cardinality, correction intervals, transactional jobs, leases, projection revisions | Correct Python to Rust, inspect old/new validity and exact evidence; replay the graph |
-| Evidence consolidation | `knowledge.rs`, `model.rs`, `worker.rs` | Schema-validated subscription inference, exact quotation checks, grounded aliases, supported observations, recursive invalidation | Derive an observation from two facts, then retract a support and show the descendant becomes stale |
-| Retrieval and explanations | `v2.rs`, `ui.html` | Lexical/vector/temporal retrieval, graph expansion, authoritative validation, deterministic RRF and bounded evidence context | Compare graph and observation ablations, inspect ranks, paths, timestamps and evidence |
+| Temporal storage and graph | `src/knowledge_store/`, migrations, `graph.rs` | Namespace isolation, atomic episode ingestion, cardinality, correction intervals, transactional jobs, leases, projection revisions | Correct Python to Rust, inspect old/new validity and exact evidence; replay the graph |
+| Evidence consolidation | `knowledge.rs`, `model.rs`, `src/worker/` | Schema-validated subscription inference, exact quotation checks, grounded aliases, supported observations, recursive invalidation | Derive an observation from two facts, then retract a support and show the descendant becomes stale |
+| Retrieval and explanations | `src/v2/`, `frontend/src/` | Lexical/vector/temporal retrieval, graph expansion, authoritative validation, deterministic RRF and bounded evidence context | Compare graph and observation ablations, inspect ranks, paths, timestamps and evidence |
 | Harness and evaluation | `integrations/pi`, `benchmark` | Automatic recall, observed tool outcomes, local spool, isolated benchmark banks, blinded judging, paired confidence intervals | Resume Pi across sessions; inspect captured command exit status and trace; reproduce the experiment |
 
 These are subsystem ownership suggestions. Team members should explain and verify their own implementation contributions rather than present suggested assignments as historical work.
@@ -66,7 +66,7 @@ An idempotency key identifies an immutable episode request. Reusing the key with
 
 ## V2 API
 
-All namespaces must be explicit. Requests and responses can be inspected in the source types in `knowledge.rs` and `v2.rs`. The original V1 endpoints remain available.
+All namespaces must be explicit. Requests and responses can be inspected in the source types in `src/knowledge.rs` and `src/v2/recall.rs`. Only the evidence API is maintained; trace endpoints are under `/api/v2/traces`.
 
 | Method and path | Purpose |
 |---|---|
@@ -91,7 +91,7 @@ A recall costs about one embedding of the query plus a few database round trips:
 
 ### Clearing a namespace
 
-`POST /api/v2/graph/clear` empties one namespace in a single PostgreSQL transaction (`Store::clear_namespace` in `src/knowledge_store.rs`): its facts, entities and aliases, edges, episodes, the events and chunks under them, the legacy V1 memories and the namespace's jobs. Traces stay, unlinked from the sessions and events they pointed at, because they are operational logs. Other namespaces are not touched. The same transaction queues a `clear_graph` job with a revision taken from the sequence the facts use, so a project job for an older fact cannot bring one back, and the endpoint also runs that clear on Neo4j before it answers, so the graph is empty when it returns. The queued job is the retry if Neo4j was unreachable, and the response says so in `graph`. A namespace with a running job (an unexpired lease) is refused with a 409, because that worker would write into rows that are gone. The graph page has a Clear button that asks for the namespace to be typed, and `scripts/clear-graph.sh NAMESPACE` does the same from a shell. The service has no authentication, so a deployment that exposes the API should not expose this route.
+`POST /api/v2/graph/clear` empties one namespace in a single PostgreSQL transaction (`Store::clear_namespace` in `src/knowledge_store/maintenance.rs`): its facts, entities and aliases, edges, episodes, the events and chunks under them, any V1 memory rows left by older releases and the namespace's jobs. Traces stay, unlinked from the sessions and events they pointed at, because they are operational logs. Other namespaces are not touched. The same transaction queues a `clear_graph` job with a revision taken from the sequence the facts use, so a project job for an older fact cannot bring one back, and the endpoint also runs that clear on Neo4j before it answers, so the graph is empty when it returns. The queued job is the retry if Neo4j was unreachable, and the response says so in `graph`. A namespace with a running job (an unexpired lease) is refused with a 409, because that worker would write into rows that are gone. The graph page has a Clear button that asks for the namespace to be typed, and `scripts/clear-graph.sh NAMESPACE` does the same from a shell. The service has no authentication, so a deployment that exposes the API should not expose this route.
 
 Readiness includes failures: pending, running, or failed jobs make a namespace unready. A submission acknowledgment means evidence was retained, not that extraction has finished.
 
@@ -110,7 +110,7 @@ The vector channels of recall return their nearest rows however far away they ar
 
 Not gated: the word channel for facts, so an identifier such as `v2.rs` or `atlas-staging` is found even when its fact's vector is far from the question; the exact word channel for `raw_only` requests; and the temporal channel. When nothing is close enough the reply is a normal 200 with empty `results` and `context`, and reflect answers insufficient evidence.
 
-Errors. A number that is NaN, zero, negative or above 2 is a 400 with a message, as is any value together with `legacy_only`, whose candidates have no distance gate. A value of the wrong JSON type, such as a string, is rejected by the request parser with a 422 that names the field, like any other mistyped field. If the query cannot be embedded no distance exists. Recall then leaves out what cannot be measured instead of returning it unfiltered: facts that match words stay, and so do source text without an embedding, while source text and graph facts that have an embedding are dropped. `degraded_reasons` says so.
+Errors. A number that is NaN, zero, negative or above 2 is a 400 with a message. A value of the wrong JSON type, such as a string, is rejected by the request parser with a 422 that names the field, like any other mistyped field. If the query cannot be embedded no distance exists. Recall then leaves out what cannot be measured instead of returning it unfiltered: facts that match words stay, and so do source text without an embedding, while source text and graph facts that have an embedding are dropped. `degraded_reasons` says so.
 
 The reply repeats the cutoff it used as `max_distance`, and omits the field when the request had none. A service built before the field accepts it and ignores it without a word, so restart the service after updating the Pi extension. The extension compares the echo with what it asked for and shows a warning when they differ.
 
@@ -153,7 +153,7 @@ python3 benchmark/run.py all --run development-10 --limit 10
 python3 benchmark/run.py all --run review-full
 ```
 
-Stages are resumable: `prepare`, `ingest`, `retrieve`, `answer`, `judge`, `report`, and `audit`. A manifest rejects reuse after implementation/configuration changes. Raw hybrid, legacy, enhanced and full history are primary conditions; graph and consolidation ablations are included. The fixed 100-question sample receives two additional repetitions. Reports expose graded counts and paired bootstrap intervals. Human audit packets hide the condition; two reviewers fill Boolean labels, and disagreements require adjudication. Recreating a packet preserves existing reviews and rejects changed answers.
+Stages are resumable: `prepare`, `ingest`, `retrieve`, `answer`, `judge`, `report`, and `audit`. A manifest rejects reuse after implementation/configuration changes. Raw hybrid, enhanced and full history are primary conditions; graph and consolidation ablations are included. The fixed 100-question sample receives two additional repetitions. Reports expose graded counts and paired bootstrap intervals. Human audit packets hide the condition; two reviewers fill Boolean labels, and disagreements require adjudication. Recreating a packet preserves existing reviews and rejects changed answers.
 
 Do not interpret a pilot, partial run, or favorable isolated example as a benchmark result. Check `project-requirements.json` for outstanding completion requirements. Runtime throughput and subscription availability determine how long the full experiment takes.
 

@@ -10,9 +10,9 @@ responsibility, and the report is explicitly incomplete.
 
 | Requirement group | Evidence inspected | Current conclusion |
 |---|---|---|
-| Storage and temporal graph | Migrations 0003–0010, `knowledge_store.rs`, PostgreSQL integration tests, live correction/provenance UI | Implemented; lifecycle, lease recovery, bank serialization and retroactive correction tests pass |
+| Storage and temporal graph | Migrations 0003–0010, `src/knowledge_store/`, PostgreSQL integration tests, live correction/provenance UI | Implemented; lifecycle, lease recovery, bank serialization and retroactive correction tests pass |
 | Evidence and observations | Exact-source validation, extraction and consolidation repair loops, support checks, invalidation tests, real demo consolidation retry | Implemented; the real invalid-support response was repaired and committed successfully |
-| Retrieval and reflection | `v2.rs`, graph traversal limits and authoritative validation, lifecycle tests, foreign-citation test, native browser recall/provenance check | Implemented and locally exercised; overall retrieval quality still requires the full experiment |
+| Retrieval and reflection | `src/v2/recall.rs`, graph traversal limits and authoritative validation, lifecycle tests, foreign-citation test, native browser recall/provenance check | Implemented and locally exercised; overall retrieval quality still requires the full experiment |
 | Native Pi harness | TypeScript checks, three integration tests, all three actual session JSONLs, `demonstration-report.json`, seven parser unit tests and twelve independent checks | Three sessions and memory injection verified; final-session evidence processing still pending at this observation |
 | Dataset and protocol | Checksummed 500-question dataset, 23,867 histories, pinned rubric, frozen manifest/source archive, five passing protocol tests | Protocol implemented; repeated session IDs have distinct episode identities without changing scoring provenance |
 | Four primary conditions | `review-full-v3` frozen manifest, live ingestion and full-history reader processes, saved answer files | In progress; complete primary results are missing |
