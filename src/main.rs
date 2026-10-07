@@ -2,7 +2,7 @@ use memory_engine::{
     AppState, api,
     graph::GraphStore,
     model::OllamaLimits,
-    providers::{OllamaEmbedder, OllamaExtractor},
+    providers::{self, OllamaEmbedder, OllamaExtractor},
     store::Store,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -34,6 +34,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         env::var("EXTRACTION_MODEL").unwrap_or_else(|_| "qwen2.5:14b-instruct-q4_K_M".into());
     let embedding = env::var("EMBEDDING_MODEL").unwrap_or_else(|_| "qwen3-embedding:0.6b".into());
     let ollama_limits = OllamaLimits::from_env()?;
+    let planner = memory_engine::v2::TemporalPlanner::from_env()?;
+    memory_engine::v2::set_temporal_planner(planner);
+    tracing::info!(?planner, "temporal planner");
     tracing::info!(
         num_ctx = ollama_limits.num_ctx,
         num_predict = ollama_limits.num_predict,
@@ -68,7 +71,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             extraction,
             ollama_limits,
         )),
-        embedder: Arc::new(OllamaEmbedder::new(base, embedding)),
+        embedder: Arc::new(OllamaEmbedder::new(base, embedding).with_keep_alive(
+            env::var("OLLAMA_KEEP_ALIVE").unwrap_or_else(|_| providers::DEFAULT_KEEP_ALIVE.into()),
+        )),
         model: if env::var("MEMORY_MODEL_PROVIDER").as_deref() == Ok("ollama") {
             Arc::new(memory_engine::model::OllamaJsonModel {
                 base: env::var("OLLAMA_URL").unwrap_or_else(|_| "http://127.0.0.1:11434".into()),
@@ -94,6 +99,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .map_err(|err| format!("cannot listen on {bind_addr}: {err}"))?;
+    // Load the embedding model now, so the first recall after a start does not pay for it.
+    let warm = state.embedder.clone();
+    tokio::spawn(async move {
+        match warm.embed("warm up").await {
+            Ok(_) => tracing::info!("embedding model loaded"),
+            Err(err) => {
+                tracing::warn!(error=%err, "embedding warm-up failed; the first recall will load the model")
+            }
+        }
+    });
     let mut inference_workers = Vec::new();
     for _ in 0..concurrency {
         inference_workers.push(tokio::spawn(memory_engine::worker::run(

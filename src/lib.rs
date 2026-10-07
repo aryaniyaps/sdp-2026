@@ -8,6 +8,7 @@ pub mod observability;
 pub mod providers;
 pub mod search;
 pub mod store;
+pub mod temporal;
 pub mod v2;
 pub mod worker;
 use axum::{
