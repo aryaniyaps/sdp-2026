@@ -2897,3 +2897,295 @@ fn urlencode(text: &str) -> String {
         })
         .collect()
 }
+
+/// Counts what one namespace still holds in PostgreSQL.
+async fn namespace_rows(store: &Store, ns: &str) -> Value {
+    let count = |sql: &'static str| {
+        let ns = ns.to_string();
+        let pool = store.pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(sql)
+                .bind(ns)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        }
+    };
+    json!({
+        "assertions": count("SELECT count(*) FROM assertions WHERE namespace=$1").await,
+        "entities": count("SELECT count(*) FROM entities WHERE namespace=$1").await,
+        "episodes": count("SELECT count(*) FROM episodes WHERE namespace=$1").await,
+        "episode_sources": count("SELECT count(*) FROM episode_sources es JOIN episodes e ON e.id=es.episode_id WHERE e.namespace=$1").await,
+        "assertion_edges": count("SELECT count(*) FROM assertion_edges WHERE namespace=$1").await,
+        "events": count("SELECT count(*) FROM raw_events re JOIN sessions s ON s.id=re.session_id WHERE s.namespace=$1").await,
+        "chunks": count("SELECT count(*) FROM chunks c JOIN raw_events re ON re.id=c.raw_event_id JOIN sessions s ON s.id=re.session_id WHERE s.namespace=$1").await,
+        "sessions": count("SELECT count(*) FROM sessions WHERE namespace=$1").await,
+        "legacy_memories": count("SELECT count(*) FROM memories WHERE namespace=$1 || ':legacy'").await,
+        "legacy_sources": count("SELECT count(*) FROM memory_version_sources mvs JOIN memory_versions mv ON mv.id=mvs.memory_version_id JOIN memories m ON m.id=mv.memory_id WHERE m.namespace=$1 || ':legacy'").await,
+        "work_jobs": count("SELECT count(*) FROM memory_jobs WHERE namespace=$1 AND kind<>'clear_graph'").await,
+        "clear_jobs": count("SELECT count(*) FROM memory_jobs WHERE namespace=$1 AND kind='clear_graph'").await,
+    })
+}
+async fn neo4j_nodes(graph: &GraphStore, ns: &str) -> i64 {
+    let rows = graph
+        .execute_cypher(
+            "MATCH (n {namespace:$ns}) WHERE NOT n:MemoryNamespace RETURN count(n)",
+            json!({"ns":ns}),
+        )
+        .await
+        .unwrap();
+    rows["results"][0]["data"][0]["row"][0].as_i64().unwrap()
+}
+async fn clear_checks(store: Store, graph: GraphStore, ns: String, other: String, busy: String) {
+    let at = Utc::now();
+    // Two namespaces, each with a correction chain (Rust superseded by Go), projected to Neo4j.
+    for namespace in [&ns, &other] {
+        extract(
+            &store,
+            namespace,
+            "Ada uses Rust",
+            at,
+            vec![claim("Rust", Cardinality::Single, false)],
+        )
+        .await;
+        extract(
+            &store,
+            namespace,
+            "Ada uses Go",
+            at + Duration::seconds(1),
+            vec![claim("Go", Cardinality::Single, true)],
+        )
+        .await;
+        project_namespace(&store, &graph, namespace).await;
+        // The worker also keeps a V1 shadow copy under "<namespace>:legacy" that cites the same chunks.
+        let chunk: Uuid = sqlx::query_scalar("SELECT c.id FROM chunks c JOIN raw_events re ON re.id=c.raw_event_id JOIN sessions s ON s.id=re.session_id WHERE s.namespace=$1 ORDER BY c.created_at LIMIT 1")
+            .bind(namespace)
+            .fetch_one(&store.pool)
+            .await
+            .unwrap();
+        let memory: Uuid = sqlx::query_scalar("INSERT INTO memories(namespace,canonical_key,subject,predicate) VALUES($1 || ':legacy','ada::uses language','Ada','uses language') RETURNING id")
+            .bind(namespace)
+            .fetch_one(&store.pool)
+            .await
+            .unwrap();
+        let version: Uuid = sqlx::query_scalar("INSERT INTO memory_versions(memory_id,version,value,normalized_value,statement,kind,status,valid_from,extractor_version) VALUES($1,1,'Rust','rust','Ada uses Rust','fact','active',$2,'fixture') RETURNING id")
+            .bind(memory)
+            .bind(at)
+            .fetch_one(&store.pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO memory_version_sources(memory_version_id,chunk_id) VALUES($1,$2)")
+            .bind(version)
+            .bind(chunk)
+            .execute(&store.pool)
+            .await
+            .unwrap();
+    }
+    // A trace written by V1 ingest points at a session and an event of the namespace. Traces stay when the namespace is
+    // cleared, so the clear has to unlink them and not trip over them.
+    sqlx::query("INSERT INTO operations(id,operation_type,namespace,session_id,event_id,status,started_at,finished_at,duration_ms,request) SELECT gen_random_uuid(),'ingest',$1,s.id,re.id,'succeeded',now(),now(),1,'{}'::jsonb FROM sessions s JOIN raw_events re ON re.session_id=s.id WHERE s.namespace=$1 LIMIT 1")
+        .bind(&ns)
+        .execute(&store.pool)
+        .await
+        .unwrap();
+    let before = namespace_rows(&store, &ns).await;
+    assert_eq!(
+        before["legacy_memories"], 1,
+        "the shadow copy exists before the clear: {before}"
+    );
+    assert_eq!(before["legacy_sources"], 1);
+    assert_eq!(before["assertions"], 2);
+    assert_eq!(before["episodes"], 2);
+    assert_eq!(before["events"], 2);
+    assert_eq!(before["chunks"], 2);
+    assert!(
+        neo4j_nodes(&graph, &ns).await >= 3,
+        "two facts and an entity are projected"
+    );
+    let other_before = namespace_rows(&store, &other).await;
+    let other_nodes = neo4j_nodes(&graph, &other).await;
+    let app = api::router(view_state(store.clone(), Some(graph.clone())));
+
+    // The confirmation has to repeat the namespace, and a refused request deletes nothing.
+    for confirm in ["", "yes", &format!("{ns} ")] {
+        let (status, body) = post_json(
+            &app,
+            "/api/v2/graph/clear",
+            &json!({"namespace":ns,"confirm":confirm}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+        assert!(
+            body.to_string()
+                .contains("confirm must repeat the namespace"),
+            "{body}"
+        );
+    }
+    assert_eq!(namespace_rows(&store, &ns).await, before);
+
+    // A running job of the namespace refuses the clear, an expired lease does not.
+    let request = RetainRequest {
+        namespace: busy.clone(),
+        session_id: "session".into(),
+        external_id: Uuid::new_v4().to_string(),
+        metadata: json!({}),
+        events: vec![EvidenceEvent {
+            role: "user".into(),
+            content: "Ada uses Rust".into(),
+            occurred_at: at,
+            metadata: json!({}),
+        }],
+    };
+    let ready = READY_EXTRACT_JOBS.read().await;
+    let (_, job, _) = store.retain(&request).await.unwrap();
+    drop(ready);
+    sqlx::query("UPDATE memory_jobs SET status='running',lease_token=gen_random_uuid(),lease_until=now()+interval '15 minutes' WHERE id=$1").bind(job).execute(&store.pool).await.unwrap();
+    let (status, body) = post_json(
+        &app,
+        "/api/v2/graph/clear",
+        &json!({"namespace":busy,"confirm":busy}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(namespace_rows(&store, &busy).await["episodes"], 1);
+    sqlx::query("UPDATE memory_jobs SET lease_until=now()-interval '1 minute' WHERE id=$1")
+        .bind(job)
+        .execute(&store.pool)
+        .await
+        .unwrap();
+
+    // The clear removes the whole namespace, in PostgreSQL and in Neo4j.
+    let (status, body) = post_json(
+        &app,
+        "/api/v2/graph/clear",
+        &json!({"namespace":ns,"confirm":ns}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["deleted"]["assertions"], 2, "{body}");
+    assert_eq!(body["deleted"]["episodes"], 2, "{body}");
+    assert_eq!(body["deleted"]["events"], 2, "{body}");
+    assert_eq!(body["deleted"]["chunks"], 2, "{body}");
+    assert_eq!(body["deleted"]["sessions"], 1, "{body}");
+    assert_eq!(body["deleted"]["legacy_memories"], 1, "{body}");
+    assert_eq!(body["graph"]["cleared"], true, "{body}");
+    let after = namespace_rows(&store, &ns).await;
+    for table in [
+        "assertions",
+        "entities",
+        "episodes",
+        "episode_sources",
+        "assertion_edges",
+        "events",
+        "chunks",
+        "sessions",
+        "work_jobs",
+        "legacy_memories",
+        "legacy_sources",
+    ] {
+        assert_eq!(after[table], 0, "{table} of the cleared namespace: {after}");
+    }
+    let (traces, linked): (i64, i64) = sqlx::query_as("SELECT count(*),count(*) FILTER(WHERE session_id IS NOT NULL OR event_id IS NOT NULL) FROM operations WHERE namespace=$1 AND operation_type='ingest'")
+        .bind(&ns)
+        .fetch_one(&store.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        (traces, linked),
+        (1, 0),
+        "the trace stays, without its links to rows that are gone"
+    );
+    assert_eq!(
+        after["clear_jobs"], 1,
+        "the Neo4j clear job stays queued as the retry: {after}"
+    );
+    assert_eq!(neo4j_nodes(&graph, &ns).await, 0);
+
+    // Nothing of the other namespace changed, and clearing again is harmless.
+    assert_eq!(namespace_rows(&store, &other).await, other_before);
+    assert_eq!(neo4j_nodes(&graph, &other).await, other_nodes);
+    let (status, body) = post_json(
+        &app,
+        "/api/v2/graph/clear",
+        &json!({"namespace":ns,"confirm":ns}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["deleted"]["assertions"], 0, "{body}");
+
+    // A fact retained and projected after the clear is not dropped by the clear's revision gate.
+    extract(
+        &store,
+        &ns,
+        "Ada uses Zig",
+        at,
+        vec![claim("Zig", Cardinality::Single, false)],
+    )
+    .await;
+    project_namespace(&store, &graph, &ns).await;
+    assert!(
+        neo4j_nodes(&graph, &ns).await >= 2,
+        "new facts are projected after a clear"
+    );
+
+    // The busy namespace clears once its lease expired.
+    let (status, body) = post_json(
+        &app,
+        "/api/v2/graph/clear",
+        &json!({"namespace":busy,"confirm":busy}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(namespace_rows(&store, &busy).await["episodes"], 0);
+}
+#[tokio::test]
+async fn clearing_the_graph_removes_one_namespace_completely_and_leaves_the_others() {
+    let Some((store, graph)) =
+        graph_view_services("clearing_the_graph_removes_one_namespace").await
+    else {
+        return;
+    };
+    let ns = format!("clear-{}", Uuid::new_v4());
+    let other = format!("clear-other-{}", Uuid::new_v4());
+    let busy = format!("clear-busy-{}", Uuid::new_v4());
+    let outcome = tokio::spawn(clear_checks(
+        store.clone(),
+        graph.clone(),
+        ns.clone(),
+        other.clone(),
+        busy.clone(),
+    ))
+    .await;
+    // Remove what the test left. The jobs go first and by plain SQL: a pending extract job left behind would be claimed by
+    // the claim test, which takes any ready extract job in the shared database, so a failure here must never leave one.
+    let all = vec![ns.clone(), other.clone(), busy.clone()];
+    sqlx::query("DELETE FROM memory_jobs WHERE namespace = ANY($1)")
+        .bind(&all)
+        .execute(&store.pool)
+        .await
+        .unwrap();
+    // The rest is removed with the function under test, so the shared databases do not grow. Every namespace is tried
+    // before a failure is reported.
+    let mut cleanup_errors = Vec::new();
+    for namespace in [&ns, &other, &busy] {
+        if let Err(error) = store.clear_namespace(namespace).await {
+            cleanup_errors.push(format!("{namespace}: {error}"));
+        }
+        delete_projected_namespace(&graph, namespace).await;
+    }
+    sqlx::query("DELETE FROM memory_jobs WHERE namespace = ANY($1)")
+        .bind(&all)
+        .execute(&store.pool)
+        .await
+        .unwrap();
+    if let Err(error) = outcome {
+        match error.try_into_panic() {
+            Ok(panic) => std::panic::resume_unwind(panic),
+            Err(error) => panic!("clear checks did not finish: {error}"),
+        }
+    }
+    assert!(
+        cleanup_errors.is_empty(),
+        "cleanup with clear_namespace failed: {cleanup_errors:?}"
+    );
+}

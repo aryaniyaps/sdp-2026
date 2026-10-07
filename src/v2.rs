@@ -37,7 +37,8 @@ use uuid::Uuid;
         graph,
         graph_projection,
         graph_memories,
-        rebuild
+        rebuild,
+        clear
     ),
     components(schemas(
         RetainRequest,
@@ -56,6 +57,7 @@ use uuid::Uuid;
         RecallResponse,
         RecallHit,
         Namespace,
+        ClearRequest,
         ProjectionResponse,
         ProjectionNode,
         ProjectionRelationship,
@@ -85,6 +87,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/api/v2/graph/projection", get(graph_projection))
         .route("/api/v2/graph/memories", get(graph_memories))
         .route("/api/v2/graph/rebuild", post(rebuild))
+        .route("/api/v2/graph/clear", post(clear))
 }
 #[derive(Deserialize, utoipa::ToSchema)]
 struct Namespace {
@@ -202,6 +205,41 @@ async fn rebuild(
     .await?;
     tx.commit().await?;
     Ok(Json(json!({"job_id":id})))
+}
+/// Body of `POST /api/v2/graph/clear`. `confirm` must repeat `namespace` exactly, so a stray request cannot wipe a memory.
+#[derive(Deserialize, utoipa::ToSchema)]
+struct ClearRequest {
+    namespace: String,
+    confirm: String,
+}
+#[utoipa::path(post,path="/api/v2/graph/clear",responses((status=200,body=Value),(status=400,description="confirm does not repeat the namespace"),(status=409,description="a job of the namespace is running")),tag="Evidence memory",request_body=ClearRequest)]
+async fn clear(
+    State(s): State<Arc<AppState>>,
+    Json(q): Json<ClearRequest>,
+) -> Result<Json<Value>, AppError> {
+    if q.namespace.trim().is_empty() || q.confirm != q.namespace {
+        return Err(AppError::Validation(
+            "confirm must repeat the namespace exactly".into(),
+        ));
+    }
+    let outcome = s.store.clear_namespace(&q.namespace).await?;
+    // The queued clear_graph job empties Neo4j too. Run it now as well, so the graph is empty when this
+    // returns. The job is safe to run twice, and it is the retry if this call fails.
+    let graph = match &s.graph {
+        None => json!({"cleared":false,"reason":"Neo4j is not configured"}),
+        Some(graph) => match graph
+            .clear_namespace(&q.namespace, outcome.min_revision)
+            .await
+        {
+            Ok(()) => json!({"cleared":true}),
+            Err(e) => {
+                json!({"cleared":false,"reason":e.to_string(),"retry":"the queued clear_graph job will try again"})
+            }
+        },
+    };
+    Ok(Json(
+        json!({"namespace":q.namespace,"deleted":outcome.deleted,"clear_graph_job":outcome.job,"graph":graph}),
+    ))
 }
 #[derive(Deserialize)]
 struct GraphQuery {

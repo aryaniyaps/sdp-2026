@@ -85,6 +85,7 @@ button.pill:focus-visible, #dhead button:focus-visible, .row:focus-visible, #leg
 .chip[aria-pressed="false"] { color: var(--faint); }
 .chip[aria-pressed="false"] .dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); opacity: 0.6; }
 #fit { margin-left: auto; }
+#clear:hover { border-color: #c0392b; color: #ff8a80; } #clear[hidden] { display: none; }
 
 /* red banner */
 #err {
@@ -205,6 +206,7 @@ div.row:hover { border-color: var(--line-soft); }
       <button class="pill chip" id="t-fact" type="button" aria-pressed="true" style="--c: var(--fact)"><span class="dot"></span>Facts <b id="c-fact">0</b></button>
       <button class="pill chip" id="t-entity" type="button" aria-pressed="true" style="--c: var(--entity)"><span class="dot"></span>Entities <b id="c-entity">0</b></button>
       <button class="pill" id="fit" type="button">Fit</button>
+      <button class="pill" id="clear" type="button" title="Delete everything this namespace knows">Clear</button>
     </div>
     <div id="err" role="alert"></div>
   </div>
@@ -1940,6 +1942,31 @@ div.row:hover { border-color: var(--line-soft); }
     $('msg').classList.add('show');
   }
 
+  /* ---------- clear the namespace ---------- */
+  /* Asks for the namespace to be typed, then deletes everything it knows (POST /api/v2/graph/clear). The next
+     refresh draws the empty graph. */
+  async function clearNamespace() {
+    if (!hasNs) return;
+    const typed = window.prompt('This deletes every fact, entity, memory and source text of the namespace "' + NS + '" and empties its graph. It cannot be undone.\n\nType the namespace to confirm:');
+    if (typed === null) return;
+    if (typed !== NS) { window.alert('Not cleared: what you typed does not match the namespace.'); return; }
+    const button = $('clear');
+    button.disabled = true;
+    try {
+      const res = await fetch('/api/v2/graph/clear', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ namespace: NS, confirm: typed }) });
+      const text = await res.text();
+      if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + serverMessage(text));
+      const done = JSON.parse(text);
+      if (done.graph && done.graph.cleared === false) window.alert('The memory was cleared, but Neo4j was not reached yet (' + (done.graph.reason || 'unknown reason') + '). The queued clear job will try again.');
+      await cycle();
+    } catch (err) {
+      window.alert('Not cleared: ' + (err && err.message ? err.message : err));
+    } finally {
+      button.disabled = false;
+    }
+  }
+  $('clear').addEventListener('click', clearNamespace);
+
   /* ---------- read-only hook for tests and debugging ---------- */
   window.__graphView = {
     stats() {
@@ -1965,6 +1992,7 @@ div.row:hover { border-color: var(--line-soft); }
   /* ---------- start ---------- */
   function start() {
     $('nsname').textContent = hasNs ? NS : 'none';
+    $('clear').hidden = !hasNs;
     if (hasNs) $('nschip').title = NS;
     document.title = hasNs ? 'Memory Graph: ' + NS : 'Memory Graph';
     resize();

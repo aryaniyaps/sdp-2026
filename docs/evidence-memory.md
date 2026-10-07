@@ -83,6 +83,11 @@ All namespaces must be explicit. Requests and responses can be inspected in the 
 | `GET /api/v2/assertions/{id}?namespace=...` | Inspect assertion provenance |
 | `POST /api/v2/assertions/{id}/retract?namespace=...` | Retract a fact and invalidate supported observations |
 | `POST /api/v2/graph/rebuild?namespace=...` | Queue projection reconstruction |
+| `POST /api/v2/graph/clear` | Delete everything one namespace knows. Body `{"namespace":"...","confirm":"..."}`, and `confirm` must repeat the namespace exactly or the request is a 400 |
+
+### Clearing a namespace
+
+`POST /api/v2/graph/clear` empties one namespace in a single PostgreSQL transaction (`Store::clear_namespace` in `src/knowledge_store.rs`): its facts, entities and aliases, edges, episodes, the events and chunks under them, the legacy V1 memories and the namespace's jobs. Traces stay, unlinked from the sessions and events they pointed at, because they are operational logs. Other namespaces are not touched. The same transaction queues a `clear_graph` job with a revision taken from the sequence the facts use, so a project job for an older fact cannot bring one back, and the endpoint also runs that clear on Neo4j before it answers, so the graph is empty when it returns. The queued job is the retry if Neo4j was unreachable, and the response says so in `graph`. A namespace with a running job (an unexpired lease) is refused with a 409, because that worker would write into rows that are gone. The graph page has a Clear button that asks for the namespace to be typed, and `scripts/clear-graph.sh NAMESPACE` does the same from a shell. The service has no authentication, so a deployment that exposes the API should not expose this route.
 
 Readiness includes failures: pending, running, or failed jobs make a namespace unready. A submission acknowledgment means evidence was retained, not that extraction has finished.
 
