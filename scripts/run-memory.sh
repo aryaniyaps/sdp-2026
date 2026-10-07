@@ -25,11 +25,11 @@ curl -fsS "$OLLAMA_URL/api/pull" -H 'content-type: application/json' -d '{"model
 wanted=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
 if command -v cargo >/dev/null && [ "$(cargo --version | awk '{print $2}')" = "$wanted" ]; then
   echo "Building with host cargo $wanted"
-  cargo build --locked
+  cargo build --release --locked
 else
   echo "Building in Docker (host cargo is not $wanted)"
-  docker run --rm -v sdp_cargo:/usr/local/cargo -v "$PWD:/app" -w /app rust:1.96-bookworm cargo build --locked
+  docker run --rm -v sdp_cargo:/usr/local/cargo -v "$PWD:/app" -w /app rust:1.96-bookworm cargo build --release --locked
 fi
 echo "Worker: pi/$PI_PROVIDER/$PI_MODEL"
 echo 'Memory API and observatory: http://127.0.0.1:8080'
-exec target/debug/memory-engine
+exec target/release/memory-engine
