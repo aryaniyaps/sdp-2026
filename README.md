@@ -17,6 +17,14 @@ The dashboard lets you save an interaction, ask a question, inspect a fact's evi
 
 ## Running locally
 
+For the browser demo with a Pi coding session beside the live graph, run:
+
+```sh
+./deploy/azure/run-local.sh
+```
+
+Open http://127.0.0.1:18088/ with user `reviewer`; the access code is in `~/.local/state/sdp-hosted-local/access.code`. This builds the React demo, starts the browser terminal and memory services, and uses Pi's configured default provider and model. The namespace control targets both the Pi session and graph; switching directories starts another session with the same memory. This stack keeps its own databases. See [the demo setup guide](deploy/azure/README.md) for configuration and stop commands.
+
 You need Docker with Compose, Node.js 22 with npm, Python 3, and Pi with an authenticated model provider. The startup script uses Rust 1.96.1 if it is installed locally; otherwise it builds the backend in a Rust container.
 
 ```sh
@@ -114,7 +122,7 @@ pi install /absolute/path/to/sdp-2026/integrations/pi
 
 The extension recalls relevant memory before a turn and saves new messages and tool output afterwards. It writes evidence to a local spool before submitting it, so a temporary server failure does not lose the batch. Injected recall context is excluded from retention.
 
-By default, sessions share `user:<login name>`. Set `MEMORY_NAMESPACE` for a separate project or experiment. `MEMORY_URL` changes the service address and `MEMORY_SPOOL` changes the local queue location. The extension also provides `memory_recall`, `memory_remember`, and `/memory-status`.
+By default, sessions share `user:<login name>`. Set `MEMORY_NAMESPACE` for a separate project or experiment, or switch the active namespace during a Pi session with `/memory-namespace [namespace]` (without an argument, Pi prompts for one). Switching namespaces also keeps retention cursors separate, so the current conversation can be retained in each namespace. `MEMORY_URL` changes the service address and `MEMORY_SPOOL` changes the local queue location. The extension also provides `memory_recall`, `memory_remember`, `/memory-status`, and `/memory-clear [namespace]`. Clear prompts you to type the namespace exactly, clears server data, then discards queued local batches for that namespace.
 
 Installing it sends session content, including tool output, to the configured service. Use `pi remove` to uninstall it.
 

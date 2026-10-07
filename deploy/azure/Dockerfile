@@ -8,13 +8,13 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM rust:1.96-bookworm AS build
+FROM rust:1.96.1-bookworm AS build
 WORKDIR /src
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY migrations migrations
 COPY src src
 COPY --from=frontend /ui/dist frontend/dist
-RUN cargo build --release --locked && cp target/release/memory-engine /memory-engine
+RUN cargo +1.96.1 build --release --locked && cp target/release/memory-engine /memory-engine
 
 FROM node:22-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tini less ripgrep fd-find \
@@ -32,7 +32,8 @@ COPY --from=build /memory-engine /usr/local/bin/memory-engine
 COPY deploy/azure/pi-session.sh /usr/local/bin/pi-session
 RUN chmod +x /usr/local/bin/pi-session \
     && useradd --create-home --uid 10001 --shell /bin/bash pi \
-    && mkdir -p /work /tmp/pi-sessions && chown -R pi:pi /work /tmp/pi-sessions /opt/memory-pi
+    && mkdir -p /work /tmp/pi-sessions /home/pi/.sdp-memory \
+    && chown -R pi:pi /work /tmp/pi-sessions /opt/memory-pi /home/pi/.sdp-memory
 USER pi
 ENV HOME=/home/pi PI_OFFLINE=1
 WORKDIR /work

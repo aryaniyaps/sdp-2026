@@ -37,6 +37,24 @@ export class EvidenceSpool {
       await directory.close();
     }
   }
+  /** Remove queued batches for one namespace after the server has cleared it. */
+  async discardNamespace(namespace: string): Promise<number> {
+    await mkdir(this.directory, { recursive: true, mode: 0o700 });
+    const files = (await readdir(this.directory)).filter((f) => f.endsWith(".json"));
+    let discarded = 0;
+    for (const file of files) {
+      const path = join(this.directory, file);
+      try {
+        const batch: RetainBatch = JSON.parse(await readFile(path, "utf8"));
+        if (batch.namespace !== namespace) continue;
+        await unlink(path);
+        discarded++;
+      } catch {
+        // Keep unreadable spool files for inspection and manual recovery.
+      }
+    }
+    return discarded;
+  }
   async flush(deliver: (batch: RetainBatch) => Promise<unknown>): Promise<{
     delivered: number;
     pending: number;

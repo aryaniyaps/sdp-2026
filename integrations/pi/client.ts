@@ -96,4 +96,8 @@ export class MemoryClient {
   async flush() {
     return this.queue.flush((batch) => this.request("/api/v2/retain", batch));
   }
+
+  async discardNamespace(namespace: string) {
+    return this.queue.discardNamespace(namespace);
+  }
 }

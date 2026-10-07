@@ -14,6 +14,7 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/", get(index))
         .route("/graph", get(index))
+        .route("/demo", get(index))
         .route("/assets/{name}", get(asset))
 }
 

@@ -194,7 +194,7 @@ SELECT jsonb_build_object('source_chunks',
                              FROM assertions
                              WHERE namespace = $1
                                AND status IN ('active', 'contested')
-                               AND embedding IS NULL)))
+                               AND embedding IS NULL))
 "#,
     )
     .bind(namespace)
