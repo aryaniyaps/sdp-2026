@@ -2,3 +2,6 @@ target
 .git
 .env
 .demo
+
+**/node_modules
+frontend/dist

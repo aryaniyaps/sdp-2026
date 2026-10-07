@@ -1,11 +1,19 @@
 # One image for the hosted setup: the memory service (its extraction worker shells out to Pi) and
 # ttyd running Pi with the memory extension. Built on the VM by deploy.sh, whose Docker has no
 # BuildKit, so there are no cache mounts here.
+FROM node:22-bookworm-slim AS frontend
+WORKDIR /ui
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 FROM rust:1.96-bookworm AS build
 WORKDIR /src
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY migrations migrations
 COPY src src
+COPY --from=frontend /ui/dist frontend/dist
 RUN cargo build --release --locked && cp target/release/memory-engine /memory-engine
 
 FROM node:22-bookworm-slim
