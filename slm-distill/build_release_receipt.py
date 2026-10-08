@@ -40,19 +40,30 @@ REQUIRED_CHECKS={
     'durable_assertions','current_chennai','correction_history','old_city_not_active',
     'sister_relationship','no_unsupported_geographic_addition',
     'derived_observation_with_two_supports','neo4j_projection',
-    'answer_does_not_assert_old_city_current',
+    'answer_does_not_assert_old_city_current','worker_identity_unchanged',
     *(name+suffix for name in ('location','preference') for suffix in
       ('_recall_source_evidence','_cited_answer','_citations_have_source_evidence'))}
 EVALUATIONS={'base-general-64':64,'student-general-64':64,
              'base-external-locomo-16':16,'student-external-locomo-16':16}
 
-def validate_acceptance(receipt,model):
+def validate_acceptance(receipt,model,gguf_sha256):
     checks=receipt.get('checks',{})
     missing=REQUIRED_CHECKS-set(checks)
     if missing:raise ValueError(f'Missing required live acceptance checks: {sorted(missing)}')
     if receipt.get('passed') is not True or any(v is not True for v in checks.values()):
         raise ValueError('Final live acceptance did not pass every check')
-    if receipt.get('worker_model')!=model:raise ValueError('Live acceptance used a different worker model')
+    def normalize(value):
+        return value.removeprefix('ollama/') if isinstance(value,str) else None
+    before=receipt.get('deployment_identity_before')
+    after=receipt.get('deployment_identity_after')
+    if not isinstance(before,dict) or before!=after:
+        raise ValueError('Verified deployment identity is missing or changed during acceptance')
+    health_model=before.get('health',{}).get('worker_model')
+    if any(normalize(value)!=normalize(model) for value in
+           (receipt.get('worker_model'),health_model,before.get('ollama_model'))):
+        raise ValueError('Live deployment used a different worker model')
+    if before.get('served_gguf_sha256')!=gguf_sha256:
+        raise ValueError('Live acceptance GGUF does not match the release artifact')
     if receipt.get('error'):raise ValueError('Final live acceptance contains an error')
 
 def load_evaluations(root):
@@ -87,7 +98,8 @@ def main():
     if completion.get('global_step',0)<=0 or not completion.get('metrics',{}).get('train_runtime'):
         raise ValueError('Final training completion metrics are missing')
     manifest=read(root/'manifest.json');acceptance=read(root/'final-acceptance.json')
-    validate_acceptance(acceptance,a.model)
+    gguf_digest=sha(gguf)
+    validate_acceptance(acceptance,a.model,gguf_digest)
     if manifest.get('pending_batches'):raise ValueError('Final corpus still contains pending batches')
     evaluation=load_evaluations(root)
     lineage=[HERE/'out/local-4b-v2',HERE/'out/local-4b-general-stage-a',a.run]
@@ -100,8 +112,8 @@ def main():
     receipt={'model_id':'aryaniyaps/mem-extractor','created_at':datetime.now(timezone.utc).isoformat(),
       'training':{'lineage':[stage(x) for x in lineage],'counting_note':'Stage row exposures overlap; do not sum them as unique conversations.'},
       'corpus':corpus,'evaluation':evaluation,
-      'live_acceptance':{'receipt_sha256':sha(root/'final-acceptance.json'),'worker_model':acceptance['worker_model'],'passed':True,'checks':checks_only(acceptance['checks'])},
-      'artifacts':{'adapter':{'bytes':adapter.stat().st_size,'sha256':sha(adapter)},'gguf':{'bytes':gguf.stat().st_size,'sha256':sha(gguf)}},
+      'live_acceptance':{'receipt_sha256':sha(root/'final-acceptance.json'),'worker_model':acceptance['worker_model'],'passed':True,'served_gguf_sha256':gguf_digest,'manifest_digest':acceptance['deployment_identity_before'].get('manifest_digest'),'checks':checks_only(acceptance['checks'])},
+      'artifacts':{'adapter':{'bytes':adapter.stat().st_size,'sha256':sha(adapter)},'gguf':{'bytes':gguf.stat().st_size,'sha256':gguf_digest}},
       'limitations':['English synthetic scenarios and a limited public coding slice do not establish universal domain or language generalization.',
         'Labels and semantic audits use the same teacher family; reported scores are not independent human accuracy estimates.',
         'Exact source quotes and schema validity do not guarantee entailment, correct temporal reasoning or complete recall.',
