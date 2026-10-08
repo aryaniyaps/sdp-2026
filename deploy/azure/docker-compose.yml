@@ -64,11 +64,24 @@ services:
       NEO4J_PASSWORD: ${NEO4J_PASSWORD}
       OLLAMA_URL: http://ollama:11434
       EMBEDDING_MODEL: qwen3-embedding:0.6b
-      PI_PROVIDER: ${PI_PROVIDER:-anthropic}
-      PI_MODEL: ${PI_MODEL:-claude-sonnet-5-5}
+      # The worker model (fine-tuned Qwen3-1.7B). Default: this stack's own Ollama. On Azure it is the
+      # GPU of a workstation, reached through the gpu-tunnel service below.
+      EXTRACTION_OLLAMA_URL: ${EXTRACTION_OLLAMA_URL:-http://ollama:11434}
+      EXTRACTION_MODEL: ${EXTRACTION_MODEL:-memex-extractor}
+      OLLAMA_NUM_CTX: "12288"
+      OLLAMA_NUM_PREDICT: "3072"
       MEMORY_WORKER_CONCURRENCY: "2"
+
+  # A workstation with a GPU dials in over HTTPS and its Ollama appears here as gpu-tunnel:11436.
+  # The auth file allows exactly one reverse port, so a stolen secret can do nothing else.
+  # Start it with COMPOSE_PROFILES=gpu-tunnel (provision.sh and sync-config.sh set that).
+  gpu-tunnel:
+    image: jpillora/chisel:1.12.0
+    profiles: ["gpu-tunnel"]
+    restart: unless-stopped
+    command: ["server", "--reverse", "--port", "9090", "--authfile", "/etc/chisel/users.json"]
     volumes:
-      - ${PI_AGENT_DIR:-./pi-agent}:/home/pi/.pi/agent
+      - ./gpu-tunnel-users.json:/etc/chisel/users.json:ro
 
   term:
     image: sdp-memory-app:bootstrap
@@ -101,6 +114,7 @@ services:
     ports: ["80:80", "443:443"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./conf.d:/etc/caddy/conf.d:ro
       - caddy_data:/data
       - caddy_config:/config
 

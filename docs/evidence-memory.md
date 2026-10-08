@@ -14,13 +14,15 @@ Install Docker Compose, Node/npm, and Pi with an authenticated provider. The run
 pi -e /absolute/path/to/sdp-2026/integrations/pi/extension.ts
 ```
 
-`PI_PROVIDER` and `PI_MODEL` select the worker; set both or neither, in which case Pi's own default model is used and verified by `scripts/check-worker.py` before the service starts. `MEMORY_URL`, `MEMORY_NAMESPACE`, and `MEMORY_SPOOL` configure the extension; without `MEMORY_NAMESPACE` every directory shares the namespace `user:<login name>`. The service binds localhost. The Compose credentials are development credentials.
+The worker is the fine-tuned student model served by Ollama (`EXTRACTION_MODEL`, default `memex-extractor`, at `EXTRACTION_OLLAMA_URL`); Pi is only the coding agent that produces the evidence. `MEMORY_URL`, `MEMORY_NAMESPACE`, and `MEMORY_SPOOL` configure the extension; without `MEMORY_NAMESPACE` every directory shares the namespace `user:<login name>`. The service binds localhost. The Compose credentials are development credentials.
 
 In Pi, `/memory-namespace [name]` changes the active namespace for the current extension session; with no name it prompts for one. Retention cursors are scoped to each namespace. `/memory-clear [name]` prompts you to type the target namespace exactly, clears its server data, and removes its pending local evidence batches. `/memory-status` reports processing for the active namespace.
 
-### Running with a local model
+### The worker model
 
-`MEMORY_MODEL_PROVIDER=ollama` sends the worker's extraction and consolidation prompts to `OLLAMA_URL` (`/api/generate`) with `EXTRACTION_MODEL`, default `qwen2.5:14b-instruct-q4_K_M`.
+Extraction, consolidation and reflection prompts go to `EXTRACTION_OLLAMA_URL` (default `OLLAMA_URL`, `/api/generate`) with `EXTRACTION_MODEL`, default `memex-extractor`. Every call sends the fixed system message in `src/worker/worker_system.txt`. The prompts are template files (`src/worker/extract_prompt.txt`, `src/worker/consolidate_prompt.txt`, `src/v2/reflect_prompt.txt`) shared with the training code in `slm-distill`, so the model is served exactly the text it was trained on. A start-up probe logs an error when the model is not installed (`scripts/fetch-slm.sh`). Setting `MEMORY_MODEL_PROVIDER` to anything but `ollama` stops the service.
+
+An episode is read in windows: each event is shortened for the prompt (the start and end of long output, tool metadata reduced to the tool, exit code and short inputs), and consecutive events are grouped until a window holds about 2,800 estimated tokens. Each window is a separate model call with its own indices; claims are checked against the full, unshortened events and their indices are shifted back to the episode before they are stored. A fact corrected in a later window of the same episode relies on the store's correction handling, because the existing-facts snapshot is taken once per episode.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -29,7 +31,7 @@ In Pi, `/memory-namespace [name]` changes the active namespace for the current e
 
 Both must be positive integers and `OLLAMA_NUM_PREDICT` must be smaller than `OLLAMA_NUM_CTX`. An unusable value stops the service at startup with a message naming the variable. The values are always sent together because Ollama reloads the model whenever a request asks for a different `num_ctx`; the readiness probe behind `/healthz` sends the same one. `/healthz` reports `worker_num_ctx` and `worker_num_predict` for a local model and `null` for Pi.
 
-Why this matters: without `num_ctx` Ollama runs the model with a 4096 token window (the model itself supports 32768) and, when a prompt is longer, keeps its first tokens and drops the middle without returning an error. The extract prompt is 2163 to 16658 tokens, and 15 of 18 real batches were cut that way, which removed the instructions, the output schema and the quote rules. The model then answered with the wrong shape, for example `{"events":[...]}` instead of `{"claims":[...]}`.
+Why this matters: without `num_ctx` Ollama runs the model with a 4096 token window (the model itself supports 32768) and, when a prompt is longer, keeps its first tokens and drops the middle without returning an error. Before windowing, the extract prompt was 2163 to 16658 tokens and 15 of 18 real batches were cut that way, which removed the instructions, the output schema and the quote rules. The model then answered with the wrong shape, for example `{"events":[...]}` instead of `{"claims":[...]}`.
 
 GPU memory for the 14B q4 model, measured on a 16 GB card shared with the embedder: about 10.6 GB at 4096 tokens, about 12.9 GB at 16384 and about 13.7 GB at 20480. Raise `OLLAMA_NUM_CTX` only as far as the card allows; above the card's memory Ollama spills layers to the CPU and slows down sharply.
 

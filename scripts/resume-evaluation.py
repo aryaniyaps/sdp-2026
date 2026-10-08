@@ -119,12 +119,12 @@ def main():
     ):
         raise RuntimeError("Pi version differs from the frozen experiment")
     config = manifest["config"]
-    if config["worker_thinking"] != "medium":
-        raise RuntimeError("The current Pi worker uses fixed medium thinking")
+    if config["worker_thinking"] != "none":
+        raise RuntimeError("The worker is the fine-tuned model served by Ollama, which does not think")
     health = api(args.base, "/healthz")
     if (
         health.get("worker_model")
-        != f"pi/{config['worker_provider']}/{config['worker_model']}"
+        != f"{config['worker_provider']}/{config['worker_model']}"
         or health.get("worker_concurrency") != config["worker_concurrency"]
         or health.get("embedding_model") != config["embedding_model"]
         or not health.get("database")
@@ -188,11 +188,6 @@ def main():
         return
     for provider, model, thinking in sorted(
         {
-            (
-                config["worker_provider"],
-                config["worker_model"],
-                config["worker_thinking"],
-            ),
             (config["reader_provider"], config["reader_model"], config["thinking"]),
             (config["judge_provider"], config["judge_model"], config["thinking"]),
         }

@@ -6,10 +6,14 @@
 #   run-local.sh [up]   build the image, start everything, print the address (the default)
 #   run-local.sh down   stop it, keeping the memory
 #   run-local.sh destroy   stop it and delete the memory and the generated files
-# Needs Docker Compose 2.24 or newer, openssl, and a Pi that is logged in on this machine.
+# Needs Docker Compose 2.24 or newer, openssl, curl, and a Pi that is logged in on this machine. The
+# memory worker is the fine-tuned model, served by the stack's own Ollama (CPU unless GPU=1); Pi and
+# its login are used only for the terminal.
 #   LOCAL_PORT    port on 127.0.0.1                 (default 18088)
 #   PI_AGENT_DIR  Pi's agent directory               (default ~/.pi/agent)
-#   PI_PROVIDER, PI_MODEL                            (default: Pi's settings.json)
+#   PI_PROVIDER, PI_MODEL                            (default: Pi's settings.json, for the terminal only)
+#   GPU=1         give the stack's Ollama your NVIDIA GPU (needs the NVIDIA container toolkit)
+#   SLM_FILE      a GGUF of the worker model you already have (default: downloaded from the release)
 #   SEED_DUMP     a dump made by make-seed.sh to start from (default: start empty)
 #   SDP_LOCAL_STATE  where the generated files live  (default ~/.local/state/sdp-hosted-local)
 set -euo pipefail
@@ -62,16 +66,13 @@ if [ ! -f "$STATE/.env" ]; then
     echo "NEO4J_PASSWORD=$(openssl rand -hex 16)"
   } > "$STATE/.env"
 fi
-{
-  grep -E '^(POSTGRES|NEO4J)_PASSWORD=' "$STATE/.env"
-  echo "PI_PROVIDER=$PI_PROVIDER"
-  echo "PI_MODEL=$PI_MODEL"
-} > "$STATE/.env.new" && mv "$STATE/.env.new" "$STATE/.env"
+grep -E '^(POSTGRES|NEO4J)_PASSWORD=' "$STATE/.env" > "$STATE/.env.new" && mv "$STATE/.env.new" "$STATE/.env"
 [ -f "$STATE/access.code" ] || openssl rand -hex 12 > "$STATE/access.code"
 hash=$(docker run --rm caddy:2 caddy hash-password --plaintext "$(cat "$STATE/access.code")")
 
 cp "$HERE/docker-compose.yml" "$HERE/pi-session.sh" "$STATE/"
 sed -e 's#__SITE_ADDRESS__#:80#' -e "s#__ACCESS_HASH__#$hash#" "$HERE/Caddyfile.template" > "$STATE/Caddyfile"
+mkdir -p "$STATE/conf.d"
 # A previous run handed this folder to uid 10001, so take it back before refreshing the login.
 docker run --rm --user root --entrypoint chown -v "$STATE/pi-agent:/d" sdp-memory-app:local -R "$(id -u):$(id -g)" /d
 cp "$PI_DIR/auth.json" "$STATE/pi-agent/auth.json"
@@ -90,10 +91,25 @@ services:
   caddy:
     ports: !override
       - "127.0.0.1:$PORT:80"
+  ollama:
+    ports:
+      - "127.0.0.1:${LOCAL_OLLAMA_PORT:-18434}:11434"
 YML
+if [ "${GPU:-0}" = 1 ]; then
+  cat >> "$STATE/docker-compose.override.yml" <<YML
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+YML
+fi
 # The files above were made under umask 077, but the terminal runs pi-session.sh as uid 10001 inside the image.
 chmod 755 "$STATE/pi-session.sh"
 chmod 644 "$STATE/docker-compose.yml" "$STATE/Caddyfile"
+chmod 755 "$STATE/conf.d"
 # The terminal and the memory worker run as uid 10001 inside the image and read the Pi login from here.
 # The files are world readable inside a folder only you can enter.
 chmod 755 "$STATE/pi-agent" && chmod 644 "$STATE/pi-agent/auth.json" "$STATE/pi-agent/settings.json"
@@ -103,6 +119,8 @@ chmod 700 "$STATE"
 echo "Starting the databases and pulling the embedding model (about 640 MB the first time)"
 dc up -d postgres neo4j ollama
 dc up ollama-init
+echo "Installing the worker model into the stack's Ollama (about 1.8 GB the first time)"
+OLLAMA_URL=http://127.0.0.1:${LOCAL_OLLAMA_PORT:-18434} "$REPO/scripts/fetch-slm.sh"
 if [ -n "$SEED" ]; then
   echo "Restoring the seed memory"
   cp "$SEED" "$STATE/seed.dump"

@@ -1,5 +1,5 @@
-# One image for the hosted setup: the memory service (its extraction worker shells out to Pi) and
-# ttyd running Pi with the memory extension. Built on the VM by deploy.sh, whose Docker has no
+# One image for the hosted setup: the memory service (its worker calls the fine-tuned model over
+# Ollama's API and never uses Pi) and ttyd running Pi with the memory extension. Built on the VM by deploy.sh, whose Docker has no
 # BuildKit, so there are no cache mounts here.
 FROM node:22-bookworm-slim AS frontend
 WORKDIR /ui

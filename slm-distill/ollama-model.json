@@ -1,0 +1,11 @@
+{
+ "template": "{{- if .System }}<|im_start|>system\n{{ .System }}<|im_end|>\n{{ end }}<|im_start|>user\n{{ .Prompt }}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+ "system": "You are the memory worker of a long-term memory system for coding agents. Answer with one JSON object only.",
+ "parameters": {
+  "stop": [
+   "<|im_end|>",
+   "<|endoftext|>"
+  ],
+  "temperature": 0
+ }
+}
