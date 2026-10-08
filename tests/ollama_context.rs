@@ -826,3 +826,32 @@ async fn extraction_decodes_paired_sources_but_returns_the_canonical_contract() 
             .contains("Generation wire format:")
     );
 }
+
+#[tokio::test]
+async fn reflection_sends_exact_evidence_ids_as_a_citation_enum() {
+    let id = "79c6279e-e958-43c8-9954-63d36427f42c";
+    let reply = json!({"answer":"Chennai.","citations":[id],"insufficient_evidence":false});
+    let (base, fake) = fake_ollama(json!({"response":reply.to_string(),"done":true,"done_reason":"stop","prompt_eval_count":500,"eval_count":60})).await;
+    let evidence = format!("[{id}] Maya lives in Chennai. [profile; active]\n");
+    let prompt = memory_engine::worker::fill_template(
+        include_str!("../src/v2/reflect_prompt.txt").trim_end_matches('\n'),
+        &[
+            ("QUESTION", "\"Where does Maya live?\""),
+            ("EVIDENCE", &evidence),
+        ],
+    );
+    let result = model(&base).generate(&prompt).await.unwrap();
+    assert_eq!(result, reply);
+    let requests = fake.requests();
+    let branches = &requests[0]["format"]["anyOf"];
+    assert_eq!(
+        branches[0]["properties"]["citations"]["items"]["enum"],
+        json!([id])
+    );
+    assert_eq!(branches[0]["properties"]["citations"]["minItems"], 1);
+    assert_eq!(branches[1]["properties"]["citations"]["minItems"], 0);
+    assert_eq!(
+        requests[0]["prompt"], prompt,
+        "decoder does not rewrite the task prompt"
+    );
+}

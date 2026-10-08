@@ -1,6 +1,7 @@
 """Ollama wire schema shared with src/model/structured.rs; validators stay unchanged."""
 import json
 import re
+import uuid
 from pathlib import Path
 import prompt
 
@@ -30,6 +31,28 @@ def first_json(text):
     value, end = json.JSONDecoder().raw_decode(text, start)
     return value, text[end:]
 
+def reflection_schema(user):
+    _, tail = first_json(user.split(' Question: ', 1)[1])
+    boundary = '\nEvidence:\n'
+    if not tail.startswith(boundary):
+        raise ValueError('missing reflection evidence')
+    ids = []
+    for line in tail[len(boundary):].splitlines():
+        if not line.startswith('[') or '] ' not in line:
+            continue
+        candidate = line[1:].split('] ', 1)[0]
+        try:
+            uuid.UUID(candidate)
+        except ValueError:
+            continue
+        if candidate not in ids:
+            ids.append(candidate)
+    def branch(insufficient, minimum):
+        citations = ({'type':'array','items':{'enum':ids},'minItems':minimum,'maxItems':len(ids)}
+                     if ids else {'type':'array','items':S,'maxItems':0})
+        return obj({'answer':S,'citations':citations,'insufficient_evidence':{'const':insufficient}})
+    return {'anyOf':[branch(False, 1),branch(True, 0)]} if ids else branch(True, 0)
+
 def prepare(user):
     if user.startswith('You are the extraction worker'):
         existing, tail = first_json(user.split('\nExisting facts: ',1)[1])
@@ -52,6 +75,8 @@ def prepare(user):
             return {'enum':values} if values else S
         schema=json.loads(prompt.fill((ROOT/'consolidate_schema.json').read_text(),{'SUBJECTS':json.dumps(ids('subject_id')),'IDS':json.dumps(ids('id'))}))
         return user, schema, False
+    if user.startswith('Answer only from the following cited evidence.'):
+        return user, reflection_schema(user), False
     return user, 'json', False
 
 def canonicalize(value, paired):
