@@ -5,6 +5,8 @@
 # Needs: az (logged in), git, tar, xz, base64. Run from anywhere inside the repository.
 #   AZURE_RG  resource group   (default sdp-memory-rg)
 #   AZURE_VM  virtual machine  (default sdp-memory-vm)
+#   BUILD_ONLY=1  build the image on the VM and stop before swapping to it. The layers stay cached,
+#                 so the real deploy of the same sources a little later takes seconds to build.
 set -euo pipefail
 
 RG=${AZURE_RG:-sdp-memory-rg}
@@ -51,6 +53,11 @@ for _ in $(seq 1 12); do
   if printf '%s' "$out" | grep -q BUILD_DONE; then built=1; break; fi
 done
 [ "${built:-0}" = 1 ] || { echo "image build did not finish within an hour, nothing was changed" >&2; exit 1; }
+
+if [ "${BUILD_ONLY:-0}" = 1 ]; then
+  echo "Built sdp-memory-app:$TAG on $VM; nothing was switched"
+  exit 0
+fi
 
 cat > "$WORK/swap.sh" <<SH
 set -u

@@ -252,7 +252,7 @@ def pi_call(prompt, provider, model):
 
 def ingest(run, data, base):
     health = api(base, "/healthz")
-    expected_worker = f"pi/{CONFIG['worker_provider']}/{CONFIG['worker_model']}"
+    expected_worker = f"{CONFIG['worker_provider']}/{CONFIG['worker_model']}"
     if (
         health.get("worker_model") != expected_worker
         or health.get("embedding_model") != CONFIG["embedding_model"]

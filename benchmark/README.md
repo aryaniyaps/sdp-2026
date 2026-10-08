@@ -31,8 +31,8 @@ edit these fields in `config.json`:
 
 | Fields | Purpose |
 |---|---|
-| `worker_provider`, `worker_model` | Extraction and consolidation |
-| `worker_thinking` | Records the worker's fixed `medium` setting; keep it `medium` |
+| `worker_provider`, `worker_model` | Extraction and consolidation: `ollama` and the installed model name (default `memex-extractor`) |
+| `worker_thinking` | `none`: the worker is the fine-tuned model served by Ollama, which does not think |
 | `reader_provider`, `reader_model`, `thinking` | Same reader for all conditions; `thinking` also applies to the judge |
 | `judge_provider`, `judge_model` | Blinded category-rubric judging |
 | `worker_concurrency`, `ingestion_concurrency` | Parallel independent memory banks |
@@ -53,11 +53,10 @@ model estimates, not proof of a subscription charge.
 
 ## 2. Start and validate the service
 
-From the repository root, export worker settings matching your chosen configuration:
+From the repository root, make sure the worker model named in `config.json` is installed (`run-memory.sh` does that) and match the concurrency:
 
 ```sh
-export PI_PROVIDER='your-worker-provider'
-export PI_MODEL='your-worker-model'
+export EXTRACTION_MODEL='memex-extractor'
 export MEMORY_WORKER_CONCURRENCY=4
 ./scripts/run-memory.sh
 ```
@@ -76,7 +75,7 @@ curl -fsS http://127.0.0.1:8080/healthz
 ```
 
 Check database and embedder readiness, worker identity, embedding model and worker
-concurrency. This experiment uses the Pi worker. A model identity mismatch stops ingestion. The normal
+concurrency. The worker is the Ollama model named in `config.json`; the reader and judge still run through Pi. A model identity mismatch stops ingestion. The normal
 runtime is `run-memory.sh`; the Compose `full` API profile uses a different Ollama
 worker configuration and is not the pinned subscription experiment.
 

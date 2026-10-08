@@ -1,32 +1,36 @@
-# Everything sits behind one access code. Only the landing page, the terminal and the read-only
-# graph routes are reachable; the memory API itself (retain, recall, jobs) is not exposed.
+# Everything except the GPU tunnel sits behind one access code. Only the landing page, the terminal
+# and the read-only graph routes are reachable; the memory API itself (retain, recall, jobs) is not
+# exposed. conf.d/*.caddy adds routes that carry their own authentication (the GPU tunnel).
 __SITE_ADDRESS__ {
 	encode zstd gzip
-	basic_auth {
-		reviewer __ACCESS_HASH__
-	}
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
 	}
-	handle /term/* {
-		reverse_proxy term:7681
-	}
-	@frontend path /demo /graph /assets/*
-	handle @frontend {
-		reverse_proxy engine:8080
-	}
-	@graphapi {
-		method GET
-		path /api/v2/graph/projection /api/v2/graph/memories
-	}
-	handle @graphapi {
-		reverse_proxy engine:8080
-	}
-	handle / {
-		redir /demo 302
-	}
+	import /etc/caddy/conf.d/*.caddy
 	handle {
-		respond "not found" 404
+		basic_auth {
+			reviewer __ACCESS_HASH__
+		}
+		handle /term/* {
+			reverse_proxy term:7681
+		}
+		@frontend path /demo /graph /assets/*
+		handle @frontend {
+			reverse_proxy engine:8080
+		}
+		@graphapi {
+			method GET
+			path /api/v2/graph/projection /api/v2/graph/memories
+		}
+		handle @graphapi {
+			reverse_proxy engine:8080
+		}
+		handle / {
+			redir /demo 302
+		}
+		handle {
+			respond "not found" 404
+		}
 	}
 }

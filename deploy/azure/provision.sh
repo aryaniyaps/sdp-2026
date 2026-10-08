@@ -4,20 +4,24 @@
 # It refuses to run when the VM already exists.
 #
 # Needs: az (logged in), docker (only to hash the access code), openssl, ssh-keygen, tar, base64,
-# and a Pi that is logged in on this machine (its auth.json is copied to the VM).
+# and a Pi that is logged in on this machine (its auth.json is copied to the VM, for the terminal only:
+# the memory worker is the fine-tuned model and never uses it).
 #   DNS_LABEL     required, a name unique in the region: the page is <label>.<location>.cloudapp.azure.com
 #   AZURE_RG      resource group            (default sdp-memory-rg)
 #   AZURE_LOC     location                  (default eastus)
 #   AZURE_VM      virtual machine           (default sdp-memory-vm)
 #   VM_SIZE       size                      (default Standard_D2s_v4, 2 vCPU 8 GB; a size can be unavailable in a subscription)
 #   PI_AGENT_DIR  Pi's agent directory      (default ~/.pi/agent)
-#   PI_PROVIDER, PI_MODEL                   (default: Pi's settings.json, used by the terminal and memory worker)
+#   PI_PROVIDER, PI_MODEL                   (default: Pi's settings.json, used by the terminal only)
+#   GPU_TUNNEL    1 (default) lets a workstation's GPU serve the worker model through gpu-tunnel.sh;
+#                 0 uses the VM's own Ollama (CPU, slow) and you install the model there yourself
 #   SEED_DUMP     a dump made by make-seed.sh; the memory starts from it (default: start empty)
 #   SSH_FROM      a CIDR to open port 22 for (default: SSH stays closed, nothing here needs it)
 #   SDP_CLOUD_STATE  where the access code, passwords and the admin key are kept (default ~/.sdp-cloud)
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
+# shellcheck disable=SC2034
 REPO=$(git -C "$HERE" rev-parse --show-toplevel)
 RG=${AZURE_RG:-sdp-memory-rg}
 LOC=${AZURE_LOC:-eastus}
@@ -28,6 +32,7 @@ STATE=${SDP_CLOUD_STATE:-$HOME/.sdp-cloud}
 PI_DIR=${PI_AGENT_DIR:-$HOME/.pi/agent}
 SEED=${SEED_DUMP:-}
 FQDN=$DNS.$LOC.cloudapp.azure.com
+# shellcheck source=lib.sh
 . "$HERE/lib.sh"
 
 for tool in az docker openssl ssh-keygen tar base64 python3; do
@@ -53,10 +58,13 @@ if [ ! -f "$STATE/secrets.env" ]; then
     echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
     echo "NEO4J_PASSWORD=$(openssl rand -hex 16)"
     echo "ACCESS_CODE=$(openssl rand -hex 12)"
+    echo "GPU_TUNNEL_SECRET=$(openssl rand -hex 24)"
   } > "$STATE/secrets.env"
 fi
+grep -q '^GPU_TUNNEL_SECRET=' "$STATE/secrets.env" || echo "GPU_TUNNEL_SECRET=$(openssl rand -hex 24)" >> "$STATE/secrets.env"
 get() { grep -m1 "^$1=" "$STATE/secrets.env" | cut -d= -f2-; }
 [ -f "$STATE/vm_key" ] || ssh-keygen -t ed25519 -N '' -C "$VM" -f "$STATE/vm_key" -q
+# shellcheck disable=SC2034  # read by render_config in lib.sh
 hash=$(docker run --rm caddy:2 caddy hash-password --plaintext "$(get ACCESS_CODE)")
 
 echo "Creating $RG, the network rules and $VM ($SIZE)"
@@ -94,14 +102,7 @@ done
 echo "Preparing the configuration"
 cfg=$WORK/cfg
 mkdir -p "$cfg/pi-agent"
-cp "$HERE/docker-compose.yml" "$HERE/pi-session.sh" "$HERE/reset-seed.sh" "$cfg/"
-sed -e "s#__SITE_ADDRESS__#$FQDN#" -e "s#__ACCESS_HASH__#$hash#" "$HERE/Caddyfile.template" > "$cfg/Caddyfile"
-{
-  echo "POSTGRES_PASSWORD=$(get POSTGRES_PASSWORD)"
-  echo "NEO4J_PASSWORD=$(get NEO4J_PASSWORD)"
-  echo "PI_PROVIDER=$PI_PROVIDER"
-  echo "PI_MODEL=$PI_MODEL"
-} > "$cfg/.env"
+render_config "$cfg"
 cp "$PI_DIR/auth.json" "$cfg/pi-agent/auth.json"
 printf '{\n  "defaultProvider": "%s",\n  "defaultModel": "%s",\n  "defaultThinkingLevel": "medium",\n  "quietStartup": true,\n  "tuiMode": "regular"\n}\n' \
   "$PI_PROVIDER" "$PI_MODEL" > "$cfg/pi-agent/settings.json"
@@ -117,8 +118,9 @@ tar xzf config.tgz && rm -f config.tgz
 # The files were made under umask 077. The terminal runs pi-session.sh as uid 10001, so it must be readable by everyone.
 chmod 755 pi-session.sh reset-seed.sh
 chmod 644 docker-compose.yml Caddyfile
-chmod 600 .env
-# The terminal and the memory worker run as uid 10001 inside the image and read the Pi login from here.
+chmod 755 conf.d && chmod 644 conf.d/* 2>/dev/null || true
+chmod 600 .env gpu-tunnel-users.json 2>/dev/null || true
+# The terminal runs as uid 10001 inside the image and reads the Pi login from here.
 chown -R 10001:10001 pi-agent && chmod 700 pi-agent && chmod 600 pi-agent/auth.json
 # Start the stores and pull the embedding model before the first app image exists.
 docker compose up -d postgres neo4j ollama
