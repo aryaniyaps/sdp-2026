@@ -61,6 +61,29 @@ Release receipts require completed baseline/student summary and semantic reports
 
 The paired-source codec binds quote choices to visible event spans and restricts enums and existing-fact identifiers. It converts back to the existing canonical API without relaxing domain validation. Exact text matching does not prove entailment; quoting a rejected proposal can still support an incorrect model claim. Short teacher quotes are widened only to the shortest permitted containing source span, retaining source identity and claim text.
 
+## Measured internal comparison: improvement and regression
+
+The 64-case matched internal comparison is complete with zero grading errors. The teacher judge is from the same family as the label generator; these numbers are not independent human accuracy.
+
+| Measurement | Untrained 4B base | Fine-tuned 4B |
+|---|---:|---:|
+| Structural acceptance | 64/64 | 63/64 |
+| Supported extraction claims | 58/63 (92.1%) | 38/42 (90.5%) |
+| Extraction reference coverage | 50/55 (90.9%) | 41/55 (74.5%) |
+| Correct annotated corrections | 8/8 | 8/8 |
+| Correct consolidation | 1/16 | 13/16 |
+| Correct reflection | 10/16 | 15/16 |
+
+This is a **multitask tradeoff with an extraction regression**, not evidence that every memory task improved. One student reflection failed the original UUID-citation contract; it remains a failure in the matched results. The external sixteen-window extraction diagnostic also regresses: supported claims are 22/26 (84.6%) versus 39/44 (88.6%); reference coverage is 13/40 (32.5%) versus 16/40 (40.0%). All sixteen windows pass structural validation for each model. These are not official LoCoMo QA scores. Final live acceptance remains separate evidence.
+
+Manual inspection also found recurrent temporal errors: “tomorrow” on June 1 became June 3; “this Friday” from October 8 became October 17; and date-only events gained fabricated midnight `event_at` values. These are substantive remaining defects, not presentation details or solved by the citation enum. Source evidence and date verification remain necessary.
+
+## Deployment-only reflection repair
+
+The first final-candidate live pilot passed its completed graph/extraction/correction checks but failed reflection with HTTP 502; runtime diagnosis identified invalid UUID citations. Its original `candidate-live-acceptance.json` is preserved. The deployment repair restricts reflection citations to retrieved assertion IDs. This changes the decoder, not the trained weights, and requires another live acceptance run.
+
+The 64-case internal and 16-case external matched comparisons retain the original Python decoder for **both** baseline and student. Their scores must not be used to claim an improvement caused by the later reflection enum. The repeated live pilot evaluates that deployment change separately. Public inference should match the repaired serving contract after the frozen comparisons finish.
+
 ## Final operational and publication gates
 
 `verify_live_memory.py` must pass all required checks using the selected final model: durable assertions, updated current city, superseded historical city, unchanged preference, correct relationship, no invented geography, observation with two supports, Neo4j projection, source-backed recall and cited reflection. `build_release_receipt.py` requires those checks, the correct worker identity, final adapter/GGUF and completed training/evaluation receipts. A saved receipt with a failed or omitted check is not acceptance.

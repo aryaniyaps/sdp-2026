@@ -120,12 +120,23 @@ def main():
                    'excluded_count':len(manifest.get('excluded',[])),'duplicate_count':len(manifest.get('duplicates',[])) if isinstance(manifest.get('duplicates',[]),list) else manifest['duplicates'],
                    'manifest_sha256':sha(root/'manifest.json'),
                    'inherited_public_data':{'source':'nebius/SWE-rebench-openhands-trajectories','license':'CC-BY-4.0','relabeled_training_windows_before_token_filter':118,'stage':'local-4b-v2','note':'Inherited through warm-start lineage; stage-1 token filtering may exclude some rows.'}})
+    manual=read(root/'student-manual-review.json')
+    manual_summary={k:manual[k] for k in ('status','method','selection','summary','prominent_limitations','artifact_sha256') if k in manual}
+    decoder_check=read(root/'reflection-decoder-python-check.json')
+    decoder_regression={k:decoder_check[k] for k in ('scope','original_key','model','structured_sha256','accepted') if k in decoder_check}
+    decoder_regression['attempt_count']=len(decoder_check.get('attempts',[]))
     receipt={'model_id':'aryaniyaps/mem-extractor','created_at':datetime.now(timezone.utc).isoformat(),
       'training':{'lineage':[stage(x) for x in lineage],'counting_note':'Stage row exposures overlap; do not sum them as unique conversations.'},
       'corpus':corpus,'evaluation':evaluation,
-      'live_acceptance':{'receipt_sha256':sha(root/'final-acceptance.json'),'worker_model':acceptance['worker_model'],'passed':True,'served_gguf_sha256':gguf_digest,'manifest_digest':acceptance['deployment_identity_before'].get('manifest_digest'),'checks':checks_only(acceptance['checks'])},
+      'evaluation_protocol':read(root/'frozen-comparison-decoder.json'),
+      'manual_review':manual_summary,'deployment_decoder':read(root/'reflection-decoder-fix.json'),
+      'post_comparison_regression':decoder_regression,
+      'live_acceptance':{'receipt_sha256':sha(root/'final-acceptance.json'),'worker_model':acceptance['worker_model'],'passed':True,'served_gguf_sha256':gguf_digest,'manifest_digest':acceptance['deployment_identity_before'].get('manifest_digest'),'checks':checks_only(acceptance['checks']),'recheck_provenance':acceptance.get('recheck_provenance')},
       'artifacts':{'adapter':{'bytes':adapter.stat().st_size,'sha256':sha(adapter)},'gguf':{'bytes':gguf.stat().st_size,'sha256':gguf_digest}},
-      'limitations':['English synthetic scenarios and a limited public coding slice do not establish universal domain or language generalization.',
+      'limitations':['The matched internal test shows a multitask tradeoff: consolidation/reflection improve, but extraction support and reference coverage regress versus the base. This is not a uniformly better extractor.',
+        'External extraction also regresses: supported claims 22/26 (84.6%) versus 39/44 (88.6%) and reference coverage 13/40 (32.5%) versus 16/40 (40.0%); this is a short-window diagnostic, not official LoCoMo QA accuracy.',
+        'Temporal normalization remains unreliable: observed errors include tomorrow June 1 mapped to June 3, this Friday from October 8 mapped to October 17, and invented midnight timestamps for date-only events. Do not treat extracted event times as verified.',
+        'English synthetic scenarios and a limited public coding slice do not establish universal domain or language generalization.',
         'Labels and semantic audits use the same teacher family; reported scores are not independent human accuracy estimates.',
         'Exact source quotes and schema validity do not guarantee entailment, correct temporal reasoning or complete recall.',
         'Training examples are capped at 4096 tokens; a larger serving context is not evidence of learned long-context performance.',

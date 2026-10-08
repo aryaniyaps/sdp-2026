@@ -14,6 +14,24 @@ from pathlib import Path
 import requests
 
 
+def sister_relationship_is_supported(graph, details, source_texts):
+    """Resolve attribution through graph entities, then require actual source evidence."""
+    subjects = {entity["id"] for entity in graph["entities"]
+                if entity.get("name", "").strip().lower() == "maya sen"}
+    for assertion in graph["assertions"]:
+        text = (assertion.get("statement", "") + " " + assertion.get("value", "")).lower()
+        if (assertion["status"] != "active" or assertion["subject_id"] not in subjects
+                or "leela sen" not in text or "sister" not in text
+                or re.search(r"\b(?:not|isn't)\b.{0,20}\bsister\b", text)):
+            continue
+        for source in details.get(assertion["id"], {}).get("sources", []):
+            quote = source.get("quote", "")
+            if ("leela sen" in quote.lower() and "sister" in quote.lower()
+                    and any(quote in original for original in source_texts)):
+                return True
+    return False
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--url", default="http://127.0.0.1:18080")
@@ -90,7 +108,13 @@ def main():
         receipt["checks"]["current_chennai"] = any("chennai" in x["statement"].lower() and x["status"] == "active" for x in assertions)
         receipt["checks"]["correction_history"] = any(x["status"] == "superseded" and "pune" in x["statement"].lower() for x in assertions)
         receipt["checks"]["old_city_not_active"] = not any(x["status"] == "active" and "pune" in x["statement"].lower() and "chennai" not in x["statement"].lower() for x in assertions)
-        receipt["checks"]["sister_relationship"] = any(x["status"] == "active" and all(word in x["statement"].lower() for word in ("maya", "leela", "sister")) for x in assertions)
+        family_details = {}
+        for assertion in assertions:
+            text = (assertion.get("statement", "") + " " + assertion.get("value", "")).lower()
+            if "leela" in text and "sister" in text:
+                family_details[assertion["id"]] = request("GET", "/api/v2/assertions/" + assertion["id"], params={"namespace": ns})
+        receipt["family_assertion_details"] = family_details
+        receipt["checks"]["sister_relationship"] = sister_relationship_is_supported(graph, family_details, source_texts)
         receipt["checks"]["no_unsupported_geographic_addition"] = not any("india" in x["statement"].lower() for x in assertions)
         receipt["checks"]["derived_observation_with_two_supports"] = any(len({e["to_id"] for e in supports if e["from_id"] == x["id"]}) >= 2 for x in observations)
         receipt["checks"]["neo4j_projection"] = bool(projection.get("nodes")) and bool(projection.get("relationships"))
