@@ -10,9 +10,11 @@ def main():
     a=p.parse_args()
     with open(a.prompt_file) as f: user=f.read()
     user,schema,paired=structured.prepare(user)
-    payload={'model':a.model,'system':prompt.SYSTEM,'prompt':user,'format':schema,'think':False,'stream':False,'options':{'temperature':0,'num_ctx':12288}}
+    if prompt.estimate_tokens(user)+3072>12288:raise ValueError('Structured prompt exceeds the tested context budget')
+    payload={'model':a.model,'system':prompt.SYSTEM,'prompt':user,'format':schema,'think':False,'stream':False,'options':{'temperature':0,'num_ctx':12288,'num_predict':3072}}
     req=urllib.request.Request(a.host.rstrip('/')+'/api/generate',data=json.dumps(payload).encode(),headers={'Content-Type':'application/json'})
     with urllib.request.urlopen(req,timeout=600) as response: result=json.load(response)
+    if result.get('prompt_eval_count',12288)+16>=12288:raise RuntimeError('Prompt truncation cannot be ruled out; no canonical result returned')
     if result.get('done_reason')=='length':raise RuntimeError('Model output was truncated; no canonical result returned')
     print(json.dumps(structured.canonicalize(json.loads(result['response']),paired),ensure_ascii=False,indent=2))
 

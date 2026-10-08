@@ -46,7 +46,7 @@ def main():
     (a.out/'README.md').write_text(card(receipt))
     system=(HERE.parent/'src/worker/worker_system.txt').read_text().strip()
     template='{{- if .System }}<|im_start|>system\n{{ .System }}<|im_end|>\n{{ end }}<|im_start|>user\n{{ .Prompt }}<|im_end|>\n<|im_start|>assistant\n'
-    (a.out/'Modelfile').write_text('FROM ./mem-extractor-q8_0.gguf\nTEMPLATE """'+template+'"""\nSYSTEM """'+system+'"""\nPARAMETER temperature 0\nPARAMETER num_ctx 12288\nPARAMETER stop "<|im_end|>"\nPARAMETER stop "<|endoftext|>"\n')
+    (a.out/'Modelfile').write_text('FROM ./mem-extractor-q8_0.gguf\nTEMPLATE """'+template+'"""\nSYSTEM """'+system+'"""\nPARAMETER temperature 0\nPARAMETER num_ctx 12288\nPARAMETER num_predict 3072\nPARAMETER stop "<|im_end|>"\nPARAMETER stop "<|endoftext|>"\n')
     copy(HERE/'release_inference.py','inference/run.py')
     files=sorted(p for p in a.out.rglob('*') if p.is_file())
     (a.out/'SHA256SUMS').write_text(''.join(f'{sha(f)}  {f.relative_to(a.out)}\n' for f in files))
