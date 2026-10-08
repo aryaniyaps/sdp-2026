@@ -154,7 +154,7 @@ on_vm "$WORK/finish.sh"
 cat <<DONE
 
 Done. Page:   https://$FQDN/   (the certificate can take a minute)
-User:         reviewer
+User:         admin
 Access code:  $STATE/secrets.env (ACCESS_CODE)
 Later:        deploy/azure/deploy.sh updates the app; az vm deallocate -g $RG -n $VM stops the compute cost;
               az group delete -n $RG removes everything.

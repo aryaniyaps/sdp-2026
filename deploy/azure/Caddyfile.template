@@ -10,7 +10,7 @@ __SITE_ADDRESS__ {
 	import /etc/caddy/conf.d/*.caddy
 	handle {
 		basic_auth {
-			reviewer __ACCESS_HASH__
+			admin __ACCESS_HASH__
 		}
 		handle /term/* {
 			reverse_proxy term:7681
