@@ -14,7 +14,7 @@ REQUIRED = {
     'src/model/paired_sources.txt', 'src/worker/worker_system.txt',
     'src/worker/extract_prompt.txt', 'src/worker/consolidate_prompt.txt',
     'src/v2/reflect_prompt.txt', 'documentation/PROMPT_DESIGN.md',
-    'documentation/RESEARCH_PROTOCOL.md',
+    'documentation/RESEARCH_PROTOCOL.md', 'documentation/EXTERNAL_LOCOMO.md',
     'documentation/Finetuning_Iteration_Report.ipynb',
 }
 
