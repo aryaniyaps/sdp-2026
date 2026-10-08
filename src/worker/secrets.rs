@@ -13,21 +13,27 @@ pub fn leaks_secret(text: &str) -> bool {
     if let Some(scheme) = text.find("://") {
         let rest = &text[scheme + 3..];
         let authority = rest.split(['/', ' ', '\n']).next().unwrap_or("");
-        if let Some((credentials, _)) = authority.split_once('@') {
-            if credentials.split_once(':').is_some_and(|(_, pw)| pw.len() >= 4) {
-                return true;
-            }
+        if let Some((credentials, _)) = authority.split_once('@')
+            && credentials
+                .split_once(':')
+                .is_some_and(|(_, pw)| pw.len() >= 4)
+        {
+            return true;
         }
     }
     token_chars(text).any(|token| {
         let body = |prefix: &str, min: usize| {
-            token.strip_prefix(prefix).is_some_and(|rest| rest.len() >= min)
+            token
+                .strip_prefix(prefix)
+                .is_some_and(|rest| rest.len() >= min)
         };
         body("sk-", 16)
             || body("ghp_", 20)
             || (token.starts_with("AKIA")
                 && token.len() == 20
-                && token.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()))
+                && token
+                    .chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()))
             || (["xoxa-", "xoxb-", "xoxp-"].iter().any(|p| body(p, 10)))
             || (token.starts_with("eyJ") && token.matches('.').count() >= 2 && token.len() > 30)
     })

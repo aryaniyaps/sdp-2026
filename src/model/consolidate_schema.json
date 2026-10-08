@@ -1,0 +1,51 @@
+{
+  "type": "object",
+  "properties": {
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "subject_id": {{SUBJECTS}},
+          "statement": {
+            "type": "string"
+          },
+          "predicate": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "supports": {
+            "type": "array",
+            "items": {{IDS}},
+            "minItems": 2,
+            "uniqueItems": true
+          },
+          "explanation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_id",
+          "statement",
+          "predicate",
+          "value",
+          "confidence",
+          "supports",
+          "explanation"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "observations"
+  ],
+  "additionalProperties": false
+}

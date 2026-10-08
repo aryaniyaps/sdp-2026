@@ -3188,7 +3188,7 @@ async fn frontend_assets_are_served_and_retired_routes_are_gone() {
     for (path, content_type, contains) in [
         ("/", "text/html", "id=\"root\""),
         ("/graph?namespace=review", "text/html", "id=\"root\""),
-        ("/assets/app.js", "text/javascript", "Memory workspace"),
+        ("/assets/app.js", "text/javascript", "Pi with shared memory"),
         ("/assets/app.css", "text/css", "graph-mode"),
     ] {
         let response = app

@@ -81,6 +81,7 @@ async fn every_generate_call_carries_context_and_output_cap() {
     assert_eq!(requests[0]["options"]["num_predict"], 4096);
     assert_eq!(requests[0]["options"]["temperature"], 0);
     assert_eq!(requests[0]["format"], "json");
+    assert_eq!(requests[0]["think"], false);
     assert_eq!(requests[0]["stream"], false);
     assert_eq!(requests[0]["prompt"], "short prompt");
 }
@@ -551,8 +552,9 @@ async fn worker_shrinks_the_snapshot_for_a_local_model_and_leaves_hosted_alone()
     store.migrate().await.unwrap();
     let facts = snapshot_facts(80);
 
-    // A small window forces the shrink; the fact the batch talks about must survive it.
-    let small = OllamaLimits::new(4096, 1024).unwrap();
+    // The expanded prompt plus wire instructions leaves no repair-adjusted snapshot
+    // room at 4096. At 5120 the snapshot still shrinks but relevant facts can survive.
+    let small = OllamaLimits::new(5120, 1024).unwrap();
     let local = Arc::new(Recording {
         prompts: Mutex::new(Vec::new()),
         limits: Some(small),
@@ -575,6 +577,17 @@ async fn worker_shrinks_the_snapshot_for_a_local_model_and_leaves_hosted_alone()
         !prompt.contains(facts[79]["id"].as_str().unwrap()),
         "the oldest fact that is not mentioned goes first"
     );
+
+    let tiny = OllamaLimits::new(4096, 1024).unwrap();
+    let model = Arc::new(Recording {
+        prompts: Mutex::new(Vec::new()),
+        limits: Some(tiny),
+    });
+    let (result, prompt, _, _) =
+        extract_with(&store, model, &facts, "Subject 77 now prefers tea.").await;
+    assert_eq!(result["existing_facts_dropped"], 80);
+    assert!(prompt.contains("Subject 77 now prefers tea."));
+    assert!(estimate_tokens(&prompt) + tiny.num_predict <= tiny.num_ctx);
 
     // A model with no known window keeps every fact.
     let hosted = Arc::new(Recording {
@@ -775,4 +788,41 @@ async fn a_long_session_is_read_in_windows_and_claims_keep_episode_indices() {
             "{quote} is not in its source event"
         );
     }
+}
+
+#[tokio::test]
+async fn extraction_decodes_paired_sources_but_returns_the_canonical_contract() {
+    let reply = json!({"claims":[{"source_quotes":[{"source_index":0,"quote":"Project uses pnpm."}],"statement":"Project uses pnpm."}]});
+    let (base, fake) = fake_ollama(json!({"response":reply.to_string(),"done":true,"done_reason":"stop","prompt_eval_count":1500,"eval_count":100})).await;
+    let prompt = memory_engine::worker::extract_prompt(
+        &[],
+        &[json!({"source_index":0,"event":{"content":"Project uses pnpm."}})],
+    );
+    let result = model(&base).generate(&prompt).await.unwrap();
+    assert_eq!(result["claims"][0]["source_indices"], json!([0]));
+    assert_eq!(result["claims"][0]["quotes"], json!(["Project uses pnpm."]));
+    let requests = fake.requests();
+    let fields = &requests[0]["format"]["properties"]["claims"]["items"]["properties"];
+    assert_eq!(
+        fields["kind"]["enum"],
+        json!([
+            "fact",
+            "preference",
+            "profile",
+            "goal",
+            "episode",
+            "procedure",
+            "other"
+        ])
+    );
+    assert_eq!(
+        fields["source_quotes"]["items"]["anyOf"][0]["properties"]["source_index"]["const"],
+        0
+    );
+    assert!(
+        requests[0]["prompt"]
+            .as_str()
+            .unwrap()
+            .contains("Generation wire format:")
+    );
 }
