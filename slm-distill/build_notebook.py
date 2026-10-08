@@ -68,6 +68,7 @@ def show_acceptance(receipt):
     show([{'query_topic':topic,'answer':receipt.get('steps',{}).get(topic+'_reflect',{}).get('answer'),
            'citation_count':len(receipt.get('steps',{}).get(topic+'_reflect',{}).get('citations',[]))}
           for topic in ('location','preference')])
+    if receipt.get('recheck_provenance'): display(receipt['recheck_provenance'])
     if receipt.get('error'): print('Acceptance error:',receipt['error'])
     display(Markdown('Full jobs, graph and retrieval responses remain in the local acceptance receipt. Quoted examples aid inspection; the check results above determine acceptance.'))
 
@@ -358,6 +359,40 @@ This tests short-window extraction on a different source distribution. It is **n
 code('''external=read(GENERAL/'external-locomo-manifest.json')
 if external: display(external)
 else: missing('completed external LoCoMo-window label/audit manifest')
+''')
+md('''## Measured tradeoff and unresolved temporal errors
+
+The internal matched comparison improves consolidation from **1/16 to 13/16** and reflection from **10/16 to 15/16**. Extraction regresses: supported-claim fraction is **38/42 (90.5%) versus 58/63 (92.1%)** for the base, and reference coverage is **41/55 (74.5%) versus 50/55 (90.9%)**. Both models recover the eight annotated corrections. Student structural acceptance is **63/64**, including the preserved reflection-citation failure. These same-family teacher judgments describe a small held-out sample, not independent human accuracy.
+
+Manual inspection found substantive temporal failures: “tomorrow” on June 1 was normalized to June 3; “this Friday” from October 8 became October 17; and date-only events acquired invented midnight timestamps. **Temporal normalization and precision remain unreliable.** The later citation-enum repair does not fix these semantic errors. Keep the evidence and verify dates before relying on extracted timestamps.
+
+This is a multitask tradeoff with an extraction regression. External extraction also regresses: support is **22/26 (84.6%) versus 39/44 (88.6%)**, and reference coverage is **13/40 (32.5%) versus 16/40 (40.0%)**. Both models pass structural validation on all sixteen windows. This is not official LoCoMo QA accuracy. Final live acceptance is separate evidence; successful graph operations do not erase extraction errors.''')
+md('''## 12e. Live reflection failure and deployment-only citation repair
+
+The first final-candidate live pilot passed the completed extraction, correction, relationship, derived-observation, projection and location-recall checks, then failed at reflection with HTTP 502. Runtime diagnosis identified invalid UUID citations. This failure remains in its original receipt; graph success alone did not satisfy acceptance.
+
+The repair constrains reflection citations to identifiers actually present in retrieved evidence. It changes the serving decoder, not the trained weights. The frozen baseline/student comparison retains its original Python reflection decoder for both models. Consequently those matched scores **do not measure the citation-enum repair**. A separate repeated live pilot and final acceptance receipt evaluate the deployment change. The second pilot also exposed a harness false negative: it searched the statement for a literal name instead of checking the resolved subject and quoted relationship evidence. A recorded re-audit of the same saved outputs corrects that check; it is not fresh inference. Both failed receipts remain preserved; their existence and outcomes are checked below. The frozen comparison is complete. Public inference now uses the deployed citation-enum contract; the previously failed row passed a separate one-attempt regression check.''')
+code('''frozen_decoder=read(GENERAL/'frozen-comparison-decoder.json')
+if frozen_decoder: display(frozen_decoder)
+else: missing('frozen matched-decoder provenance')
+for filename in ('candidate-live-acceptance.json','candidate-live-acceptance-v2.json','candidate-live-acceptance-v3.json'):
+    pilot=read(GENERAL/filename)
+    if pilot:
+        show([{'receipt':filename,'passed':pilot.get('passed'),
+               'completed_checks':len(pilot.get('checks',{})),
+               'passed_checks':sum(v is True for v in pilot.get('checks',{}).values()),
+               'error':pilot.get('error'),
+               'worker_model':pilot.get('worker_model')}])
+    else: missing(filename)
+manual_review=read(GENERAL/'student-manual-review.json')
+if manual_review:
+    display({k:manual_review[k] for k in ('method','selection','summary','prominent_limitations') if k in manual_review})
+decoder_regression=read(GENERAL/'reflection-decoder-python-check.json')
+if decoder_regression:
+    show([{'scope':decoder_regression['scope'],'accepted':decoder_regression['accepted'],
+           'attempts':len(decoder_regression.get('attempts',[])),
+           'decoder_sha256':decoder_regression['structured_sha256']}])
+    display(Markdown('This is a separate regression check on the previously failed row. The frozen reflection score remains 15/16; it is not retroactively changed to 16/16.'))
 ''')
 md('''## 13. Reproduce the experiment deliberately
 

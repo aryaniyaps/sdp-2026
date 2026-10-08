@@ -23,6 +23,14 @@ def main():
     required={'training','corpus','evaluation','limitations'}
     if not required <= receipt.keys(): raise ValueError(f'Receipt requires {sorted(required)}')
     if not a.gguf.is_file(): raise FileNotFoundError(a.gguf)
+    for name,path in [('adapter',a.adapter/'adapter_model.safetensors'),('gguf',a.gguf)]:
+        expected=receipt.get('artifacts',{}).get(name,{})
+        if not path.is_file() or expected.get('bytes')!=path.stat().st_size or expected.get('sha256')!=sha(path):
+            raise ValueError(f'{name} does not match the validated release receipt')
+    if receipt.get('live_acceptance',{}).get('served_gguf_sha256')!=receipt['artifacts']['gguf']['sha256']:
+        raise ValueError('Live acceptance does not identify the staged GGUF')
+    if receipt.get('live_acceptance',{}).get('passed') is not True:
+        raise ValueError('Live acceptance has not passed')
     if a.out.exists() and any(a.out.iterdir()): raise ValueError('Use an empty staging directory')
     a.out.mkdir(parents=True,exist_ok=True)
     def copy(src,dest,hardlink=False):
@@ -70,6 +78,10 @@ tags:
 
 A fine-tuned 4B worker for **general-purpose conversational memory**: extracting evidence-backed facts, consolidating supported observations, and reflecting over retrieved evidence. Coding is one application, alongside personal preferences, relationships, plans, routines, learning, and work.
 
+**Measured tradeoff:** the internal matched test improves consolidation (13/16 versus 1/16) and reflection (15/16 versus 10/16), but extraction reference coverage falls to 41/55 (74.5%) from 50/55 (90.9%), and supported-claim fraction falls to 38/42 (90.5%) from 58/63 (92.1%). The external extraction diagnostic also regresses: supported claims 22/26 (84.6%) versus 39/44 (88.6%), and reference coverage 13/40 (32.5%) versus 16/40 (40.0%). It is not a uniformly better extractor. These are same-family teacher judgments on small held-out sets; the external result is not official LoCoMo QA accuracy.
+
+**Known temporal failures:** relative-date normalization can select the wrong day, and date-only events can acquire invented midnight timestamps. Observed examples include “tomorrow” on June 1 mapped to June 3 and “this Friday” from October 8 mapped to October 17. Keep original evidence and verify dates before relying on them.
+
 This release contains a PEFT adapter and merged Q8_0 GGUF. It is a research prototype, not an independently validated general-purpose memory benchmark winner. Use it with evidence validation and the supplied prompts/structured-output codec.
 
 ## Base and training
@@ -86,7 +98,7 @@ Base: [{BASE}](https://huggingface.co/{BASE}), pinned revision `{REVISION}` (Apa
 {json.dumps(r['corpus'],indent=2)}
 ```
 
-General-purpose examples are synthetic and automatically audited. The inherited coding-stage adapter used a slice of [Nebius SWE-rebench OpenHands trajectories](https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories), CC-BY-4.0, plus synthetic examples; The warm-start lineage includes 118 relabeled public training windows before the stage-1 token filter; this data remains inherited even when later stages do not replay it. Multiple tasks from one scenario are correlated, so row counts are not independent conversation counts. No private user conversations or teacher credentials are included in this release.
+General-purpose examples are synthetic and automatically audited. The inherited coding-stage adapter used a slice of [Nebius SWE-rebench OpenHands trajectories](https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories), CC-BY-4.0, plus synthetic examples. The warm-start lineage includes 118 relabeled public training windows before the stage-1 token filter; this data remains inherited even when later stages do not replay it. Multiple tasks from one scenario are correlated, so row counts are not independent conversation counts. No private user conversations or teacher credentials are included in this release.
 
 [Hindsight is 20/20](https://arxiv.org/abs/2512.12818) and its [pinned extraction implementation](https://github.com/vectorize-io/hindsight/blob/1152717735237c26986b877789704b89bac89681/hindsight-api-slim/hindsight_api/engine/retain/fact_extraction.py) informed contextualization, attribution and temporal rules. The prompts use this project's own schema and wording. See `documentation/PROMPT_DESIGN.md`; this is not a Hindsight reproduction. No LongMemEval score is claimed.
 
@@ -96,7 +108,7 @@ General-purpose examples are synthetic and automatically audited. The inherited 
 {json.dumps(r['evaluation'],indent=2)}
 ```
 
-Schema validity, semantic support, reference coverage and live graph completion are separate measurements. Teacher-generated labels and same-family automated judging are correlated; they do not replace independent human evaluation. Historical iterations and failures are preserved in the executed notebook.
+Schema validity, semantic support, reference coverage and live graph completion are separate measurements. Both models in the matched comparison used the original reflection decoder. A subsequent deployment-only citation-enum repair addresses an observed live UUID-citation failure; it does not change the weights, and its benefit is not measured by those matched scores. Separate live acceptance verifies the deployed contract. Teacher-generated labels and same-family automated judging are correlated; they do not replace independent human evaluation. Historical iterations and failures are preserved in the executed notebook.
 
 ## Ollama
 

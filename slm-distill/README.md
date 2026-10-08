@@ -2,7 +2,9 @@
 
 This directory trains and evaluates the worker behind the project's **general-purpose conversational memory**: evidence-backed fact extraction, supported observation consolidation, and cited reflection. Personal preferences, relationships, plans, routines, learning and work are in scope; coding is one of sixteen sampled domains.
 
-The current candidate uses **Qwen3-4B-Instruct-2507**, NF4 QLoRA and a 4,096-token training cap on an RTX 4070 Laptop GPU. The intended Hugging Face release is **`aryaniyaps/mem-extractor`**. The final training continuation is complete; matched evaluation, live acceptance and publication must still be confirmed from their corresponding receipts. Training loss alone is not evidence of better memory quality.
+The current candidate uses **Qwen3-4B-Instruct-2507**, NF4 QLoRA and a 4,096-token training cap on an RTX 4070 Laptop GPU. The intended Hugging Face release is **`aryaniyaps/mem-extractor`**. Final training, matched evaluation and live acceptance are complete, with the evidence and limitations documented below. Publication is verified separately from its upload receipt. Training loss alone is not evidence of better memory quality.
+
+**Measured limitation:** on the internal matched test, consolidation and reflection improve, while extraction coverage declines from 50/55 to 41/55 reference facts. Relative dates and unsupported timestamp precision remain known failure modes. See the protocol for denominators and judging limitations; this is a multitask tradeoff, not a universally better extractor.
 
 ## Current experiment and evidence
 

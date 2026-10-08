@@ -32,7 +32,7 @@ The first 7,016-byte draft failed four existing context-budget tests because no 
 
 `evaluate_prompt_revision.py` compares the original coding prompt and revised general prompt on the same eight manually specified development probes: preference exceptions, relationship coreference, changed plans, date precision, rejected suggestions, injection, empty chatter and attributed beliefs. Receipts retain model identity, prompt/system hashes, raw outputs, validation attempts and semantic review criteria. These probes are diagnostic, not a fresh generalization benchmark. Results must be reviewed before asserting prompt-quality improvement.
 
-The broader corpus must be regenerated/rendered with the revised shared prompts. Historical dataset hashes and old run results must not be rewritten to imply they used this revision. Final general-purpose training and domain-stratified evaluation remain outstanding.
+The broader corpus was rendered with the revised shared prompts and frozen at 2,961 task rows across sixteen domains. Historical dataset hashes and old run results retain their original prompt provenance. General-purpose training and the matched 64-case internal/16-case external evaluation are complete; see RESEARCH_PROTOCOL.md for the measured multitask gains and extraction regressions.
 
 ## Measured prompt iterations
 
@@ -40,4 +40,8 @@ The original coding prompt retained only a simplified train preference among the
 
 All eight revision-4 responses passed structural validation. Semantic inspection still found unresolved relative dates, fabricated event timestamps and incomplete cross-event identity support; one relationship slot disagreed with its narrative statement. These results are diagnostic, not eight successful semantic tests. Full receipts and inspection notes are in `data/research-v3/prompt-probes/`. The current prompt is 5,649 bytes; 59 Rust unit tests, 14 Ollama contract tests and 7 focused Python tests passed. No test expectations were weakened to accommodate semantic failures.
 
-A new 320-batch general-purpose corpus generation run has started across 16 domains, with scenario-family splits allocated before generation. Targets still require semantic audit. Generation began with the revision-3 contract; preserve that provenance and render accepted training rows with the final prompt separately, retaining both hashes. No new model is promoted merely because its prompts or corpus changed.
+The 320-batch general-purpose corpus run produced 1,280 scenarios across sixteen domains, with scenario-family splits allocated before generation. Semantic audit and repair retained 1,065 generated scenarios; replay and correlated task expansion yield the frozen 2,961-row corpus. Generation began with the revision-3 contract; preserve that provenance and render accepted training rows with the final prompt separately, retaining both hashes. No new model is promoted merely because its prompts or corpus changed.
+
+## Deployment citation repair after the frozen comparison
+
+The first final-candidate live run exposed invalid UUID citations in reflection. The runtime and public Python inference now restrict citation choices to IDs present in retrieved evidence. The matched baseline/student scores retain their original decoder and are not rewritten; the failed internal reflection remains in the 15/16 score. A separate replay of that failed case passes in one attempt under the repaired decoder. Live graph/correction/recall/reflection acceptance passes sixteen checks, including a source-aware re-audit of a relationship harness false negative. The earlier failed receipts remain preserved. Relative-date normalization and invented timestamp precision remain unresolved semantic limitations.
