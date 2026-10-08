@@ -45,7 +45,7 @@ Implementation: Transformers + PEFT + bitsandbytes, NF4 double quantization, bf1
 |---|---|---|---|
 | Historical coding stage | `out/local-4b-v2` | 507 rows within 4,096-token cap; 48 excluded from original 555 | Completed adapter and saved run configuration |
 | General stage A | `out/local-4b-general-stage-a` | 585 audited rows, all 16 domains, 20% coding; 74 optimizer steps | Completed; 1,415.34 seconds, loss 0.21553, peak allocated VRAM 5.21 GB |
-| General stage B | `out/local-4b-general` | 1,510 remaining unique training rows + 128 replay exposures = 1,638 rows | Read `training-result.json` and `final/adapter_model.safetensors`; do not infer completion from launch |
+| General stage B | `out/local-4b-general` | 1,510 remaining unique training rows + 128 replay exposures = 1,638 rows | Completed: 205 steps, 4,005.27 seconds including validation, loss 0.17596, validation loss 0.12629, peak allocated VRAM 5.36 GB |
 
 Stages A and B cover 2,095 unique training rows. Their 2,223 combined row exposures include 128 repeated rows and must not be reported as additional unique data. The historical coding stage is inherited through the warm start. Exact learning rates, seeds, epochs, token totals, hashes and exclusions are in each `run-config.json`; completion metrics are in `training-result.json`.
 

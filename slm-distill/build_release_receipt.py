@@ -23,12 +23,23 @@ def stage(path):
             value=Path(args[key])
             try: args[key]=str(value.resolve().relative_to(HERE))
             except ValueError: args[key]=value.name
+    states=[(candidate,read(candidate)) for candidate in path.glob('**/trainer_state.json')]
+    state_path,state=max(states,key=lambda item:item[1].get('global_step',0)) if states else (None,{})
+    history=state.get('log_history',[])
+    validation=next((entry for entry in reversed(history) if 'eval_loss' in entry),None)
+    result=read(path/'training-result.json') if (path/'training-result.json').exists() else None
+    if result is None and state:
+        summary=next((entry for entry in reversed(history) if 'train_loss' in entry),{})
+        result={'global_step':state.get('global_step'),'epoch':state.get('epoch'),
+                'metrics':summary,'source':'historical trainer_state fallback'}
     return {'run':path.name,'arguments':args,'counts':c.get('counts',{}),
             'tokens':c.get('tokens',{}),'excluded_counts':c.get('excluded_counts') or {k:len(v) for k,v in c.get('exclusions',{}).items()},
             'dataset_sha256':c.get('dataset_sha256',{}),
             'system_sha256':c.get('system_sha256'),'extraction_template_sha256':c.get('extraction_template_sha256'),
             'run_config_sha256':sha(path/'run-config.json'),
-            'training_result':read(path/'training-result.json') if (path/'training-result.json').exists() else None}
+            'training_result':result,'last_validation':validation,
+            'trainer_state_file':str(state_path.relative_to(path)) if state_path else None,
+            'trainer_state_sha256':sha(state_path) if state_path else None}
 
 def checks_only(value):
     # Preserve check outcomes and numeric aggregates, never arbitrary narrative/content.
