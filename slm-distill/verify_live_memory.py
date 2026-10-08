@@ -4,6 +4,7 @@ Run only against a local engine configured with the candidate model. No data is 
 """
 import argparse
 import datetime as dt
+import hashlib
 import json
 import re
 import time
@@ -18,6 +19,7 @@ def main():
     p.add_argument("--url", default="http://127.0.0.1:18080")
     p.add_argument("--out", type=Path, default=Path(__file__).parent / "data/research-v3/final-acceptance.json")
     p.add_argument("--timeout", type=int, default=1800)
+    p.add_argument("--ollama-url", default="http://127.0.0.1:11434")
     a = p.parse_args()
     ns = "acceptance-general:" + str(uuid.uuid4())
     receipt = {"namespace": ns, "url": a.url, "started_at": dt.datetime.now(dt.timezone.utc).isoformat(), "steps": {}, "checks": {}}
@@ -31,6 +33,25 @@ def main():
         r = requests.request(method, a.url + route, timeout=600, **kwargs)
         r.raise_for_status()
         return r.json()
+
+    def deployment_identity():
+        health = request("GET", "/healthz")
+        model = health["worker_model"].removeprefix("ollama/")
+        tags_response = requests.get(a.ollama_url + "/api/tags", timeout=30)
+        tags_response.raise_for_status()
+        names = {model, model if ":" in model else model + ":latest"}
+        tag = next((tag for tag in tags_response.json()["models"] if tag["name"] in names), None)
+        if tag is None:
+            raise RuntimeError("Configured worker model was not found on the supplied Ollama server")
+        show_response = requests.post(a.ollama_url + "/api/show", json={"model": model}, timeout=30)
+        show_response.raise_for_status()
+        show = show_response.json()
+        blob = re.search(r"sha256-([0-9a-f]{64})", show.get("modelfile", ""))
+        return {"health": health, "ollama_url": a.ollama_url, "ollama_model": tag["name"],
+                "manifest_digest": tag["digest"], "served_gguf_sha256": blob[1] if blob else None,
+                "details": show.get("details"), "parameters": show.get("parameters"),
+                "template_sha256": hashlib.sha256(show.get("template", "").encode()).hexdigest(),
+                "system_sha256": hashlib.sha256(show.get("system", "").encode()).hexdigest()}
 
     def wait_jobs(stage):
         deadline = time.monotonic() + a.timeout
@@ -54,7 +75,8 @@ def main():
         save()
 
     try:
-        receipt["health"] = request("GET", "/healthz")
+        receipt["deployment_identity_before"] = deployment_identity()
+        receipt["health"] = receipt["deployment_identity_before"]["health"]
         receipt["worker_model"] = receipt["health"].get("worker_model")
         retain("initial", "My name is Maya Sen. I live in Pune. I prefer vegetarian meals. I avoid meat when choosing restaurants. My sister is Leela Sen.", "2026-10-08T09:00:00Z")
         retain("correction", "I am Maya Sen. Correction: I moved from Pune to Chennai today. My current home city is Chennai, not Pune. My vegetarian meal preference has not changed.", "2026-10-08T10:00:00Z")
@@ -88,6 +110,8 @@ def main():
                     if name == "location":
                         receipt["checks"]["answer_does_not_assert_old_city_current"] = not bool(re.search(r"(?:currently\s+)?(?:lives?|resides?|home\s+city\s+is)\s+(?:in\s+)?pune", value.get("answer", ""), re.I))
                 save()
+        receipt["deployment_identity_after"] = deployment_identity()
+        receipt["checks"]["worker_identity_unchanged"] = receipt["deployment_identity_before"] == receipt["deployment_identity_after"]
         receipt["passed"] = all(receipt["checks"].values())
     except Exception as exc:
         receipt["error"] = str(exc)
