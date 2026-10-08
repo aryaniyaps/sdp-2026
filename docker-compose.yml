@@ -49,13 +49,13 @@ services:
     environment:
       DATABASE_URL: postgres://memory:memory@127.0.0.1:55432/memory
       NEO4J_URI: http://127.0.0.1:7474
-      MEMORY_MODEL_PROVIDER: ollama
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: password
       OLLAMA_URL: http://127.0.0.1:11434
-      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-16384}
-      OLLAMA_NUM_PREDICT: ${OLLAMA_NUM_PREDICT:-4096}
-      EXTRACTION_MODEL: qwen2.5:14b-instruct-q4_K_M
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-12288}
+      OLLAMA_NUM_PREDICT: ${OLLAMA_NUM_PREDICT:-3072}
+      EXTRACTION_MODEL: ${EXTRACTION_MODEL:-memex-extractor}
+      EXTRACTION_OLLAMA_URL: ${EXTRACTION_OLLAMA_URL:-http://127.0.0.1:11434}
       EMBEDDING_MODEL: qwen3-embedding:0.6b
       LOG_FORMAT: json
     depends_on:

@@ -19,4 +19,5 @@ else
   docker run --rm --network host -e TEST_DATABASE_URL=postgres://memory:memory@127.0.0.1:55432/memory_test -e TEST_NEO4J_URL=http://127.0.0.1:7474 -v sdp_cargo:/usr/local/cargo -v "$PWD:/app" -w /app rust:1.96-bookworm sh -c "$checks"
 fi
 python3 -m unittest discover -s benchmark -p 'test_*.py'
+python3 -m unittest discover -s scripts -p 'test_*.py'
 (cd integrations/pi && npm ci --legacy-peer-deps && npm run check && npm test)

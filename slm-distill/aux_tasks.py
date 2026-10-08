@@ -202,10 +202,11 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=DATA / "aux")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--reverse", action="store_true", help="start from the last timeline, to share a run with another process")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     teacher = Teacher(DATA / "teacher_cache", DATA / "teacher_usage.jsonl")
-    files = sorted(args.timelines.glob("tl*.json"))[: args.limit]
+    files = sorted(args.timelines.glob("tl*.json"), reverse=args.reverse)[: args.limit]
     failures = 0
     with ThreadPoolExecutor(args.workers) as pool:
         futures = {pool.submit(process, teacher, f, args.labeled, args.out): f for f in files}

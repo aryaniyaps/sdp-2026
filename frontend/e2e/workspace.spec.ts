@@ -75,7 +75,7 @@ const trace = {
 test.beforeEach(async ({ page }) => {
   await page.route("**/healthz", (route) =>
     route.fulfill({
-      json: { database: true, embedder: true, worker_model: "pi/test/model" },
+      json: { database: true, embedder: true, worker_model: "ollama/memex-extractor" },
     }),
   );
   await page.route("**/api/v2/**", (route) => {
