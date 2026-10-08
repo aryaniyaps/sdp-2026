@@ -192,6 +192,275 @@ existing NetworkManager Docker-bridge exclusions. Never fix this by deleting mem
 volumes. Rebuild changes while online; normal startup deliberately runs the last
 prepared application image/binary.
 
+## End-to-end walkthrough
+
+This example follows a fictional person's information through retention,
+extraction, consolidation, corrections and recall. It also covers conflicting
+reports and retrieval from a new Pi session. The API responses and graph expose
+the evidence behind each stage.
+
+### Setup
+
+1. Start the browser stack and run `./deploy/azure/run-local.sh check` as described
+   above. Check `/healthz` for the actual worker model and degraded state.
+2. Open the Pi console at **http://127.0.0.1:18088/** and a separate terminal in
+   this repository. Use the browser stack's API at **18080** throughout; the native
+   service at 8080 has separate data.
+3. Use a fresh namespace for each run to keep existing project memory intact.
+   Model wording, extraction counts, observations and latency can vary. The checks
+   below describe expected behavior; inspect the actual results at each stage.
+4. Keep the responses for comparison between runs. If inference fails, inspect
+   the current job error and distinguish it from any earlier successful result.
+
+Paste this setup into the terminal. It needs only Python 3 and the running API.
+`memory_request` makes one request, prints the response, and saves it under a temporary
+receipt directory. Supplying JSON makes a POST; omitting it makes a GET.
+
+```sh
+export WALKTHROUGH_API=http://127.0.0.1:18080
+export WALKTHROUGH_NS="walkthrough:$(date -u +%Y%m%dT%H%M%SZ)"
+export WALKTHROUGH_RECEIPTS="$(mktemp -d /tmp/memory-walkthrough.XXXXXX)"
+memory_request() {
+  python3 - "$@" <<'PYREQUEST'
+import datetime, json, os, pathlib, sys, urllib.parse, urllib.request
+route = sys.argv[1]
+ns = os.environ["WALKTHROUGH_NS"]
+body = None
+if len(sys.argv) > 2:
+    payload = json.loads(sys.argv[2])
+    payload["namespace"] = ns
+    body = json.dumps(payload).encode()
+else:
+    route += ("&" if "?" in route else "?") + urllib.parse.urlencode({"namespace": ns})
+request = urllib.request.Request(os.environ["WALKTHROUGH_API"] + route, data=body,
+                                 headers={"Content-Type": "application/json"})
+with urllib.request.urlopen(request, timeout=600) as response:
+    value = json.load(response)
+stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+name = sys.argv[1].split("?")[0].strip("/").replace("/", "-")
+path = pathlib.Path(os.environ["WALKTHROUGH_RECEIPTS"]) / (stamp + "-" + name + ".json")
+path.write_text(json.dumps(value, indent=2) + "\n")
+print(json.dumps(value, indent=2))
+print("Saved:", path, file=sys.stderr)
+PYREQUEST
+}
+printf 'Namespace: %s\nGraph: http://127.0.0.1:18088/graph?namespace=%s\nReceipts: %s\n' \
+  "$WALKTHROUGH_NS" "$WALKTHROUGH_NS" "$WALKTHROUGH_RECEIPTS"
+memory_request /healthz
+```
+
+Open the printed graph URL. Use **Fit**, **Search nodes**, and the **Memories**,
+**Facts**, and **Entities** toggles to inspect one layer at a time. Click nodes
+for details; hover over purple arrows to read their relation. Keep the namespace
+identical in the terminal, graph and Pi.
+
+### Concepts
+
+| Term | Meaning |
+| --- | --- |
+| Evidence / memory | The original retained message, role, timestamp and source text. Click a memory node to see the facts it supports. |
+| Claim | The extractor's proposed subject, predicate, value, kind, confidence and source quotes. The job's `result.decisions` records accepted actions and assertion IDs; inspect those assertions for the stored fields. The public job response does not expose the full raw model proposal. |
+| Assertion / fact | A stored, validated claim with an ID, status and validity dates. Click a fact and inspect its assertion API response. “Validated” means structural/source checks, not proof that the speaker is truthful. |
+| Entity | A person, place, technology or other subject mentioned by facts. Entity links connect related knowledge. |
+| Observation | A derived assertion produced by consolidation, supported by other assertions. Follow its support relations back to source-backed facts. It is an inference, not a direct quote. |
+| Correction | A new accepted value supersedes a previous belief while retaining its history. |
+| Contradiction | Incompatible values remain contested when there is no sufficiently confident explicit correction. Both claims retain their evidence. |
+| Recall / reflection | Recall returns ranked evidence and packed context; reflection generates an answer with citations to retrieved IDs. Pi uses recall to inform its own response. |
+
+### 1. Retain evidence
+
+Use the API for the first part so the source is exactly what you type, without
+an assistant response adding extra facts. This is the same retention API used by Pi.
+
+```sh
+memory_request /api/v2/retain '{"session_id":"maya-story","external_id":"initial","events":[{"role":"user","content":"My name is Maya Sen. I live in Pune. I prefer vegetarian meals. I avoid meat when choosing restaurants. My sister is Leela Sen.","occurred_at":"2026-10-08T09:00:00Z"}]}'
+memory_request /api/v2/jobs
+memory_request /api/v2/status
+```
+
+The response includes `episode_id`, `job_id` and `created`: evidence is durable, but extraction
+may still be running. Repeat the jobs/status requests until work finishes.
+Inspect `extract`, `consolidate` and `project` jobs and their `status`, `attempts`,
+`result` and `error`. Jobs may finish too quickly to catch every intermediate state.
+
+**Checkpoint:** jobs have succeeded, status is `ready: true`, and the graph has
+source-backed assertions. An empty namespace can also report ready, so readiness
+alone is insufficient. Inspect `embedding_gaps` too. Wait for this stage before
+submitting the next episode; sequential episodes make the history easy to follow.
+
+### 2. Inspect facts and source evidence
+
+Search for **Maya** or **Pune**. Click the memory and read its original text, then
+click the residence fact to inspect its source quote. The same data is available
+through the API:
+
+```sh
+memory_request /api/v2/graph/memories
+memory_request /api/v2/graph
+# Replace the value with the residence assertion's actual UUID from the graph response.
+ASSERTION_ID='paste-assertion-uuid-here'
+memory_request "/api/v2/assertions/$ASSERTION_ID"
+```
+
+Inspect `subject`, `predicate`, `value`, `kind`, `status`, `valid_from`,
+`valid_to`, `sources` and `relations`. Each source includes a `chunk_id`, exact
+`quote`, `role`, `session_id` and `occurred_at`. Compare the quote to the memory
+text to check the assertion's provenance.
+
+The graph JSON includes assertions and edges; its inspection endpoint is limited
+to 100 assertions. Projection and memory endpoints also have limits, so use this
+small namespace to avoid truncation. One graph view may not contain a large
+account's entire history.
+
+### 3. Inspect derived observations
+
+Look for an observation about Maya's food preferences. In the graph legend,
+observations have a distinct style within the **Facts** layer. Select one and
+follow its support relations to the vegetarian preference and avoiding-meat facts.
+In `/api/v2/graph`, locate `kind: "observation"` and its `supports`/`derives` edges;
+inspect the supporting assertion IDs with the assertion endpoint.
+
+**Checkpoint:** the observation is active and has at least two distinct supporting
+facts, each traceable to evidence. Check that the inference follows from its
+supports: a vegetarian preference, for example, does not establish an allergy.
+If consolidation produces no observation, inspect its job result. A successful
+job need not produce new knowledge.
+
+### 4. Correct a fact and query its history
+
+```sh
+memory_request /api/v2/retain '{"session_id":"maya-story","external_id":"move","events":[{"role":"user","content":"I am Maya Sen. Correction: I moved from Pune to Chennai today. My current home city is Chennai, not Pune. My vegetarian meal preference has not changed.","occurred_at":"2026-10-08T10:00:00Z"}]}'
+memory_request /api/v2/jobs
+memory_request /api/v2/status
+# Repeat these after jobs finish; inspect both city assertions.
+memory_request /api/v2/graph
+memory_request /api/v2/recall '{"query":"Where does Maya Sen currently live?","max_tokens":2048,"reference_date":"2026-10-08T11:00:00Z"}'
+memory_request /api/v2/recall '{"query":"Where did Maya Sen live?","as_of":"2026-10-08T09:30:00Z","max_tokens":2048}'
+```
+
+**Checkpoint:** Chennai is active, the old Pune residence is superseded with a
+closed `valid_to`, and a `supersedes` relation connects the change. The current
+recall should support Chennai; the historical recall should support Pune if the
+extracted validity interval covers 09:30. Verify the actual dates rather than
+assuming them. `as_of` queries validity time, not a replay of the database as it
+was recorded at that instant.
+
+An explicit correction to a single-valued slot requires extracted confidence of
+at least **0.8** to supersede automatically. Extraction still has to recognize
+the same subject/predicate and correction. If it does not, inspect the stored
+assertions and job decisions for the mismatch. Dependent observations can become
+stale when their support changes.
+
+### 5. Handle conflicting reports
+
+Use a separate person to keep this conflict independent of Maya's correction.
+Submit these **one at a time**, waiting for jobs after each:
+
+```sh
+memory_request /api/v2/retain '{"session_id":"conflict-a","external_id":"arun-a","events":[{"role":"user","content":"Arun Das currently lives in Jaipur.","occurred_at":"2026-10-08T11:00:00Z"}]}'
+memory_request /api/v2/jobs
+# Wait for completion before submitting the second report.
+memory_request /api/v2/retain '{"session_id":"conflict-b","external_id":"arun-b","events":[{"role":"user","content":"Arun Das currently lives in Kochi.","occurred_at":"2026-10-08T11:00:00Z"}]}'
+memory_request /api/v2/jobs
+# After completion:
+memory_request /api/v2/graph
+memory_request /api/v2/recall '{"query":"Where does Arun Das live?","max_tokens":2048}'
+```
+
+**Checkpoint:** for the same single-valued residence slot, both incompatible
+assertions are `contested` and linked by `contradicts`; inspect both sources.
+Two conflicting reports do not establish which one is correct.
+This depends on the model extracting a shared slot without marking a correction.
+If it chooses different predicates or treats the second report as a correction,
+inspect the stored assertions and job decisions to identify the mismatch.
+`contested` facts remain eligible for recall; check whether retrieval returns both.
+
+### 6. Retrieve evidence and generate cited answers
+
+```sh
+memory_request /api/v2/recall '{"query":"What meals does Maya Sen prefer?","max_tokens":2048,"graph":true,"observations":true}'
+memory_request /api/v2/reflect '{"query":"What meals does Maya Sen prefer?","max_tokens":2048}'
+memory_request /api/v2/graph/projection
+memory_request '/api/v2/traces?limit=10'
+```
+
+In the recall response, inspect `results`, their `sources`, `ranks`, `paths`, the packed
+`context`, `estimated_tokens`, `temporal_plan`, `degraded_reasons` and `trace_id`.
+A path may be empty if a result came directly from text/vector retrieval.
+In the reflection response, inspect `answer`, `citations` and `insufficient_evidence`; resolve
+citation IDs against `recall.results` and inspect their source quotes.
+
+PostgreSQL holds the authoritative evidence/assertions while Neo4j
+holds the graph projection. The projection endpoint demonstrates actual Neo4j
+nodes/relationships; a PostgreSQL graph response alone does not prove that
+projection succeeded. Traces make retrieval and worker behavior inspectable.
+
+For an optional comparison, repeat recall with `graph: false` and
+`observations: false`, then with `raw_only: true`. These isolate capabilities;
+they are not a lexical-only baseline or an accuracy benchmark, and a simple
+question may return the same answer in every configuration.
+
+### 7. Recall memory in a new Pi session
+
+In the browser console, use `/memory-namespace` with the **exact printed
+`WALKTHROUGH_NS` value** (shell variables do not expand inside Pi). Wait until the
+console and graph show the same namespace, then run `/memory-status`.
+
+Ask Pi:
+
+> “Use memory to tell me where Maya Sen currently lives and what food she prefers.
+> Cite the evidence you retrieve; do not guess missing details.”
+
+Click **New session** in the console. Confirm the namespace again and ask:
+
+> “What is the name of Maya Sen's sister? Retrieve the evidence from memory.”
+
+Inspect the `memory_recall` result if Pi invokes the tool, or inspect the namespace's
+recall traces for automatic pre-turn recall. The new session has not been given
+the biography; a supported answer should identify Leela Sen from retained evidence.
+Check `/memory-status` after the turn for retention/spool state. Pi answering
+successfully without visible retrieved evidence is not enough to prove memory use.
+The API and graph work locally; Pi's configured remote model requires
+internet and working authentication.
+
+### Verification and troubleshooting
+
+For the existing automated live acceptance check, preserve a separate receipt:
+
+```sh
+env -u PYTHONPATH slm-distill/.venv/bin/python slm-distill/verify_live_memory.py \
+  --url "$WALKTHROUGH_API" --out "$WALKTHROUGH_RECEIPTS/live-acceptance.json"
+```
+
+This uses its own `acceptance-general:...` namespace, not `WALKTHROUGH_NS`, and needs the
+training environment's Python dependencies and access to the configured Ollama
+(default `http://127.0.0.1:11434`; use `--ollama-url` if different). It checks
+extraction, source evidence, observations, correction, projection, recall and
+reflection. It does **not** verify the ambiguous-conflict or new-Pi-session steps;
+check those separately. Read `passed`, individual checks, timestamps and model
+identity, then open the receipt's namespace in the graph.
+
+| What goes wrong | What to inspect next |
+| --- | --- |
+| Retain succeeded but no facts appear | `/api/v2/jobs`: evidence is saved before inference. Inspect failed jobs' `error` and `result`; inspect the memory node's extraction state. |
+| Fact exists in API but not graph | Confirm namespace; inspect projection jobs and `/api/v2/graph/projection`. |
+| Wrong/unsupported fact | Compare the assertion's quotes with the original text and the extraction job decisions. Source matching does not guarantee semantic accuracy. |
+| Recall is empty or degraded | Check namespace, worker/embedding health, `embedding_gaps`, `degraded_reasons`, temporal filters and trace. |
+| Pi does not retrieve the saved information | Confirm `MEMORY_URL` points to 18080, the exact namespace, `/memory-status`, and recall traces. |
+| A job failed | Fix the reported cause first, then retry that job as shown below; retain the failure receipt. |
+
+```sh
+# Replace with the failed job's UUID. The namespace is added by the helper.
+FAILED_JOB_ID='paste-failed-job-uuid-here'
+memory_request "/api/v2/jobs/$FAILED_JOB_ID/retry" '{}'
+memory_request /api/v2/jobs
+```
+
+The complete flow is: original memory → exact quote → assertion → supported
+observation → correction/history → contested conflict → cited recall →
+new-session use. Record which checks passed, failed or were not run alongside
+the saved responses. Keep receipts outside Git and do not include credentials.
+
 ## Frontend development
 
 Start the backend first, then run:
