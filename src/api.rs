@@ -56,6 +56,7 @@ async fn get_trace(
 ) -> Result<Json<OperationTrace>, AppError> {
     Ok(Json(s.store.trace(id).await?))
 }
+
 async fn metrics(State(s): State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
     // Use durable traces rather than counters that disappear when the service restarts.
     let rows: Vec<(String, String, i64, i64)> = sqlx::query_as(
@@ -97,6 +98,7 @@ pub struct HealthResponse {
     pub worker_concurrency: usize,
     pub embedding_model: String,
 }
+
 #[utoipa::path(get,path="/healthz",responses((status=200,body=HealthResponse)))]
 async fn health(State(s): State<Arc<AppState>>) -> Json<HealthResponse> {
     let (database, embedder) = tokio::join!(
