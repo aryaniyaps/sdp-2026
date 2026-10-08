@@ -2,13 +2,13 @@
 
 This directory trains and evaluates the worker behind the project's **general-purpose conversational memory**: evidence-backed fact extraction, supported observation consolidation, and cited reflection. Personal preferences, relationships, plans, routines, learning and work are in scope; coding is one of sixteen sampled domains.
 
-The current candidate uses **Qwen3-4B-Instruct-2507**, NF4 QLoRA and a 4,096-token training cap on an RTX 4070 Laptop GPU. The intended Hugging Face release is **`aryaniyaps/mem-extractor`**. Training and publication are not established merely by the existence of this README: the final continuation, matched evaluations, live acceptance and upload must each have their corresponding receipt.
+The current candidate uses **Qwen3-4B-Instruct-2507**, NF4 QLoRA and a 4,096-token training cap on an RTX 4070 Laptop GPU. The intended Hugging Face release is **`aryaniyaps/mem-extractor`**. The final training continuation is complete; matched evaluation, live acceptance and publication must still be confirmed from their corresponding receipts. Training loss alone is not evidence of better memory quality.
 
 ## Current experiment and evidence
 
 The general-purpose corpus is frozen at **2,961 task rows**: 2,095 train, 424 validation and 442 test. Every partition covers sixteen domains. Task rows from the same episode are correlated; this is 1,181 episode identifiers including historical replay, not 2,961 independent conversations. Software/technical rows account for 11.46% of training.
 
-The historical 4B coding adapter is followed by general stage A (585 audited rows, completed) and general stage B (1,510 new rows plus 128 replay exposures). Together A/B cover 2,095 unique training rows. The same teacher family generates and audits targets, so label acceptance is not independent human accuracy.
+The historical 4B coding adapter is followed by general stage A (585 audited rows, completed) and general stage B (1,510 new rows plus 128 replay exposures, completed in 205 optimizer steps). Together A/B cover 2,095 unique training rows. The same teacher family generates and audits targets, so label acceptance is not independent human accuracy.
 
 | Start here | What it contains |
 |---|---|
@@ -58,7 +58,7 @@ env -u PYTHONPATH slm-distill/.venv/bin/python slm-distill/train.py \
   --qlora --sets slm-distill/data/research-v3/continuation-sets \
   --adapter slm-distill/out/local-4b-general-stage-a/final \
   --out slm-distill/out/local-4b-general \
-  --rank 16 --accum 8 --epochs 1 --max-length 4096 --lr 3e-5 --eval-on-epoch
+  --rank 16 --accum 8 --epochs 1 --max-length 4096 --loss-chunk-size 256 --lr 3e-5 --eval-on-epoch
 ```
 
 It depends on the preserved stage-A adapter and frozen curriculum. A from-scratch run is a different experiment unless all earlier stages and inputs are reproduced. Do not overwrite completed run directories.
@@ -83,6 +83,16 @@ Repeat the matched protocol for the untrained base and external set; see the pro
 ## Package and publish
 
 `export.py` merges the completed adapter and converts it to Q8_0 GGUF. Export needs substantial temporary memory/disk space. Preserve the GGUF checksum and use the supplied non-thinking chat template.
+
+```bash
+env -u PYTHONPATH slm-distill/.venv/bin/python slm-distill/export.py \
+  --base Qwen/Qwen3-4B-Instruct-2507 \
+  --revision cdbee75f17c01a7cc42f958dc650907174af0554 \
+  --adapter slm-distill/out/local-4b-general/final \
+  --name mem-extractor:general-v1 --quant q8_0
+```
+
+Use `--work` to choose the temporary workspace; merging and conversion need about 13 GB before cleanup. The supervised local pipeline checks available RAM before using `/dev/shm/mem-extractor-export` instead of the default disk workspace.
 
 After completed evaluation and live acceptance:
 

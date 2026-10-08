@@ -130,6 +130,8 @@ The worker can still misattribute statements, mishandle time, over-extract trans
 
 ## Reproducibility and files
 
+The [project's training and evaluation code](https://github.com/aryaniyaps/sdp-2026/tree/main/slm-distill) includes corpus construction, audits, training, export and the executed experiment notebook.
+
 `release-receipt.json` contains aggregate counts, run configuration and evaluation. `SHA256SUMS` identifies every staged artifact except the checksum manifest itself. `documentation/Finetuning_Iteration_Report.ipynb` documents the actual assisted experiment and unsuccessful iterations. Raw private conversation data, caches, authentication files and optimizer states are excluded.
 '''
 

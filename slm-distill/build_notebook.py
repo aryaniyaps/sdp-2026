@@ -275,7 +275,7 @@ On 8 October 2026, the originally blocked extraction job `731699d3-52c1-4d08-af6
 The graph UI's body-scoped theme variables were also fixed and browser-tested. Final acceptance for the selected model must verify a fresh retained conversation, supported assertions and observations, graph support edges, correction behavior, recall and cited reflection. Pending acceptance must remain visible.''')
 code('''receipt=read(DATA/'receipts/final-acceptance.json')
 if receipt: show_acceptance(receipt)
-else: missing('final selected-model end-to-end acceptance receipt')
+else: display(Markdown('**Historical stage not run:** coding-only stage 2 was stopped after the general-purpose scope correction. Its acceptance receipt is intentionally absent; the selected general-purpose model is evaluated in Section 12c.'))
 ''')
 md('''## 12b. Scope correction and Hindsight-informed extraction
 
@@ -370,7 +370,7 @@ env -u PYTHONPATH .venv/bin/python train.py \
   --revision cdbee75f17c01a7cc42f958dc650907174af0554 \
   --qlora --sets data/research-v3/continuation-sets \
   --adapter out/local-4b-general-stage-a/final --out out/local-4b-general \
-  --rank 16 --accum 8 --epochs 1 --max-length 4096 --lr 3e-5 --eval-on-epoch
+  --rank 16 --accum 8 --epochs 1 --max-length 4096 --loss-chunk-size 256 --lr 3e-5 --eval-on-epoch
 ```
 
 The command is an example; use the actual final `run-config.json` for exact curriculum and warm-start lineage. General-purpose construction is in `expand_general_corpus.py` and `audit_general_corpus.py`. Inspect `sample_public_corpus.py`, `research_corpus.py`, `expand_corpus.py`, `audit_corpus.py`, `adjudicate_audit.py` and `assemble_research.py` for corpus construction. `evaluate_research.py` records raw responses; `grade_research.py` grades them against evidence. `export.py` merges the adapter, converts to GGUF and installs an Ollama model.
