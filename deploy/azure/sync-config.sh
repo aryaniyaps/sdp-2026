@@ -45,7 +45,9 @@ chmod 755 conf.d && chmod 644 conf.d/* 2>/dev/null || true
 chmod 600 .env gpu-tunnel-users.json 2>/dev/null || true
 docker compose up -d 2>&1 | tail -n 15
 docker compose ps --format 'table {{.Service}}\t{{.Status}}'
-rm -rf /var/lib/waagent/run-command/download/*
+# The config travelled in earlier run-command scripts. Remove those copies, but not this run's own
+# folder: the agent keeps this script's output there, and deleting it would lose it.
+cd /var/lib/waagent/run-command/download && ls -1 | sort -n | head -n -1 | xargs -r rm -rf
 echo STEP_OK
 SH
 on_vm "$WORK/apply.sh"
