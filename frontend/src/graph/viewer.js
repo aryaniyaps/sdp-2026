@@ -60,7 +60,7 @@ export function mountGraph(container) {
   const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
   const cvs = $("cv");
   const ctx = cvs.getContext("2d", { alpha: false });
-  const rootStyle = getComputedStyle(document.documentElement);
+  const rootStyle = getComputedStyle(document.body);
   const cssVar = (n) => rootStyle.getPropertyValue(n).trim();
   const FONT_FAMILY = getComputedStyle(document.body).fontFamily;
   const LABEL_FONT = "13px " + FONT_FAMILY;
