@@ -3271,3 +3271,101 @@ async fn metrics_report_durable_operations_instead_of_unused_counters() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn dashboard_projects_persist_and_session_namespace_changes_are_isolated_and_versioned() {
+    let Some(store) = graph_view_store("dashboard projects").await else {
+        return;
+    };
+    let app = api::router(view_state(store.clone(), None));
+    let (status, initial_catalog) = get_json(&app, "/api/v2/projects").await;
+    assert_eq!(status, StatusCode::OK);
+    for sample in ["payments-api", "mobile-app", "scratch"] {
+        assert!(
+            initial_catalog["projects"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(sample))
+        );
+        let (status, session) = post_json(
+            &app,
+            "/api/v2/dashboard/sessions",
+            &json!({"project": sample}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(session["namespace"], format!("project:{sample}"));
+        sqlx::query("DELETE FROM dashboard_sessions WHERE id=$1")
+            .bind(Uuid::parse_str(session["id"].as_str().unwrap()).unwrap())
+            .execute(&store.pool)
+            .await
+            .unwrap();
+    }
+    let project = format!("project-{}", Uuid::new_v4());
+    for invalid in ["../escape", "a/b", "", "-option", "a b"] {
+        let (status, _) = post_json(&app, "/api/v2/projects", &json!({"id":invalid})).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+    let (status, _) = post_json(&app, "/api/v2/projects", &json!({"id":project})).await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, catalog) = get_json(&app, "/api/v2/projects").await;
+    assert!(
+        catalog["projects"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(project))
+    );
+    let (_, first) = post_json(
+        &app,
+        "/api/v2/dashboard/sessions",
+        &json!({"project":project}),
+    )
+    .await;
+    let (_, second) = post_json(
+        &app,
+        "/api/v2/dashboard/sessions",
+        &json!({"project":project}),
+    )
+    .await;
+    assert_eq!(first["namespace"], format!("project:{project}"));
+    let path = format!(
+        "/api/v2/dashboard/sessions/{}",
+        first["id"].as_str().unwrap()
+    );
+    let (status, changed) = post_json(
+        &app,
+        &path,
+        &json!({"namespace":"custom:namespace", "revision":0}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(changed["revision"], 1);
+    let (status, _) = post_json(&app, &path, &json!({"namespace":"stale", "revision":0})).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (_, stale_ack) = post_json(&app, &format!("{path}/ack"), &json!({"revision":0})).await;
+    assert_eq!(stale_ack["applied"], false);
+    let (_, ack) = post_json(&app, &format!("{path}/ack"), &json!({"revision":1})).await;
+    assert_eq!(ack["applied"], true);
+    let (_, current) = get_json(&app, &path).await;
+    assert_eq!(current["namespace"], "custom:namespace");
+    assert_eq!(current["applied_revision"], 1);
+    let (_, unchanged) = get_json(
+        &app,
+        &format!(
+            "/api/v2/dashboard/sessions/{}",
+            second["id"].as_str().unwrap()
+        ),
+    )
+    .await;
+    assert_eq!(unchanged["namespace"], first["namespace"]);
+    sqlx::query("DELETE FROM dashboard_sessions WHERE project=$1")
+        .bind(&project)
+        .execute(&store.pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM dashboard_projects WHERE id=$1")
+        .bind(&project)
+        .execute(&store.pool)
+        .await
+        .unwrap();
+}

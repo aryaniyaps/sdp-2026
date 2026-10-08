@@ -33,7 +33,7 @@ export function GraphPage() {
               className="pill"
               style={readOnly ? { display: "none" } : undefined}
             >
-              Workspace
+              Pi console
             </Button>
             <span className="pill" id="nschip">
               Namespace <b id="nsname" />

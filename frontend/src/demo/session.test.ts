@@ -11,8 +11,9 @@ describe("demo session routing", () => {
     expect(terminal.searchParams.getAll("arg")).toEqual([
       "mobile-app",
       namespace,
+      "2",
     ]);
-    expect(terminal.searchParams.get("session")).toBe("2");
+
     expect(
       new URL(graphUrl(namespace), "http://localhost").searchParams.get(
         "namespace",
@@ -20,7 +21,8 @@ describe("demo session routing", () => {
     ).toBe(namespace);
   });
 
-  it("restricts the directory to the supported projects", () => {
+  it("accepts new project names and rejects path traversal", () => {
+    expect(directoryFrom("new-project_2")).toBe("new-project_2");
     expect(directoryFrom("scratch")).toBe("scratch");
     expect(directoryFrom("../../etc")).toBe("payments-api");
     expect(directoryFrom(null)).toBe("payments-api");

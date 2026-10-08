@@ -14,7 +14,7 @@ Install Docker Compose, Node/npm, and Pi with an authenticated provider. The run
 pi -e /absolute/path/to/sdp-2026/integrations/pi/extension.ts
 ```
 
-The worker is the fine-tuned student model served by Ollama (`EXTRACTION_MODEL`, default `mem-extractor`, at `EXTRACTION_OLLAMA_URL`); Pi is only the coding agent that produces the evidence. `MEMORY_URL`, `MEMORY_NAMESPACE`, and `MEMORY_SPOOL` configure the extension; without `MEMORY_NAMESPACE` every directory shares the namespace `user:<login name>`. The service binds localhost. The Compose credentials are development credentials.
+The worker is the fine-tuned student model served by Ollama (`EXTRACTION_MODEL`, default `mem-extractor`, at `EXTRACTION_OLLAMA_URL`); Pi is only the coding agent that produces the evidence. `MEMORY_URL`, `MEMORY_NAMESPACE`, and `MEMORY_SPOOL` configure the extension; without `MEMORY_NAMESPACE`, sessions default to `project:<repository basename>:<root path digest>` (working directory outside Git), isolating different project roots. Dashboard projects use `project:<project name>` and a session-specific binding synchronizes namespace changes in both directions. The service binds localhost. The Compose credentials are development credentials.
 
 In Pi, `/memory-namespace [name]` changes the active namespace for the current extension session; with no name it prompts for one. Retention cursors are scoped to each namespace. `/memory-clear [name]` prompts you to type the target namespace exactly, clears its server data, and removes its pending local evidence batches. `/memory-status` reports processing for the active namespace.
 

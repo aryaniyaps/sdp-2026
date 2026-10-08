@@ -7796,21 +7796,20 @@ a.anchor-link {
 <!-- End of mermaid configuration --></head>
 <body class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
 <main>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0fbe4e92">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=99d4024d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="Building-a-grounded-memory-worker:-an-iterative-distillation-experiment">Building a grounded memory worker: an iterative distillation experiment<a class="anchor-link" href="#Building-a-grounded-memory-worker:-an-iterative-distillation-experiment">¶</a></h1><p><strong>Project:</strong> SDP 2026 memory engine · <strong>Experiment date:</strong> 8 October 2026</p>
-<p><strong>Scope correction:</strong> the product is general-purpose memory. The coding-focused runs below are initial experiments. The automatic coding-only second stage was stopped before training; general-purpose corpus, training and evaluation are recorded from current receipts in Section 12c.</p>
-<p>This notebook reconstructs the actual local, AI-assisted experiment from saved artifacts. It records unsuccessful attempts and measured limitations as well as successful runs. It is a research record, not a claim that every experiment was originally conducted inside Jupyter.</p>
-<p><strong>Question:</strong> Can a small model on an 8 GB laptop GPU extract durable facts with exact evidence, synthesize supported observations, and answer with citations?</p>
-<p>Run All refreshes tables and figures from local receipts. It does <strong>not</strong> start training, download weights, modify databases, or invoke a paid teacher. Outputs remain visible when the notebook is shared without large ignored datasets. Missing results are explicitly marked pending.</p>
+<h1 id="Fine-tuning-a-small-model-for-memory">Fine-tuning a small model for memory<a class="anchor-link" href="#Fine-tuning-a-small-model-for-memory">¶</a></h1><p>SDP 2026 · 8 October 2026</p>
+<p>The aim was to train a small model to extract facts from conversations, combine related facts, and answer questions with sources. The final model is <strong>Qwen3-4B-Instruct-2507</strong>, fine-tuned with QLoRA on an 8 GB RTX 4070 laptop GPU.</p>
+<p>This notebook follows the iterations using saved results from the training scripts. Each stage helped decide what to try next: coding conversations provided the initial test setting, then the dataset and prompts were extended to everyday conversations. The experiments were AI-assisted and were not all run inside Jupyter.</p>
+<p>Run All reads local results and redraws the plots. It does not train, call the teacher, or change the running service. Saved outputs can be read without the local datasets; missing files are marked unavailable.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f6005162">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2c61b69d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7839,7 +7838,7 @@ a.anchor-link {
 <span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
     <span class="n">display</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">value</span><span class="p">))</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="n">display</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">digest</span><span class="p">(</span><span class="n">path</span><span class="p">):</span> <span class="k">return</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">read_bytes</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">missing</span><span class="p">(</span><span class="n">label</span><span class="p">):</span> <span class="n">display</span><span class="p">(</span><span class="n">Markdown</span><span class="p">(</span><span class="sa">f</span><span class="s1">'**Pending / unavailable:** </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s1">. No result is inferred.'</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">missing</span><span class="p">(</span><span class="n">label</span><span class="p">):</span> <span class="n">display</span><span class="p">(</span><span class="n">Markdown</span><span class="p">(</span><span class="sa">f</span><span class="s1">'**Not available locally:** </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s1">.'</span><span class="p">))</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">show_acceptance</span><span class="p">(</span><span class="n">receipt</span><span class="p">):</span>
     <span class="n">identity</span><span class="o">=</span><span class="n">receipt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'deployment_identity_before'</span><span class="p">,{})</span>
     <span class="n">show</span><span class="p">([{</span><span class="s1">'worker_model'</span><span class="p">:</span><span class="n">receipt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'worker_model'</span><span class="p">,</span><span class="n">receipt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'health'</span><span class="p">,{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'worker_model'</span><span class="p">)),</span>
@@ -7868,7 +7867,7 @@ a.anchor-link {
           <span class="k">for</span> <span class="n">topic</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">'location'</span><span class="p">,</span><span class="s1">'preference'</span><span class="p">)])</span>
     <span class="k">if</span> <span class="n">receipt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'recheck_provenance'</span><span class="p">):</span> <span class="n">display</span><span class="p">(</span><span class="n">receipt</span><span class="p">[</span><span class="s1">'recheck_provenance'</span><span class="p">])</span>
     <span class="k">if</span> <span class="n">receipt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'error'</span><span class="p">):</span> <span class="nb">print</span><span class="p">(</span><span class="s1">'Acceptance error:'</span><span class="p">,</span><span class="n">receipt</span><span class="p">[</span><span class="s1">'error'</span><span class="p">])</span>
-    <span class="n">display</span><span class="p">(</span><span class="n">Markdown</span><span class="p">(</span><span class="s1">'Full jobs, graph and retrieval responses remain in the local acceptance receipt. Quoted examples aid inspection; the check results above determine acceptance.'</span><span class="p">))</span>
+    <span class="n">display</span><span class="p">(</span><span class="n">Markdown</span><span class="p">(</span><span class="s1">'The local receipt has the full job, graph and retrieval responses.'</span><span class="p">))</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="s1">'Report refreshed:'</span><span class="p">,</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span><span class="o">.</span><span class="n">isoformat</span><span class="p">())</span>
 <span class="nb">print</span><span class="p">(</span><span class="s1">'Python:'</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">version</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
@@ -7884,7 +7883,7 @@ a.anchor-link {
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Report refreshed: 2026-10-08T17:00:09.532810+00:00
+<pre>Report refreshed: 2026-10-08T17:19:33.032840+00:00
 Python: 3.12.13
 </pre>
 </div>
@@ -7892,127 +7891,111 @@ Python: 3.12.13
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=69bcab0c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8363fe8e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1.-Define-the-task-and-acceptance-criteria-before-comparing-models">1. Define the task and acceptance criteria before comparing models<a class="anchor-link" href="#1.-Define-the-task-and-acceptance-criteria-before-comparing-models">¶</a></h2><p>The unavailable original worker artifact meant we needed a reproducible replacement. The worker has three tasks:</p>
-<table>
+<h2 id="1.-What-the-model-needs-to-do">1. What the model needs to do<a class="anchor-link" href="#1.-What-the-model-needs-to-do">¶</a></h2><table>
 <thead>
 <tr>
 <th>Task</th>
 <th>Input</th>
-<th>Output and acceptance</th>
+<th>Expected output</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>Extraction</td>
-<td>Timestamped events + earlier facts</td>
-<td>Durable claims, exact source quotes, valid source indices, entity/slot/value and correction metadata</td>
+<td>Conversation events and earlier facts</td>
+<td>Facts with exact quotes, source indices, and correction details</td>
 </tr>
 <tr>
 <td>Consolidation</td>
 <td>Accepted facts</td>
-<td>Useful observations supported by at least two distinct supplied facts</td>
+<td>Observations supported by at least two distinct facts</td>
 </tr>
 <tr>
 <td>Reflection</td>
-<td>Question + retrieved evidence</td>
-<td>Answer with valid citations, or explicit insufficient evidence</td>
+<td>A question and retrieved facts</td>
+<td>An answer with citations, or insufficient evidence</td>
 </tr>
 </tbody>
 </table>
-<p>PostgreSQL is the evidence store; Neo4j is a derived projection. A queued retain response alone does not prove extraction or graph completion. Final operational checks must follow jobs through extraction, consolidation, projection, retrieval and correction.</p>
-<p>We distinguish <strong>schema acceptance</strong>, <strong>semantic support</strong>, <strong>reference coverage</strong>, and <strong>live pipeline completion</strong>. These are different measurements.</p>
+<p>Valid JSON is only the first check. The claims also need to match their sources and cover the relevant facts. The app stores evidence in PostgreSQL and projects it into Neo4j, so the live checks also follow jobs through graph updates and retrieval.</p>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=fea1f59c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=796947a6">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="2.-Iteration-ledger:-observation-%E2%86%92-hypothesis-%E2%86%92-change-%E2%86%92-check">2. Iteration ledger: observation → hypothesis → change → check<a class="anchor-link" href="#2.-Iteration-ledger:-observation-%E2%86%92-hypothesis-%E2%86%92-change-%E2%86%92-check">¶</a></h2><table>
+<h2 id="2.-Iterations">2. Iterations<a class="anchor-link" href="#2.-Iterations">¶</a></h2><table>
 <thead>
 <tr>
 <th>Iteration</th>
 <th>Observation</th>
-<th>Hypothesis and intervention</th>
-<th>Evidence / remaining boundary</th>
+<th>Next step</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Bootstrap 1.7B</td>
-<td>Original GGUF unavailable</td>
-<td>Learn the output contract from deterministic examples</td>
-<td>Excellent synthetic scores; not evidence of natural conversation quality</td>
+<td>1.7B bootstrap</td>
+<td>Good synthetic scores, poor transfer to conversations</td>
+<td>Add teacher-labeled conversations and replay</td>
 </tr>
 <tr>
-<td>Naturalistic refinement</td>
-<td>Synthetic success did not transfer</td>
-<td>Add teacher-labeled coding timelines and deterministic replay</td>
-<td>Natural extraction remained weak; exact quotes and IDs frequently failed</td>
+<td>1.7B refinement</td>
+<td>Source attribution remained unreliable</td>
+<td>Pair each quote with its source and constrain IDs</td>
 </tr>
 <tr>
-<td>Memory optimization</td>
-<td>Full output logits caused OOM</td>
-<td>Checkpoint answer-only output-head chunks</td>
-<td>Training completed within laptop capacity</td>
+<td>Training memory fixes</td>
+<td>Full output logits ran out of GPU memory</td>
+<td>Compute answer-only loss in chunks</td>
 </tr>
 <tr>
-<td>Structured decoding</td>
-<td>Valid-looking claims had invalid source attribution/IDs</td>
-<td>Bind source and quote together; constrain enums and existing IDs</td>
-<td>Original blocked job completed with the 1.7B bridge worker</td>
+<td>4B base</td>
+<td>7,141 tokens caused OOM; 4,091 worked after a dtype fix</td>
+<td>Use a 4,096-token training cap</td>
 </tr>
 <tr>
-<td>Stronger base</td>
-<td>Remaining errors were semantic as well as structural</td>
-<td>Use Qwen3-4B-Instruct-2507 and NF4 QLoRA</td>
-<td>7,141-token smoke OOM; 4,091-token smoke passed after dtype correction</td>
+<td>Coding corpus</td>
+<td>Established a starting point for software conversations</td>
+<td>Extend coverage to sixteen everyday and professional domains</td>
 </tr>
 <tr>
-<td>Corpus expansion</td>
-<td>Narrow examples could encourage memorization</td>
-<td>Public traces + diverse stacks/domains/behaviors; family/repository splits</td>
-<td>Audit, counts and leakage receipts below</td>
+<td>Label review</td>
+<td>Review surfaced unsupported labels and ambiguous timestamp flags</td>
+<td>Add contract-based adjudication and exclude rejected cases</td>
 </tr>
 <tr>
-<td>Label adjudication</td>
-<td>Auditor incorrectly rejected valid null timestamps</td>
-<td>Re-review flags against the actual worker contract</td>
-<td>Keep original audit and revised decisions; exclude remaining rejected cases</td>
-</tr>
-<tr>
-<td>Stage 2 + comparison</td>
-<td>Need evidence that fine-tuning helps the stronger base</td>
-<td>Matched decoder/quantization comparison and fresh held-out subset</td>
-<td>Results appear only when their receipts exist</td>
+<td>Final model</td>
+<td>Better consolidation and reflection, lower extraction coverage</td>
+<td>Record the tradeoff and inspect errors</td>
 </tr>
 </tbody>
 </table>
-<p>Changes to base, data and decoder occurred together across generations. Cross-generation improvement cannot be attributed to model size alone.</p>
+<p>The base model, data and decoder changed between early runs. Those runs do not isolate the effect of model size.</p>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=c45a01f0">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a38e22c3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="3.-Bootstrap:-useful-contract-learning,-insufficient-generalization">3. Bootstrap: useful contract learning, insufficient generalization<a class="anchor-link" href="#3.-Bootstrap:-useful-contract-learning,-insufficient-generalization">¶</a></h2><p>The first adapter used Qwen3-1.7B, 1,260 training examples, 140 validation examples and 280 synthetic test examples. The matched 28-case comparison below uses identical prompts with thinking disabled. CPU/GPU differed, so its latency is not a fair speed comparison.</p>
+<h2 id="3.-First-run:-1.7B-bootstrap">3. First run: 1.7B bootstrap<a class="anchor-link" href="#3.-First-run:-1.7B-bootstrap">¶</a></h2><p>The first adapter used Qwen3-1.7B with 1,260 training, 140 validation and 280 synthetic test examples. The 28-case comparison below used matching prompts with thinking disabled. The hardware differed, so the latency numbers are not directly comparable.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e934f7e4">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b12b9e77">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8158,18 +8141,18 @@ bootstrap synthetic test
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ada1b35d">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0eb60890">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="4.-Natural-conversations-exposed-the-failure">4. Natural conversations exposed the failure<a class="anchor-link" href="#4.-Natural-conversations-exposed-the-failure">¶</a></h2><p>The refined 1.7B adapter mixed teacher-labeled conversations with replay. Its naturalistic extraction result under the earlier unconstrained decoder was only 18 accepted windows out of 33. This set was subsequently used for diagnosis, so it is <strong>development evidence</strong>, not a fresh final test.</p>
-<p>The semantic judge's supported fraction is measured over emitted claims in accepted windows. Its earlier recall calculation also excludes failed windows; it must not be presented as end-to-end recall. Later comparisons retain failures in the coverage denominator.</p>
+<h2 id="4.-Testing-on-conversations">4. Testing on conversations<a class="anchor-link" href="#4.-Testing-on-conversations">¶</a></h2><p>The refined 1.7B model accepted only 18 of 33 extraction windows with the earlier decoder. These conversations were later used for debugging, so they are development results.</p>
+<p>The old judge measured support and recall only on accepted windows. That misses failed windows; later coverage scores include them.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b40189b2">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4251a41d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8275,18 +8258,18 @@ bootstrap synthetic test
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e7de7050">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=be653381">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="5.-Fix-the-representation-without-weakening-validation">5. Fix the representation without weakening validation<a class="anchor-link" href="#5.-Fix-the-representation-without-weakening-validation">¶</a></h2><p>The canonical API uses parallel <code>source_indices</code> and <code>quotes</code> arrays. The constrained generation format emits <code>source_quotes: [{source_index, quote}]</code> first, binding each quote to visible spans from that event. A lossless codec restores the API contract. Consolidation identifiers are restricted to supplied facts. The Python teacher/training pipeline and Rust runtime share schema files.</p>
-<p>Exact text does <strong>not</strong> imply entailment: a model can quote a rejected proposal and still incorrectly describe it as a decision. Semantic grading remains necessary. Short teacher quotes are widened to the shortest permitted containing span; source index and claim statement stay unchanged.</p>
+<h2 id="5.-Keeping-quotes-with-their-sources">5. Keeping quotes with their sources<a class="anchor-link" href="#5.-Keeping-quotes-with-their-sources">¶</a></h2><p>The API stores <code>source_indices</code> and <code>quotes</code> in separate arrays. During generation, <code>source_quotes: [{source_index, quote}]</code> keeps each pair together, then a codec converts it back. Consolidation IDs are limited to the supplied facts. Python and Rust use the shared schema files below.</p>
+<p>Short teacher quotes are widened to an allowed containing span without changing the claim or source index. An exact quote can still be misinterpreted, so semantic review is needed too.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2eaa7b09">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=1c3a440b">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8358,37 +8341,36 @@ bootstrap synthetic test
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=097ea893">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=0b53d7f1">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="6.-Research-informed-base-model-and-training-method">6. Research-informed base model and training method<a class="anchor-link" href="#6.-Research-informed-base-model-and-training-method">¶</a></h2><p>Selected <strong><a href="https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507">Qwen3-4B-Instruct-2507</a></strong>, Apache-2.0, revision <code>cdbee75f17c01a7cc42f958dc650907174af0554</code>. Its non-thinking instruction behavior and compatible Qwen3 export path made it a practical controlled candidate. Official instruction-following results motivated the choice; they are not project measurements.</p>
-<p><a href="https://huggingface.co/Qwen/Qwen3.5-4B">Qwen3.5-4B</a> was considered, but a different architecture/export path would add uncertainty. We do not claim the selected model is globally optimal.</p>
-<p>The implementation uses Transformers + PEFT + bitsandbytes: NF4, double quantization, bfloat16 compute, rank-16 LoRA, alpha 32, dropout 0.05, answer-only loss and gradient checkpointing. See <a href="https://huggingface.co/docs/peft/developer_guides/quantization">PEFT quantization documentation</a>. This is <strong>sequence-level distillation</strong> from teacher-generated targets, not teacher-logit/KL distillation.</p>
-<p>Hardware: RTX 4070 Laptop GPU, 8 GB nominal VRAM. A 7,141-token smoke attempt ran out of memory. Reducing to 4,091 tokens then exposed an fp32-hidden-state/bf16-output-head mismatch; an explicit cast fixed it. The two-step smoke test passed at approximately 6.2 GB peak allocation. Training excludes examples over 4,096 tokens rather than silently truncating labels.</p>
+<h2 id="6.-Model-and-training-setup">6. Model and training setup<a class="anchor-link" href="#6.-Model-and-training-setup">¶</a></h2><p>Base: <a href="https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507">Qwen3-4B-Instruct-2507</a>, revision <code>cdbee75f17c01a7cc42f958dc650907174af0554</code>, Apache-2.0. It fit the non-thinking instruction and Qwen3 export setup. Qwen3.5-4B was considered, but would have needed a different export path.</p>
+<p>Training uses Transformers, PEFT and bitsandbytes: NF4 with double quantization, bfloat16 compute, LoRA rank 16, alpha 32, dropout 0.05, gradient checkpointing and answer-only loss. The targets are teacher-generated sequences, not teacher logits. See the <a href="https://huggingface.co/docs/peft/developer_guides/quantization">PEFT quantization guide</a>.</p>
+<p>On the 8 GB RTX 4070 laptop GPU, a 7,141-token trial ran out of memory. A 4,091-token trial exposed an fp32/bf16 mismatch; casting the hidden states fixed it. The two-step check used about 6.2 GB peak allocation. Training skips examples over 4,096 tokens instead of cutting off their answers.</p>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bec5ea20">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=c9ed0863">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="7.-Data-provenance-and-generalization-strategy">7. Data provenance and generalization strategy<a class="anchor-link" href="#7.-Data-provenance-and-generalization-strategy">¶</a></h2><ol>
-<li><strong>Public traces:</strong> <a href="https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories">Nebius SWE-rebench OpenHands trajectories</a>, CC-BY-4.0. We sampled 52 distinct repositories from the fetched source slice, constructing 144 windows. Repository-disjoint allocation: 40 train / 6 validation / 6 test repositories. These are relabeled memory tasks, not copied agent responses. Provenance retains repository, issue, trajectory, event range and source hash.</li>
-<li><strong>Fresh synthetic conversations:</strong> varied software stacks, project domains and memory behaviors, labeled by the authenticated Pi teacher. These are synthetic, not human annotations.</li>
-<li><strong>Earlier examples:</strong> naturalistic teacher corpus plus bounded deterministic replay. Repeated epochs/replay exposure are not additional unique examples.</li>
-</ol>
-<p><a href="https://github.com/xiaowu0162/LongMemEval">LongMemEval</a> informed coverage of temporal reasoning, updates and abstention. It was not used as training data and no LongMemEval score is claimed.</p>
-<p>This historical corpus quantity is justified only as a bounded software-memory fine-tuning experiment. It is not evidence of general intelligence or broad real-world reliability. Extraction, consolidation and reflection from one episode are correlated.</p>
+<h2 id="7.-Early-coding-dataset">7. Early coding dataset<a class="anchor-link" href="#7.-Early-coding-dataset">¶</a></h2><ul>
+<li><a href="https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories">SWE-rebench OpenHands traces</a>, CC-BY-4.0: 144 windows from 52 repositories, split into 40 train / 6 validation / 6 test repositories. The traces were relabeled as memory tasks.</li>
+<li>Synthetic conversations across software stacks and memory behaviors, labeled by the Pi teacher.</li>
+<li>Earlier teacher-labeled conversations and a limited amount of deterministic replay.</li>
+</ul>
+<p>Source records keep repository, issue, trajectory, event range and hashes. Multiple tasks from one episode are related examples, not independent conversations. Replay does not add unique examples.</p>
+<p><a href="https://github.com/xiaowu0162/LongMemEval">LongMemEval</a> informed the temporal, update and abstention cases. It was not training data, and no LongMemEval score was measured.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e24c748b">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=27f2a93e">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8490,7 +8472,7 @@ Fresh evaluation: {'n': 60, 'sha256': '66e3ba2e9fab2490735c350163db4b72f8b2b569a
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=58f6f26f">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e47f3274">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8645,18 +8627,18 @@ Fresh evaluation: {'n': 60, 'sha256': '66e3ba2e9fab2490735c350163db4b72f8b2b569a
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=fccb22aa">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=c8f9f79d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="8.-Label-audit,-mistakes-and-adjudication">8. Label audit, mistakes and adjudication<a class="anchor-link" href="#8.-Label-audit,-mistakes-and-adjudication">¶</a></h2><p>All expanded cases that yielded accepted rows were reviewed. The auditor uses the same teacher family, so this is a correlated automated quality check, not independent human validation. Rejected cases were removed from <strong>every partition</strong>.</p>
-<p>Some initial flags misunderstood the runtime: a null timestamp can legitimately defer to the source event time. We preserved the first review and adjudicated against the complete worker contract. Other flags found real errors, such as observations inventing test coverage or reflections using facts absent from their supplied claims.</p>
+<h2 id="8.-Checking-the-labels">8. Checking the labels<a class="anchor-link" href="#8.-Checking-the-labels">¶</a></h2><p>The same teacher family generated and reviewed the labels. This identified cases for further review but was not independent human review. Rejected cases were removed from all splits.</p>
+<p>A second review checked timestamp flags against the runtime contract: a null timestamp can use the source event time. Other flags identified unsupported test coverage or answers based on facts missing from the input. This led to an adjudication step, with both the original reviews and later decisions kept.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d1c6112e">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=9bad40a8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8787,17 +8769,17 @@ Fresh evaluation: {'n': 60, 'sha256': '66e3ba2e9fab2490735c350163db4b72f8b2b569a
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=9f9ea872">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bc1450a6">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="9.-Verify-the-frozen-partitions-and-inspect-a-synthetic-example">9. Verify the frozen partitions and inspect a synthetic example<a class="anchor-link" href="#9.-Verify-the-frozen-partitions-and-inspect-a-synthetic-example">¶</a></h2><p>Partition by repository/project family before training. Exact prompt hashing provides an additional check, but cannot rule out semantic overlap or model pretraining contamination. Public source diversity is limited by the fetched slice and is Python-heavy. The synthetic stack distribution does not erase that limitation.</p>
+<h2 id="9.-Split-checks-and-an-example">9. Split checks and an example<a class="anchor-link" href="#9.-Split-checks-and-an-example">¶</a></h2><p>Splits were assigned by repository or scenario family before training. The check below looks for identical prompts across splits. It cannot detect all semantic overlap or pretraining contamination. The public trace sample is also Python-heavy.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=34bc9068">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=f0da5be9">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8934,19 +8916,18 @@ Fresh evaluation: {'n': 60, 'sha256': '66e3ba2e9fab2490735c350163db4b72f8b2b569a
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=d8361e41">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ddc0de07">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="10.-Training-stages-and-loss-curves">10. Training stages and loss curves<a class="anchor-link" href="#10.-Training-stages-and-loss-curves">¶</a></h2><p>Stage 1: initial 555-row training set, 507 examples within the token cap; 48 excluded. Validation: 64 fit, 18 excluded. One epoch, learning rate 5e-5, effective batch size 8, 64 optimizer steps.</p>
-<p>Superseded stage-2 plan: continue the stage-1 adapter on audited coding examples plus 128 replay rows. This automatic launch was stopped after the general-purpose scope clarification. The replacement curriculum covers everyday domains with the revised shared prompts. Its audited initial shard is stage A; stage B covers the remaining accepted training rows with bounded replay. See Section 12c for current receipts. The actual encoded counts and exclusions are recorded by <code>train.py</code>. Loss is a diagnostic, not a replacement for semantic evaluation.</p>
-<p>Checkpoint/receipt availability is checked dynamically below. A missing final adapter is reported as unfinished.</p>
+<h2 id="10.-Training-results">10. Training results<a class="anchor-link" href="#10.-Training-results">¶</a></h2><p>The first 4B stage had 555 training rows: 507 fit the token cap and 48 were skipped. Of the validation rows, 64 fit and 18 were skipped. It ran for one epoch at 5e-5, effective batch size 8, for 64 optimizer steps.</p>
+<p>The next iteration extended the work from coding conversations to general memory. The planned second coding stage was not run; it was replaced by general stage A using the first audited shard, followed by stage B using the remaining accepted rows plus replay. The saved configurations below give the actual counts and exclusions. Loss curves show training progress, not memory accuracy.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a21a10be">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b23a3fd8">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9230,18 +9211,18 @@ Fresh evaluation: {'n': 60, 'sha256': '66e3ba2e9fab2490735c350163db4b72f8b2b569a
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bb96ecbc">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=a5ab8139">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="11.-Controlled-comparison-and-fresh-evaluation">11. Controlled comparison and fresh evaluation<a class="anchor-link" href="#11.-Controlled-comparison-and-fresh-evaluation">¶</a></h2><p>Compare the previous fine-tuned 1.7B, untrained 4B and fine-tuned 4B with the <strong>same constrained decoder and Q8 serving quantization</strong>. The 48-case matched set is development comparison evidence. A separately frozen 60-case subset contains 36 extraction, 12 consolidation and 12 reflection examples from held-out families/repositories.</p>
-<p>Report first-attempt validity and eventual acceptance separately. Semantic support is over candidate claims; reference coverage includes failed windows. Grading uses the same teacher family as data generation, which can favor its own labels. Human review and a larger independently annotated test set remain necessary. Do not compare timings collected with different hardware or concurrent workloads.</p>
+<h2 id="11.-Early-model-comparisons">11. Early model comparisons<a class="anchor-link" href="#11.-Early-model-comparisons">¶</a></h2><p>The 1.7B student, 4B base and 4B student use the same constrained decoder and Q8 quantization. The 48-case comparison is development evidence. A separate 60-case held-out subset has 36 extraction, 12 consolidation and 12 reflection examples.</p>
+<p>First-try validity and eventual acceptance are separate scores. Support measures emitted claims; coverage includes failed windows. The teacher family also does the grading, so these scores still need independent review. Timings from different hardware or concurrent workloads are not comparable.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=09e8b393">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=dab05f2a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9285,18 +9266,18 @@ Fresh evaluation: {'n': 60, 'sha256': '66e3ba2e9fab2490735c350163db4b72f8b2b569a
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f876be89">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cbdb83c3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="12.-From-model-output-to-the-derived-knowledge-graph">12. From model output to the derived knowledge graph<a class="anchor-link" href="#12.-From-model-output-to-the-derived-knowledge-graph">¶</a></h2><p>On 8 October 2026, the originally blocked extraction job <code>731699d3-52c1-4d08-af65-fa6b2031a8b6</code> completed after deployment of structured decoding with the 1.7B bridge model. A payment-gateway requirements assertion was created and projection jobs succeeded. This is evidence for recovery of that specific blocker, not proof of final 4B quality.</p>
-<p>The graph UI's body-scoped theme variables were also fixed and browser-tested. Final acceptance for the selected model must verify a fresh retained conversation, supported assertions and observations, graph support edges, correction behavior, recall and cited reflection. Pending acceptance must remain visible.</p>
+<h2 id="12.-Connecting-the-model-to-the-app">12. Connecting the model to the app<a class="anchor-link" href="#12.-Connecting-the-model-to-the-app">¶</a></h2><p>Structured decoding with the 1.7B bridge model unblocked extraction job <code>731699d3-52c1-4d08-af65-fa6b2031a8b6</code> on 8 October. Its payment-gateway fact and graph projection completed. This checked that particular recovery, not the final 4B model.</p>
+<p>The final model has separate checks for extraction, observations, correction history, graph edges, recall and cited answers.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=2ae374e1">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e82ca085">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9306,7 +9287,7 @@ Fresh evaluation: {'n': 60, 'sha256': '66e3ba2e9fab2490735c350163db4b72f8b2b569a
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">receipt</span><span class="o">=</span><span class="n">read</span><span class="p">(</span><span class="n">DATA</span><span class="o">/</span><span class="s1">'receipts/final-acceptance.json'</span><span class="p">)</span>
 <span class="k">if</span> <span class="n">receipt</span><span class="p">:</span> <span class="n">show_acceptance</span><span class="p">(</span><span class="n">receipt</span><span class="p">)</span>
-<span class="k">else</span><span class="p">:</span> <span class="n">display</span><span class="p">(</span><span class="n">Markdown</span><span class="p">(</span><span class="s1">'**Historical stage not run:** coding-only stage 2 was stopped after the general-purpose scope correction. Its acceptance receipt is intentionally absent; the selected general-purpose model is evaluated in Section 12c.'</span><span class="p">))</span>
+<span class="k">else</span><span class="p">:</span> <span class="n">display</span><span class="p">(</span><span class="n">Markdown</span><span class="p">(</span><span class="s1">'The next training iteration used the general-memory curriculum instead of coding stage 2. See Section 14 for those model checks.'</span><span class="p">))</span>
 </pre></div>
 </div>
 </div>
@@ -9319,25 +9300,25 @@ Fresh evaluation: {'n': 60, 'sha256': '66e3ba2e9fab2490735c350163db4b72f8b2b569a
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-OutputArea-output" data-mime-type="text/markdown" tabindex="0">
-<p><strong>Historical stage not run:</strong> coding-only stage 2 was stopped after the general-purpose scope correction. Its acceptance receipt is intentionally absent; the selected general-purpose model is evaluated in Section 12c.</p>
+<p>The next training iteration used the general-memory curriculum instead of coding stage 2. See Section 14 for those model checks.</p>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3c7ea64f">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=066d8040">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="12b.-Scope-correction-and-Hindsight-informed-extraction">12b. Scope correction and Hindsight-informed extraction<a class="anchor-link" href="#12b.-Scope-correction-and-Hindsight-informed-extraction">¶</a></h2><p>The user clarified that memory must serve everyday and professional conversations, not only coding agents. Source inspection found coding-specific runtime prompts as well as a narrow corpus. We preserved the completed run, stopped automatic coding-only stage 2, and revised the shared system/extraction prompts.</p>
-<p><a href="https://arxiv.org/pdf/2512.12818v1#page=23">Hindsight is 20/20, Appendix A.1</a> motivates contextual facts and reference resolution. Its <a href="https://github.com/vectorize-io/hindsight/blob/1152717735237c26986b877789704b89bac89681/hindsight-api-slim/hindsight_api/engine/retain/fact_extraction.py">pinned current implementation</a> also has concise extraction. Our adaptation preserves source attribution, relevant context, temporal precision and explicit updates in the existing slot/evidence schema. See <code>reports/PROMPT_DESIGN.md</code> for the mapping and differences.</p>
-<p>A 7,016-byte draft failed four small-context tests. Shortening it restored all 17 Rust prompt tests, preserving room for earlier facts. Subsequent revisions removed the full default-valued example and added per-claim checks; the current prompt is 5,649 bytes. Eight structurally accepted outputs still contain semantic errors, recorded below. Tests establish integration and capacity, not semantic improvement. Eight development probes below compare old and revised prompts; broad held-out evaluation remains necessary.</p>
+<h2 id="13.-Prompt-iteration:-everyday-conversations">13. Prompt iteration: everyday conversations<a class="anchor-link" href="#13.-Prompt-iteration:-everyday-conversations">¶</a></h2><p>The initial prompts provided a coding-focused starting point. The next iteration extended them to everyday conversations while keeping the existing evidence and slot schema.</p>
+<p><a href="https://arxiv.org/pdf/2512.12818v1#page=23">Hindsight, Appendix A.1</a> and its <a href="https://github.com/vectorize-io/hindsight/blob/1152717735237c26986b877789704b89bac89681/hindsight-api-slim/hindsight_api/engine/retain/fact_extraction.py">pinned implementation</a> informed the treatment of context, references and dates. The mapping is in <code>reports/PROMPT_DESIGN.md</code>.</p>
+<p>Context-budget tests showed that the 7,016-byte draft left too little room for earlier facts in four cases. The next version shortened the instructions and passed all 17 prompt tests. Further iterations removed the full default-valued example and added per-claim checks, bringing the prompt to 5,649 bytes. All eight development probes passed structural validation, but date and attribution errors remained.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=15e75266">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=79298488">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9748,19 +9729,18 @@ Fresh evaluation: {'n': 60, 'sha256': '66e3ba2e9fab2490735c350163db4b72f8b2b569a
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=12738bcc">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=be8c3c01">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="12c.-General-purpose-corpus-and-final-release">12c. General-purpose corpus and final release<a class="anchor-link" href="#12c.-General-purpose-corpus-and-final-release">¶</a></h2><p>The product target covers everyday and professional memory. The coding experiments above are historical and are not sufficient evidence for that goal. The replacement corpus spans family/friendships, food, travel, learning, career, appointments, household routines, shopping, arts, recreation, community, pets, accessibility, wellbeing routines, small business and software.</p>
-<p>Teacher-generated cases undergo contract checks and semantic audit. Partitions are assigned by scenario family before training. Task rows from the same scenario remain correlated. Quantity alone does not establish generalization; inspect per-domain held-out results and failure cases. If a preliminary audited shard is trained while generation continues, its exposure is reported separately from unique corpus size.</p>
-<p><strong>Release name:</strong> <code>aryaniyaps/mem-extractor</code>. Historical <code>memex-extractor</code> aliases remain in old experiment receipts. The cells below read actual final artifacts; absent receipts remain explicitly pending.</p>
+<h2 id="14.-General-memory-dataset-and-final-model">14. General memory dataset and final model<a class="anchor-link" href="#14.-General-memory-dataset-and-final-model">¶</a></h2><p>The replacement dataset covers sixteen domains, including relationships, food, travel, learning, work, routines and software. Scenarios were split by family, then labeled, checked and reviewed. Related tasks from one scenario still count as correlated rows.</p>
+<p>The cells below load the final corpus counts, training configuration, evaluations and live checks. The release is named <code>aryaniyaps/mem-extractor</code>; <code>memex-extractor</code> in older files is a historical name.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=14806d0d">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8dba0333">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -10417,7 +10397,7 @@ base-general-64 summary
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-OutputArea-output" data-mime-type="text/markdown" tabindex="0">
-<p>Full jobs, graph and retrieval responses remain in the local acceptance receipt. Quoted examples aid inspection; the check results above determine acceptance.</p>
+<p>The local receipt has the full job, graph and retrieval responses.</p>
 </div>
 </div>
 <div class="jp-OutputArea-child">
@@ -10886,18 +10866,18 @@ base-general-64 summary
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8ac21620">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=eaa7c9ed">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="12d.-External-conversation-diagnostic">12d. External conversation diagnostic<a class="anchor-link" href="#12d.-External-conversation-diagnostic">¶</a></h2><p>To separate evaluation from our own scenario generator, we froze sixteen short windows from ten conversations in <a href="https://github.com/snap-research/locomo">LoCoMo</a>, an external machine-human conversation dataset described by <a href="https://aclanthology.org/2024.acl-long.747/">Maharana et al. (ACL 2024)</a>. The upstream license is CC-BY-NC-4.0. Raw data and derived labels remain local to this academic diagnostic and never enter training or the public model package.</p>
-<p>This tests short-window extraction on a different source distribution. It is <strong>not the official LoCoMo QA benchmark</strong>, a long-horizon retrieval test, or independently human-graded extraction accuracy. Our task labels and semantic review still use the same teacher family. Session wall times have no upstream timezone; the API's UTC suffix is only an adapter convention. See <code>reports/EXTERNAL_LOCOMO.md</code> for the frozen selection and attribution protocol.</p>
+<h2 id="15.-External-conversation-check">15. External conversation check<a class="anchor-link" href="#15.-External-conversation-check">¶</a></h2><p>The external set has sixteen short windows from ten <a href="https://github.com/snap-research/locomo">LoCoMo</a> conversations (<a href="https://aclanthology.org/2024.acl-long.747/">Maharana et al., 2024</a>). The data is CC-BY-NC-4.0 and stays local for academic evaluation. It is excluded from training and the model package.</p>
+<p>This is a short-window extraction check, not the official LoCoMo QA benchmark or a long-history retrieval test. Labels and grading still use the same teacher family. Source session times have no timezone; the UTC suffix is an API convention. Details are in <code>reports/EXTERNAL_LOCOMO.md</code>.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=3bf36c01">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=b39d270d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -10940,31 +10920,68 @@ base-general-64 summary
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=5282743c">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cf59d9a3">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="Measured-tradeoff-and-unresolved-temporal-errors">Measured tradeoff and unresolved temporal errors<a class="anchor-link" href="#Measured-tradeoff-and-unresolved-temporal-errors">¶</a></h2><p>The internal matched comparison improves consolidation from <strong>1/16 to 13/16</strong> and reflection from <strong>10/16 to 15/16</strong>. Extraction regresses: supported-claim fraction is <strong>38/42 (90.5%) versus 58/63 (92.1%)</strong> for the base, and reference coverage is <strong>41/55 (74.5%) versus 50/55 (90.9%)</strong>. Both models recover the eight annotated corrections. Student structural acceptance is <strong>63/64</strong>, including the preserved reflection-citation failure. These same-family teacher judgments describe a small held-out sample, not independent human accuracy.</p>
-<p>Manual inspection found substantive temporal failures: “tomorrow” on June 1 was normalized to June 3; “this Friday” from October 8 became October 17; and date-only events acquired invented midnight timestamps. <strong>Temporal normalization and precision remain unreliable.</strong> The later citation-enum repair does not fix these semantic errors. Keep the evidence and verify dates before relying on extracted timestamps.</p>
-<p>This is a multitask tradeoff with an extraction regression. External extraction also regresses: support is <strong>22/26 (84.6%) versus 39/44 (88.6%)</strong>, and reference coverage is <strong>13/40 (32.5%) versus 16/40 (40.0%)</strong>. Both models pass structural validation on all sixteen windows. This is not official LoCoMo QA accuracy. Final live acceptance is separate evidence; successful graph operations do not erase extraction errors.</p>
+<h2 id="16.-Results-and-remaining-limitations">16. Results and remaining limitations<a class="anchor-link" href="#16.-Results-and-remaining-limitations">¶</a></h2><table>
+<thead>
+<tr>
+<th>Internal test</th>
+<th style="text-align:right">Base</th>
+<th style="text-align:right">Fine-tuned</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consolidation</td>
+<td style="text-align:right">1/16</td>
+<td style="text-align:right">13/16</td>
+</tr>
+<tr>
+<td>Reflection</td>
+<td style="text-align:right">10/16</td>
+<td style="text-align:right">15/16</td>
+</tr>
+<tr>
+<td>Supported extraction claims</td>
+<td style="text-align:right">58/63 (92.1%)</td>
+<td style="text-align:right">38/42 (90.5%)</td>
+</tr>
+<tr>
+<td>Reference facts covered</td>
+<td style="text-align:right">50/55 (90.9%)</td>
+<td style="text-align:right">41/55 (74.5%)</td>
+</tr>
+<tr>
+<td>Annotated corrections recovered</td>
+<td style="text-align:right">8/8</td>
+<td style="text-align:right">8/8</td>
+</tr>
+</tbody>
+</table>
+<p>The fine-tuned model passed structural checks on 63/64 internal cases. It improved consolidation and reflection but lost extraction coverage. These are small, same-family teacher-graded samples.</p>
+<p>The external results also dropped: support went from 39/44 (88.6%) to 22/26 (84.6%), and coverage from 16/40 (40.0%) to 13/40 (32.5%). Both models passed structural checks on all sixteen windows.</p>
+<p>Manual review identified date-handling limitations: “tomorrow” on June 1 became June 3, and “this Friday” from October 8 became October 17. Some date-only events acquired midnight timestamps. These errors remain; successful graph checks and the citation fix below do not resolve them.</p>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=90d4f5d4">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=6eef3abc">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="12e.-Live-reflection-failure-and-deployment-only-citation-repair">12e. Live reflection failure and deployment-only citation repair<a class="anchor-link" href="#12e.-Live-reflection-failure-and-deployment-only-citation-repair">¶</a></h2><p>The first final-candidate live pilot passed the completed extraction, correction, relationship, derived-observation, projection and location-recall checks, then failed at reflection with HTTP 502. Runtime diagnosis identified invalid UUID citations. This failure remains in its original receipt; graph success alone did not satisfy acceptance.</p>
-<p>The repair constrains reflection citations to identifiers actually present in retrieved evidence. It changes the serving decoder, not the trained weights. The frozen baseline/student comparison retains its original Python reflection decoder for both models. Consequently those matched scores <strong>do not measure the citation-enum repair</strong>. A separate repeated live pilot and final acceptance receipt evaluate the deployment change. The second pilot also exposed a harness false negative: it searched the statement for a literal name instead of checking the resolved subject and quoted relationship evidence. A recorded re-audit of the same saved outputs corrects that check; it is not fresh inference. Both failed receipts remain preserved; their existence and outcomes are checked below. The frozen comparison is complete. Public inference now uses the deployed citation-enum contract; the previously failed row passed a separate one-attempt regression check.</p>
+<h2 id="17.-Serving-iteration:-citation-constraints">17. Serving iteration: citation constraints<a class="anchor-link" href="#17.-Serving-iteration:-citation-constraints">¶</a></h2><p>The first final-model pilot passed extraction and graph checks, but reflection returned HTTP 502 because of invalid UUID citations. That result motivated the next serving iteration: restrict citations to IDs in the retrieved evidence. The weights did not change.</p>
+<p>The frozen comparison used the original decoder for both models, so its reflection score stays 15/16. A separate retry of the failed row passed in one attempt with the repaired decoder.</p>
+<p>The second pilot led to a refinement of the relationship check. The original check required a literal name in the statement; the revised check uses the resolved subject and relationship quote. Rechecking the saved outputs resolved that false negative; it was not a new inference run. Both pilot outcomes and subsequent checks are shown below.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8999d550">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=1145a91a">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -11209,40 +11226,38 @@ base-general-64 summary
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=428e77be">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=12b44c66">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="13.-Reproduce-the-experiment-deliberately">13. Reproduce the experiment deliberately<a class="anchor-link" href="#13.-Reproduce-the-experiment-deliberately">¶</a></h2><p>Use the repository's virtual environment. Clear ROS-injected <code>PYTHONPATH</code>. Corpus generation invokes a teacher and is an explicit, separate operation; credentials are not included in this notebook. The commands below are displayed, <strong>not executed by Run All</strong>.</p>
+<h2 id="18.-Running-the-scripts">18. Running the scripts<a class="anchor-link" href="#18.-Running-the-scripts">¶</a></h2><p>Use the local virtual environment and clear the externally supplied <code>PYTHONPATH</code>. The commands here are examples, not executable notebook cells.</p>
 <div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>slm-distill
-env<span class="w"> </span>-u<span class="w"> </span>PYTHONPATH<span class="w"> </span>.venv/bin/python<span class="w"> </span>train.py<span class="w">   </span>--base<span class="w"> </span>Qwen/Qwen3-4B-Instruct-2507<span class="w">   </span>--revision<span class="w"> </span>cdbee75f17c01a7cc42f958dc650907174af0554<span class="w">   </span>--qlora<span class="w"> </span>--sets<span class="w"> </span>data/research-v3/continuation-sets<span class="w">   </span>--adapter<span class="w"> </span>out/local-4b-general-stage-a/final<span class="w"> </span>--out<span class="w"> </span>out/local-4b-general<span class="w">   </span>--rank<span class="w"> </span><span class="m">16</span><span class="w"> </span>--accum<span class="w"> </span><span class="m">8</span><span class="w"> </span>--epochs<span class="w"> </span><span class="m">1</span><span class="w"> </span>--max-length<span class="w"> </span><span class="m">4096</span><span class="w"> </span>--loss-chunk-size<span class="w"> </span><span class="m">256</span><span class="w"> </span>--lr<span class="w"> </span>3e-5<span class="w"> </span>--eval-on-epoch
+env<span class="w"> </span>-u<span class="w"> </span>PYTHONPATH<span class="w"> </span>.venv/bin/python<span class="w"> </span>train.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--base<span class="w"> </span>Qwen/Qwen3-4B-Instruct-2507<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--revision<span class="w"> </span>cdbee75f17c01a7cc42f958dc650907174af0554<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--qlora<span class="w"> </span>--sets<span class="w"> </span>data/research-v3/continuation-sets<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--adapter<span class="w"> </span>out/local-4b-general-stage-a/final<span class="w"> </span>--out<span class="w"> </span>out/local-4b-general<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--rank<span class="w"> </span><span class="m">16</span><span class="w"> </span>--accum<span class="w"> </span><span class="m">8</span><span class="w"> </span>--epochs<span class="w"> </span><span class="m">1</span><span class="w"> </span>--max-length<span class="w"> </span><span class="m">4096</span><span class="w"> </span>--loss-chunk-size<span class="w"> </span><span class="m">256</span><span class="w"> </span>--lr<span class="w"> </span>3e-5<span class="w"> </span>--eval-on-epoch
 </pre></div>
-<p>The command is an example; use the actual final <code>run-config.json</code> for exact curriculum and warm-start lineage. General-purpose construction is in <code>expand_general_corpus.py</code> and <code>audit_general_corpus.py</code>. Inspect <code>sample_public_corpus.py</code>, <code>research_corpus.py</code>, <code>expand_corpus.py</code>, <code>audit_corpus.py</code>, <code>adjudicate_audit.py</code> and <code>assemble_research.py</code> for corpus construction. <code>evaluate_research.py</code> records raw responses; <code>grade_research.py</code> grades them against evidence. <code>export.py</code> merges the adapter, converts to GGUF and installs an Ollama model.</p>
-<p>Refresh this report:</p>
+<p>This continues stage A. Use the saved <code>run-config.json</code> and frozen inputs to reproduce the run, and choose a new output directory to avoid overwriting it. Teacher generation is separate and uses provider credits.</p>
+<p>From the repository root, rebuild this report with:</p>
 <div class="highlight"><pre><span></span>env<span class="w"> </span>-u<span class="w"> </span>PYTHONPATH<span class="w"> </span>slm-distill/.venv/bin/python<span class="w"> </span>slm-distill/build_notebook.py<span class="w"> </span>--execute
 </pre></div>
-<p>Large datasets, checkpoints and teacher caches are ignored by Git. Preserve them with their manifests when transferring the experiment. The executed notebook is a portable view of measurements, not a substitute for the underlying evidence.</p>
+<p>The README maps the scripts. Large datasets, checkpoints and teacher caches are ignored by Git; keep their manifests when moving them.</p>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=92002321">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=1d5c2509">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="14.-Claims-we-can-defend,-and-remaining-limitations">14. Claims we can defend, and remaining limitations<a class="anchor-link" href="#14.-Claims-we-can-defend,-and-remaining-limitations">¶</a></h2><ul>
-<li>The experiment iterated from contract learning to naturalistic diagnosis, representation repair, a stronger base, broader data and audited labels.</li>
-<li>Corpus quantity must be reported together with unique episodes, split strategy, provenance, exclusions and task correlation.</li>
-<li>The initial synthetic/public mix supported only software-memory experiments. The frozen replacement corpus spans sixteen everyday/professional domains; it still does not establish generalization to arbitrary domains, languages or very long histories.</li>
-<li>Teacher-generated targets and teacher grading are correlated. Hard validators establish structural grounding, not factual entailment.</li>
-<li>Training fits an 8 GB GPU at the measured token cap. Serving a larger context does not establish learned long-context quality.</li>
-<li>No final improvement or deployment claim is made until its corresponding saved evaluation and operational receipt exists.</li>
-</ul>
-<p><strong>Guide review:</strong> inspect the failure examples, rejected label reasons, frozen split hashes, matched baseline comparison and live evidence path before interpreting aggregate scores.</p>
+<h2 id="19.-What-remains">19. What remains<a class="anchor-link" href="#19.-What-remains">¶</a></h2><p>The model fits the laptop and works through the memory pipeline. It is better at consolidation and reflection on the internal sample, but extraction coverage is lower than the base model.</p>
+<p>The next priorities are date handling, missed facts and an independently reviewed test set. Sixteen domains do not establish performance on arbitrary topics, languages or long histories. Teacher-generated labels and teacher grading are also a shared source of bias.</p>
 </div>
 </div>
 </div>

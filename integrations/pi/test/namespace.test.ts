@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import memoryExtension from "../extension.ts";
+import { defaultNamespace } from "../identity.ts";
 import { AUTOMATIC_RECALL_MAX_DISTANCE } from "../client.ts";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
@@ -31,7 +32,7 @@ function session(cwd: string, id: string) {
   return { handlers, ctx };
 }
 
-test("sessions in different directories share one namespace and one spool", async () => {
+test("projects have isolated namespaces and spools; sessions in the same project share them", async () => {
   const root = await mkdtemp(join(tmpdir(), "memory-namespace-"));
   const saved = {
     fetch: globalThis.fetch,
@@ -99,11 +100,11 @@ test("sessions in different directories share one namespace and one spool", asyn
       second.ctx,
     );
 
-    assert.equal(injected.message.details.namespace, "user:tester");
-    assert.equal(injectedB.message.details.namespace, "user:tester");
+    assert.equal(injected.message.details.namespace, defaultNamespace(a));
+    assert.equal(injectedB.message.details.namespace, defaultNamespace(b));
     assert.deepEqual(
       recalls.map((r) => r.namespace),
-      ["user:tester", "user:tester"],
+      [defaultNamespace(a), defaultNamespace(b)],
     );
     // Automatic recall must not wait for the server's LLM date planner.
     assert(recalls.every((r) => r.temporal === false));
@@ -112,9 +113,13 @@ test("sessions in different directories share one namespace and one spool", asyn
     // Automatic recall drops vector matches beyond the calibrated distance, so an unrelated prompt injects nothing.
     assert.equal(AUTOMATIC_RECALL_MAX_DISTANCE, 0.45);
     assert(recalls.every((r) => r.max_distance === 0.45));
-    // Directory B delivered the evidence directory A had queued.
+    // Directory B must not deliver A's queued evidence.
+    assert.equal(retained.length, 0);
+    const resumedA = session(a, "session-a2");
+    await resumedA.handlers.get("session_start")!({}, resumedA.ctx);
+    // Another session in A delivers A's spool.
     assert.equal(retained.length, 1);
-    assert.equal(retained[0].namespace, "user:tester");
+    assert.equal(retained[0].namespace, defaultNamespace(a));
     assert.equal(retained[0].session_id, "session-a");
     // An empty prompt does not ask the service to search for nothing.
     assert.equal(
