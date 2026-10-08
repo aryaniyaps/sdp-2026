@@ -194,7 +194,10 @@ fig,ax=plt.subplots(figsize=(9,4)); plotted=False
 for label,folder in runs:
     run=SLM/'out'/folder
     config=read(run/'run-config.json')
-    status.append({'run':label,'adapter_saved':(run/'final/adapter_model.safetensors').exists(),'run_config_saved':config is not None})
+    completion=read(run/'training-result.json')
+    status.append({'run':label,'adapter_saved':(run/'final/adapter_model.safetensors').exists(),'run_config_saved':config is not None,'completion_receipt':completion is not None})
+    if completion:
+        print(label+' completion metrics'); display(completion)
     states=list(run.glob('**/trainer_state.json'))
     history=[]
     if states:
@@ -206,6 +209,8 @@ for label,folder in runs:
             for text in re.findall(r"\\{[^{}]*'loss'[^{}]*\\}",log.read_text()):
                 try: history.append(ast.literal_eval(text))
                 except (ValueError,SyntaxError): pass
+    validations=[x for x in history if 'eval_loss' in x]
+    if validations: status[-1]['last_eval_loss']=validations[-1]['eval_loss']
     loss=[x for x in history if 'loss' in x]
     if loss:
         ax.plot([x.get('step',i) for i,x in enumerate(loss)],[float(x['loss']) for x in loss],label=label); plotted=True
@@ -277,7 +282,16 @@ if not general_manifest and interim:
     display(Markdown('**Interim audited shard; not the final corpus:**'))
     display({k:interim[k] for k in ('status','counts','coding_replay_rows','leakage_checks') if k in interim})
 if general_manifest:
-    display({k:v for k,v in general_manifest.items() if k not in ('accepted_episodes','excluded','duplicates','pending_batches')})
+    show([{'split':split,'rows':value['rows'],'episodes':value['episodes'],**value['tasks'],'coding_fraction':value['coding_fraction']} for split,value in general_manifest['counts'].items()])
+    print('Frozen total rows:',sum(v['rows'] for v in general_manifest['counts'].values()))
+    print('Audit decisions:',general_manifest.get('label_audit_counts'))
+    print('Continuation curriculum:',general_manifest.get('continuation'))
+    print('Held-out selection:',general_manifest.get('heldout'))
+    print('Leakage checks:',general_manifest.get('leakage_checks'))
+    fig,ax=plt.subplots(figsize=(10,6))
+    pd.Series(general_manifest['counts']['train']['domains']).sort_values().plot.barh(ax=ax,title='General-purpose training rows across 16 domains')
+    ax.set_xlabel('Task rows; multiple tasks can share an episode')
+    fig.tight_layout(); fig.savefig(FIG/'general-domain-coverage.png',dpi=160); plt.show()
     print('Accepted episodes:',len(general_manifest.get('accepted_episodes',[])))
     print('Excluded cases:',len(general_manifest.get('excluded',[])))
 else: missing('frozen general-purpose corpus manifest')
@@ -289,11 +303,12 @@ config=read(SLM/'out/local-4b-general/run-config.json')
 if config: display({k:v for k,v in config.items() if k!='exclusions'})
 else: missing('final general-purpose training configuration')
 print('Final adapter saved:',(SLM/'out/local-4b-general/final/adapter_model.safetensors').exists())
-for path in sorted((GENERAL/'eval').glob('*.json')):
-    result=read(path)
-    # Aggregate summaries only; raw/private event transcripts are never embedded.
-    if any(key in result for key in ('summary','accepted','tasks','evaluation','extract','total','metrics')):
-        print(path.name); display(result)
+for label in ('base-general-64','student-general-64','base-external-locomo-16','student-external-locomo-16'):
+    for kind in ('summary','semantic'):
+        result=read(GENERAL/'eval'/f'{label}-{kind}.json')
+        if result:
+            print(label,kind); display(result)
+        else: missing(f'{label} {kind} evaluation')
 acceptance=read(GENERAL/'final-acceptance.json')
 if acceptance: display(acceptance)
 else: missing('general-purpose selected-model live extraction and graph acceptance')
@@ -319,8 +334,8 @@ cd slm-distill
 env -u PYTHONPATH .venv/bin/python train.py \
   --base Qwen/Qwen3-4B-Instruct-2507 \
   --revision cdbee75f17c01a7cc42f958dc650907174af0554 \
-  --qlora --sets data/research-v3/sets \
-  --out out/local-4b-general \
+  --qlora --sets data/research-v3/continuation-sets \
+  --adapter out/local-4b-general-stage-a/final --out out/local-4b-general \
   --rank 16 --accum 8 --epochs 1 --max-length 4096 --lr 3e-5 --eval-on-epoch
 ```
 
@@ -337,7 +352,7 @@ md('''## 14. Claims we can defend, and remaining limitations
 
 - The experiment iterated from contract learning to naturalistic diagnosis, representation repair, a stronger base, broader data and audited labels.
 - Corpus quantity must be reported together with unique episodes, split strategy, provenance, exclusions and task correlation.
-- The initial synthetic/public mix supports only a software-memory scope; it does not satisfy the general-purpose product target. It does not establish generalization to arbitrary domains, languages or very long histories.
+- The initial synthetic/public mix supported only software-memory experiments. The frozen replacement corpus spans sixteen everyday/professional domains; it still does not establish generalization to arbitrary domains, languages or very long histories.
 - Teacher-generated targets and teacher grading are correlated. Hard validators establish structural grounding, not factual entailment.
 - Training fits an 8 GB GPU at the measured token cap. Serving a larger context does not establish learned long-context quality.
 - No final improvement or deployment claim is made until its corresponding saved evaluation and operational receipt exists.
