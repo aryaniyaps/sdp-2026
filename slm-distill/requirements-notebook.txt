@@ -1,0 +1,8 @@
+# Reporting dependencies; install into the training virtual environment.
+jupyterlab==4.6.4
+nbformat==5.11.1
+nbclient==0.11.0
+nbconvert==7.17.1
+ipykernel==7.4.0
+matplotlib==3.11.2
+pandas==3.0.6

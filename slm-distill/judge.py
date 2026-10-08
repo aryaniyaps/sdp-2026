@@ -6,12 +6,16 @@ import json
 
 from teacher import Teacher
 
-SYSTEM = "You grade a memory extraction system for coding agents. Return one JSON object only."
+SYSTEM = "You grade a general-purpose memory extraction system. Return one JSON object only."
 
 PROMPT = """The system read these events (exactly as shown to it; long outputs may be cut, marked with "[... N characters omitted ...]"):
 {events}
 
-A human planted these facts in the transcript (ground truth):
+Earlier accepted facts supplied to the extractor (context for attribution and corrections,
+not a substitute for new evidence in these events):
+{existing}
+
+Reference facts planted in the synthetic transcript:
 {planted}
 
 The system extracted these claims:
@@ -41,12 +45,13 @@ Is the candidate answer correct according to the evidence, and consistent with t
 Return {{"correct":true|false,"reason":"one short sentence"}}."""
 
 
-def grade_window(teacher: Teacher, events: list[dict], planted: list[dict], claims: list[dict], tag: str) -> dict:
-    shown = [{"i": i, "role": e["role"], "content": e["content"]} for i, e in enumerate(events)]
+def grade_window(teacher: Teacher, events: list[dict], planted: list[dict], claims: list[dict], tag: str,
+                 *, existing: list[dict] | None = None) -> dict:
+    shown = [{**e, "i": i} for i, e in enumerate(events)]
     brief = [{"id": p["id"], "statement": p["statement"]} for p in planted]
     listed = [{"i": i, "statement": c["statement"], "value": c["value"], "quotes": c["quotes"]} for i, c in enumerate(claims)]
     verdict = teacher.complete_json(
-        SYSTEM, PROMPT.format(events=json.dumps(shown, ensure_ascii=False), planted=json.dumps(brief, ensure_ascii=False),
+        SYSTEM, PROMPT.format(events=json.dumps(shown, ensure_ascii=False), existing=json.dumps(existing or [], ensure_ascii=False), planted=json.dumps(brief, ensure_ascii=False),
                               claims=json.dumps(listed, ensure_ascii=False)),
         effort="low", tag=tag)
     return verdict
