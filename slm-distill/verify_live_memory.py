@@ -92,7 +92,7 @@ def main():
         receipt["checks"]["old_city_not_active"] = not any(x["status"] == "active" and "pune" in x["statement"].lower() and "chennai" not in x["statement"].lower() for x in assertions)
         receipt["checks"]["sister_relationship"] = any(x["status"] == "active" and all(word in x["statement"].lower() for word in ("maya", "leela", "sister")) for x in assertions)
         receipt["checks"]["no_unsupported_geographic_addition"] = not any("india" in x["statement"].lower() for x in assertions)
-        receipt["checks"]["derived_observation_with_two_supports"] = any(sum(e["from_id"] == x["id"] for e in supports) >= 2 for x in observations)
+        receipt["checks"]["derived_observation_with_two_supports"] = any(len({e["to_id"] for e in supports if e["from_id"] == x["id"]}) >= 2 for x in observations)
         receipt["checks"]["neo4j_projection"] = bool(projection.get("nodes")) and bool(projection.get("relationships"))
         for name, query in [("location", "Where does Maya Sen currently live?"), ("preference", "What meals does Maya Sen prefer?")]:
             for route in ("recall", "reflect"):
