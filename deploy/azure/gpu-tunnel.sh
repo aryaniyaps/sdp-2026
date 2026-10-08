@@ -8,14 +8,14 @@
 #   gpu-tunnel.sh status    say whether it is running and whether the VM sees the model server
 # Needs the local Ollama to serve the model first (scripts/fetch-slm.sh with OLLAMA_URL set to it).
 #   GPU_OLLAMA_URL   the local Ollama to lend (default http://127.0.0.1:11436)
-#   EXTRACTION_MODEL the model that must be installed there (default memex-extractor)
+#   EXTRACTION_MODEL the model that must be installed there (default mem-extractor)
 # If this machine is off or asleep the memory worker cannot reach a model: extraction jobs fail
 # with a clear error and are retried, nothing falls back to another model.
 set -euo pipefail
 
 STATE=${SDP_CLOUD_STATE:-$HOME/.sdp-cloud}
 OLLAMA=${GPU_OLLAMA_URL:-http://127.0.0.1:11436}
-MODEL=${EXTRACTION_MODEL:-memex-extractor}
+MODEL=${EXTRACTION_MODEL:-mem-extractor}
 VERSION=1.12.0
 SHA256=f3f180f1d93aa72cce4e6386f98cc06569a0146fbd65eb4423cf83e6434bcfe6
 DEST=$HOME/.local/opt/chisel

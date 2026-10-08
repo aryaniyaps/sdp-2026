@@ -20,9 +20,9 @@ if ! curl -fsS --max-time 3 "$OLLAMA_URL/api/version" >/dev/null; then
   until curl -fsS --max-time 3 "$OLLAMA_URL/api/version" >/dev/null; do sleep 1; done
 fi
 curl -fsS "$OLLAMA_URL/api/pull" -H 'content-type: application/json' -d '{"model":"qwen3-embedding:0.6b","stream":false}' >/dev/null
-# The memory worker is the fine-tuned student model. It is installed once from the release (about 1.8 GB)
+# The memory worker is the fine-tuned student model. It is installed once from the release (about 4.3 GB)
 # into the Ollama that serves it, which can be another machine: set EXTRACTION_OLLAMA_URL.
-export EXTRACTION_MODEL="${EXTRACTION_MODEL:-memex-extractor}"
+export EXTRACTION_MODEL="${EXTRACTION_MODEL:-mem-extractor}"
 export EXTRACTION_OLLAMA_URL="${EXTRACTION_OLLAMA_URL:-$OLLAMA_URL}"
 OLLAMA_URL="$EXTRACTION_OLLAMA_URL" scripts/fetch-slm.sh
 # Host cargo is used when it is the pinned toolchain. Building in Docker leaves root-owned files in target/.

@@ -67,7 +67,7 @@ services:
       # The worker model (fine-tuned Qwen3-1.7B). Default: this stack's own Ollama. On Azure it is the
       # GPU of a workstation, reached through the gpu-tunnel service below.
       EXTRACTION_OLLAMA_URL: ${EXTRACTION_OLLAMA_URL:-http://ollama:11434}
-      EXTRACTION_MODEL: ${EXTRACTION_MODEL:-memex-extractor}
+      EXTRACTION_MODEL: ${EXTRACTION_MODEL:-mem-extractor}
       OLLAMA_NUM_CTX: "12288"
       OLLAMA_NUM_PREDICT: "3072"
       MEMORY_WORKER_CONCURRENCY: "2"

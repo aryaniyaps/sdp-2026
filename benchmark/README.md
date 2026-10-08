@@ -31,7 +31,7 @@ edit these fields in `config.json`:
 
 | Fields | Purpose |
 |---|---|
-| `worker_provider`, `worker_model` | Extraction and consolidation: `ollama` and the installed model name (default `memex-extractor`) |
+| `worker_provider`, `worker_model` | Extraction and consolidation: `ollama` and the installed model name (default `mem-extractor`) |
 | `worker_thinking` | `none`: the worker is the fine-tuned model served by Ollama, which does not think |
 | `reader_provider`, `reader_model`, `thinking` | Same reader for all conditions; `thinking` also applies to the judge |
 | `judge_provider`, `judge_model` | Blinded category-rubric judging |
@@ -56,7 +56,7 @@ model estimates, not proof of a subscription charge.
 From the repository root, make sure the worker model named in `config.json` is installed (`run-memory.sh` does that) and match the concurrency:
 
 ```sh
-export EXTRACTION_MODEL='memex-extractor'
+export EXTRACTION_MODEL='mem-extractor'
 export MEMORY_WORKER_CONCURRENCY=4
 ./scripts/run-memory.sh
 ```
