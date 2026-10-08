@@ -13,6 +13,7 @@ Set OLLAMA_HOST to the server that should hold the model and OLLAMA_BIN to its c
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -24,8 +25,8 @@ import prompt
 HERE = Path(__file__).resolve().parent
 BASE = "Qwen/Qwen3-1.7B"
 
-MODELFILE = '''FROM ./model-f16.gguf
-TEMPLATE """{{- if .System }}<|im_start|>system
+# The chat format used in training: system message, user message, and Qwen3's empty think block.
+TEMPLATE = """{{- if .System }}<|im_start|>system
 {{ .System }}<|im_end|>
 {{ end }}<|im_start|>user
 {{ .Prompt }}<|im_end|>
@@ -35,11 +36,20 @@ TEMPLATE """{{- if .System }}<|im_start|>system
 </think>
 
 """
-SYSTEM """%s"""
-PARAMETER stop "<|im_end|>"
-PARAMETER stop "<|endoftext|>"
-PARAMETER temperature 0
-'''
+STOP = ["<|im_end|>", "<|endoftext|>"]
+SPEC_FILE = HERE / "ollama-model.json"
+
+
+def spec() -> dict:
+    """What turns a bare GGUF into the served model. scripts/fetch-slm.sh sends this to Ollama's
+    /api/create, so a machine without this repository's Python setup can build the same model."""
+    return {"template": TEMPLATE, "system": prompt.SYSTEM, "parameters": {"stop": STOP, "temperature": 0}}
+
+
+def modelfile() -> str:
+    s = spec()
+    return (f'FROM ./model-f16.gguf\nTEMPLATE """{s["template"]}"""\nSYSTEM """{s["system"].replace(chr(34) * 3, chr(39) * 3)}"""\n'
+            + "".join(f'PARAMETER stop "{x}"\n' for x in STOP) + "PARAMETER temperature 0\n")
 
 
 def run(cmd: list[str], **kwargs) -> None:
@@ -49,13 +59,21 @@ def run(cmd: list[str], **kwargs) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--write-spec", action="store_true", help="write ollama-model.json and stop")
+    ap.add_argument("--gguf-out", type=Path, help="also copy the created model's GGUF here (for publishing)")
     ap.add_argument("--adapter", type=Path)
     ap.add_argument("--base-only", action="store_true")
-    ap.add_argument("--name", required=True, help="Ollama model name to create")
+    ap.add_argument("--name", help="Ollama model name to create")
     ap.add_argument("--quant", default="q8_0", help="q8_0, q4_K_M, f16 ...")
     ap.add_argument("--work", type=Path, default=HERE / "out" / "export")
     ap.add_argument("--keep-work", action="store_true")
     args = ap.parse_args()
+    if args.write_spec:
+        SPEC_FILE.write_text(json.dumps(spec(), indent=1) + "\n")
+        print("wrote", SPEC_FILE)
+        return
+    if not args.name:
+        sys.exit("--name is required")
     if bool(args.adapter) == args.base_only:
         sys.exit("give exactly one of --adapter or --base-only")
 
@@ -80,12 +98,18 @@ def main() -> None:
     env = {**os.environ, "PYTHONPATH": str(HERE / ".tools" / "llama.cpp" / "gguf-py")}
     gguf = merged / "model-f16.gguf"
     run([sys.executable, str(converter), str(merged), "--outfile", str(gguf), "--outtype", "f16"], env=env)
-    (merged / "Modelfile").write_text(MODELFILE % prompt.SYSTEM.replace('"""', "'''"))
+    (merged / "Modelfile").write_text(modelfile())
     ollama = os.environ.get("OLLAMA_BIN", "ollama")
     create = [ollama, "create", args.name, "-f", "Modelfile"]
     if args.quant != "f16":
         create += ["--quantize", args.quant]
     run(create, cwd=merged)
+    if args.gguf_out:
+        models = Path(os.environ.get("OLLAMA_MODELS", Path.home() / ".ollama" / "models"))
+        manifest = json.loads((models / "manifests" / "registry.ollama.ai" / "library" / args.name / "latest").read_text())
+        layer = next(l for l in manifest["layers"] if l["mediaType"] == "application/vnd.ollama.image.model")
+        shutil.copyfile(models / "blobs" / layer["digest"].replace(":", "-"), args.gguf_out)
+        print(f"copied the served GGUF to {args.gguf_out}")
     if not args.keep_work:
         shutil.rmtree(merged)
     print(f"created {args.name} ({args.quant}) on {os.environ.get('OLLAMA_HOST', 'the default Ollama host')}")

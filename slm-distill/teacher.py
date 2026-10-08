@@ -32,7 +32,7 @@ class TeacherError(RuntimeError):
 
 class Teacher:
     def __init__(self, cache_dir: Path, usage_log: Path | None = None, effort: str = "low",
-                 attempts: int = 8):
+                 attempts: int = 12):
         key = os.environ.get("TEACHER_API_KEY")
         if not key:
             raise TeacherError("TEACHER_API_KEY is not set")

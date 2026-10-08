@@ -1,4 +1,5 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2154  # render_config reads hash, FQDN and get from the script that sources this file
 # Shared by deploy.sh, provision.sh and run-local.sh. Source it, do not run it.
 # Needs REPO (the repository root); on_vm and put_file also need RG and VM.
 
@@ -52,4 +53,27 @@ pack_context() {
   rm -rf "$ctx/integrations/pi/node_modules" "$ctx/integrations/pi/test"
   cp "$REPO/deploy/azure/Dockerfile" "$ctx/Dockerfile"
   cp "$REPO/deploy/azure/pi-session.sh" "$ctx/deploy/azure/pi-session.sh"
+}
+
+# Writes the stack's configuration files into the directory $1: compose file, proxy, environment, and
+# (when GPU_TUNNEL is 1) the tunnel's auth file and proxy route. Needs HERE, FQDN and hash (the Caddy
+# password hash), and a `get NAME` function that reads a generated secret. Does not write the Pi
+# login or the seed: those are uploaded once and left alone afterwards.
+render_config() {
+  local cfg=$1
+  mkdir -p "$cfg/conf.d"
+  cp "$HERE/docker-compose.yml" "$HERE/pi-session.sh" "$HERE/reset-seed.sh" "$cfg/"
+  sed -e "s#__SITE_ADDRESS__#$FQDN#" -e "s#__ACCESS_HASH__#$hash#" "$HERE/Caddyfile.template" > "$cfg/Caddyfile"
+  {
+    echo "POSTGRES_PASSWORD=$(get POSTGRES_PASSWORD)"
+    echo "NEO4J_PASSWORD=$(get NEO4J_PASSWORD)"
+    if [ "${GPU_TUNNEL:-1}" = 1 ]; then
+      echo "COMPOSE_PROFILES=gpu-tunnel"
+      echo "EXTRACTION_OLLAMA_URL=http://gpu-tunnel.internal:11436"
+    fi
+  } > "$cfg/.env"
+  if [ "${GPU_TUNNEL:-1}" = 1 ]; then
+    printf '{"gpu:%s":["^R:0.0.0.0:11436$"]}\n' "$(get GPU_TUNNEL_SECRET)" > "$cfg/gpu-tunnel-users.json"
+    cp "$HERE/gpu-tunnel.caddy" "$cfg/conf.d/gpu-tunnel.caddy"
+  fi
 }

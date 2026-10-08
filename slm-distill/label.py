@@ -149,11 +149,12 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=DATA / "labeled")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--reverse", action="store_true", help="start from the last timeline, to share a run with another process")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     teacher = Teacher(DATA / "teacher_cache", DATA / "teacher_usage.jsonl")
     files, loaded = [], {}
-    for f in sorted(args.timelines.glob("tl*.json")):
+    for f in sorted(args.timelines.glob("tl*.json"), reverse=args.reverse):
         try:
             loaded[f] = json.loads(f.read_text())  # a file still being written is skipped this run
         except json.JSONDecodeError:

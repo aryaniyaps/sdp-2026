@@ -65,6 +65,13 @@ LIMIT 80
             extract_window(state, &window_existing, &event_values, &window_events).await?;
         // Window-local source indices become indices into the whole episode.
         for mut claim in extraction.claims {
+            if leaks_secret(&claim.statement) {
+                tracing::warn!(
+                    namespace=%job.namespace, job_id=%job.id,
+                    "dropped an extracted claim that contains a credential"
+                );
+                continue;
+            }
             for index in &mut claim.source_indices {
                 *index += range.start;
             }

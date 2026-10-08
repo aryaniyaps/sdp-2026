@@ -23,15 +23,15 @@ For the browser demo with a Pi coding session beside the live graph, run:
 ./deploy/azure/run-local.sh
 ```
 
-Open http://127.0.0.1:18088/ with user `reviewer`; the access code is in `~/.local/state/sdp-hosted-local/access.code`. This builds the React demo, starts the browser terminal and memory services, and uses Pi's configured default provider and model. The namespace control targets both the Pi session and graph; switching directories starts another session with the same memory. This stack keeps its own databases. See [the demo setup guide](deploy/azure/README.md) for configuration and stop commands.
+Open http://127.0.0.1:18088/ with user `reviewer`; the access code is in `~/.local/state/sdp-hosted-local/access.code`. This builds the React demo, starts the browser terminal and memory services, and installs the worker model into the stack's Ollama (see [The worker model](#the-worker-model)). Pi's configured default provider and model drive only the terminal. The namespace control targets both the Pi session and graph; switching directories starts another session with the same memory. This stack keeps its own databases. See [the demo setup guide](deploy/azure/README.md) for configuration and stop commands.
 
-You need Docker with Compose, Node.js 22 with npm, Python 3, and Pi with an authenticated model provider. The startup script uses Rust 1.96.1 if it is installed locally; otherwise it builds the backend in a Rust container.
+You need Docker with Compose, Node.js 22 with npm, Python 3, curl, and Pi with an authenticated model provider (Pi is the coding agent whose sessions are remembered; the memory service itself never calls it). About 2 GB of disk is needed for the worker model. The startup script uses Rust 1.96.1 if it is installed locally; otherwise it builds the backend in a Rust container.
 
 ```sh
 ./scripts/run-memory.sh
 ```
 
-The script builds the frontend, checks that the Pi worker can make a request, starts PostgreSQL and Neo4j, and prepares the Ollama embedding model. The first run can take a while because it downloads images and model weights.
+The script builds the frontend, starts PostgreSQL and Neo4j, prepares the Ollama embedding model, and installs the worker model `memex-extractor` from the project's GitHub release. The first run can take a while because it downloads images and model weights. Set `GPU=1` to give the Ollama container your NVIDIA GPU, or point `EXTRACTION_OLLAMA_URL` at an Ollama that already has one.
 
 Open these URLs after the service starts:
 
@@ -158,6 +158,12 @@ To clear a namespace:
 
 This deletes its evidence and facts and queues a graph cleanup. The command asks you to confirm the namespace.
 
+## The worker model
+
+The memory worker (extraction, consolidation and reflection) is a fine-tuned Qwen3-1.7B served by Ollama. It is trained on synthetic Pi coding sessions labeled by a larger teacher, with the engine's own prompts and acceptance rules; see [slm-distill](slm-distill/README.md) for the pipeline and its measured results. Pi and its API key are used only for the live coding session.
+
+`scripts/fetch-slm.sh` installs it into any Ollama over HTTP (`OLLAMA_URL`). The service reads one episode as windows of a few thousand tokens and checks every claim's quotes against the full events. If the model cannot be reached, extraction jobs fail with a clear error and are retried; nothing falls back to another model. To lend a GPU workstation to the Azure stack, see [deploy/azure](deploy/azure/README.md#lend-a-gpu-to-the-azure-stack).
+
 ## Configuration
 
 | Variable | Purpose |
@@ -166,10 +172,9 @@ This deletes its evidence and facts and queues a graph cleanup. The command asks
 | `NEO4J_URI` | Neo4j HTTP endpoint; empty disables graph projection |
 | `OLLAMA_URL` | Ollama endpoint |
 | `EMBEDDING_MODEL` | Embedding model, default `qwen3-embedding:0.6b` |
-| `PI_PROVIDER`, `PI_MODEL` | Model used by the Pi extraction worker |
-| `MEMORY_MODEL_PROVIDER` | Set to `ollama` to use local inference |
-| `EXTRACTION_MODEL` | Local model, default `qwen2.5:14b-instruct-q4_K_M` |
-| `OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT` | Local context window and output cap; defaults 16384 and 4096 |
+| `EXTRACTION_MODEL` | Worker model, default `memex-extractor` |
+| `EXTRACTION_OLLAMA_URL` | Ollama that serves the worker model, default `OLLAMA_URL` |
+| `OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT` | Context window and output cap of worker calls; defaults 16384 and 4096 (the stacks here set 12288 and 3072) |
 | `MEMORY_WORKER_CONCURRENCY` | Extraction workers, default 4 |
 | `TEMPORAL_PLANNER` | `rules` (default), `model`, or `off` |
 | `BIND_ADDR` | API address, default `127.0.0.1:8080` |

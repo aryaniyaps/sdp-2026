@@ -33,9 +33,12 @@ def compact(value) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--labeled", type=Path, default=DATA / "labeled")
+    ap.add_argument("--turns", type=Path, default=DATA / "labeled_turns")
     ap.add_argument("--aux", type=Path, default=DATA / "aux")
     ap.add_argument("--out", type=Path, default=DATA / "sets")
     ap.add_argument("--no-aux", action="store_true", help="extraction examples only")
+    ap.add_argument("--reflect-per-timeline", type=int, default=4,
+                    help="most reflection examples kept per training timeline (they are short and numerous)")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     files = {s: (args.out / f"{s}.jsonl").open("w") for s in ("train", "val", "test")}
@@ -43,7 +46,14 @@ def main() -> None:
     for path in sorted(args.labeled.glob("tl*.json")):
         labeled = json.loads(path.read_text())
         split = split_of(labeled["id"])
-        for r in labeled["records"]:
+        by_turn = args.turns / path.name
+        turn_records = json.loads(by_turn.read_text())["records"] if by_turn.exists() else []
+        turn_sessions = {r["session"] for r in turn_records}
+        # Turn-sized episodes are what the extension retains. A session replayed by turn replaces its
+        # whole-session windows; the test split uses turn-sized windows only.
+        records = turn_records if split == "test" else \
+            turn_records + [r for r in labeled["records"] if r["session"] not in turn_sessions]
+        for r in records:
             row = {"task": "extract", "timeline": r["timeline"], "prompt": r["prompt"],
                    "target": compact({"claims": r["claims"]})}
             if split == "test":
@@ -54,7 +64,8 @@ def main() -> None:
         for path in sorted(args.aux.glob("tl*.json")):
             aux = json.loads(path.read_text())
             split = split_of(aux["id"])
-            for r in aux["consolidate"] + aux["reflect"]:
+            reflect = aux["reflect"] if split == "test" else aux["reflect"][: args.reflect_per_timeline]
+            for r in aux["consolidate"] + reflect:
                 row = {"task": r["task"], "timeline": r["timeline"], "prompt": r["prompt"], "target": compact(r["target"])}
                 if r["task"] == "reflect":
                     row["meta"] = {"allowed": r["allowed"], "kind": r["kind"]}
