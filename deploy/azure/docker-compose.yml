@@ -72,7 +72,7 @@ services:
       OLLAMA_NUM_PREDICT: "3072"
       MEMORY_WORKER_CONCURRENCY: "2"
 
-  # A workstation with a GPU dials in over HTTPS and its Ollama appears here as gpu-tunnel:11436.
+  # A workstation with a GPU dials in over HTTPS and its Ollama appears here as gpu-tunnel.internal:11436.
   # The auth file allows exactly one reverse port, so a stolen secret can do nothing else.
   # Start it with COMPOSE_PROFILES=gpu-tunnel (provision.sh and sync-config.sh set that).
   gpu-tunnel:
@@ -82,6 +82,11 @@ services:
     command: ["server", "--reverse", "--port", "9090", "--authfile", "/etc/chisel/users.json"]
     volumes:
       - ./gpu-tunnel-users.json:/etc/chisel/users.json:ro
+    # Ollama on a loopback address refuses requests whose Host header is not a local name
+    # (protection against DNS rebinding). A name ending in .internal is accepted.
+    networks:
+      default:
+        aliases: [gpu-tunnel.internal]
 
   term:
     image: sdp-memory-app:bootstrap

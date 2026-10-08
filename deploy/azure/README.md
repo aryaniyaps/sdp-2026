@@ -29,7 +29,7 @@ For frontend development, start the demo stack and run `MEMORY_API_URL=http://12
 | --- | --- |
 | `term` | ttyd starts Pi with the memory extension for each browser connection. Repeated URL arguments pass the project directory and namespace to `pi-session.sh`. |
 | `engine` | Stores evidence, extracts facts with the worker model, serves the React UI, and exposes graph APIs internally. It has no Pi login. |
-| `gpu-tunnel` | Optional (profile `gpu-tunnel`). A chisel server that a GPU workstation dials into over HTTPS; the workstation's Ollama then appears as `gpu-tunnel:11436`. |
+| `gpu-tunnel` | Optional (profile `gpu-tunnel`). A chisel server that a GPU workstation dials into over HTTPS; the workstation's Ollama then appears as `gpu-tunnel.internal:11436`. |
 | `postgres`, `neo4j` | Authoritative evidence storage and graph projection. |
 | `ollama`, `ollama-init` | Serve and prepare `qwen3-embedding:0.6b`, and the worker model when it is not lent by a GPU workstation. |
 | `caddy` / `Caddyfile.template` | Access code, frontend assets, graph reads, terminal HTTP and WebSocket proxying. `/` redirects to `/demo`. `conf.d/gpu-tunnel.caddy` adds the tunnel route, which carries its own secret instead of the access code. |
@@ -67,7 +67,7 @@ To update an existing VM, run `deploy/azure/deploy.sh`. Its image includes the R
 
 ## Lend a GPU to the Azure stack
 
-The VM has two CPU cores and no GPU, and this subscription has no GPU quota, so the worker model is served by a workstation's GPU. The workstation dials out to the VM over HTTPS (port 443; nothing is opened on the workstation and no SSH is needed), and its Ollama appears inside the stack as `gpu-tunnel:11436`.
+The VM has two CPU cores and no GPU, and this subscription has no GPU quota, so the worker model is served by a workstation's GPU. The workstation dials out to the VM over HTTPS (port 443; nothing is opened on the workstation and no SSH is needed), and its Ollama appears inside the stack as `gpu-tunnel.internal:11436`.
 
 One time, on the workstation (an Ollama on port 11436 that has the model; the Ollama binary is not part of this repository):
 

@@ -69,7 +69,7 @@ render_config() {
     echo "NEO4J_PASSWORD=$(get NEO4J_PASSWORD)"
     if [ "${GPU_TUNNEL:-1}" = 1 ]; then
       echo "COMPOSE_PROFILES=gpu-tunnel"
-      echo "EXTRACTION_OLLAMA_URL=http://gpu-tunnel:11436"
+      echo "EXTRACTION_OLLAMA_URL=http://gpu-tunnel.internal:11436"
     fi
   } > "$cfg/.env"
   if [ "${GPU_TUNNEL:-1}" = 1 ]; then
