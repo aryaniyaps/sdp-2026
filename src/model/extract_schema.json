@@ -1,0 +1,158 @@
+{
+  "type": "object",
+  "properties": {
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_quotes": {
+            "type": "array",
+            "items": {
+              "anyOf": {{SOURCES}}
+            },
+            "minItems": 1
+          },
+          "subject": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "entity_type": {
+                "enum": [
+                  "person",
+                  "organization",
+                  "project",
+                  "place",
+                  "technology",
+                  "other"
+                ]
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "name",
+              "entity_type",
+              "aliases"
+            ],
+            "additionalProperties": false
+          },
+          "predicate": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "cardinality": {
+            "enum": [
+              "single",
+              "multiple",
+              "event"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "fact",
+              "preference",
+              "profile",
+              "goal",
+              "episode",
+              "procedure",
+              "other"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 1
+          },
+          "valid_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "event_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "entities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "entity_type": {
+                  "enum": [
+                    "person",
+                    "organization",
+                    "project",
+                    "place",
+                    "technology",
+                    "other"
+                  ]
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "entity_type",
+                "aliases"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "correction": {
+            "type": "boolean"
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "related": {{RELATED}}
+        },
+        "required": [
+          "source_quotes",
+          "subject",
+          "predicate",
+          "value",
+          "statement",
+          "cardinality",
+          "kind",
+          "confidence",
+          "valid_from",
+          "event_at",
+          "entities",
+          "correction",
+          "explanation",
+          "related"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 12
+    }
+  },
+  "required": [
+    "claims"
+  ],
+  "additionalProperties": false
+}

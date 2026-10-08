@@ -5,6 +5,29 @@ use async_trait::async_trait;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::time::Duration;
+mod structured;
+
+/// Extraction's wire adapter appends instructions after the canonical prompt. Budget the
+/// exact text that will be sent, including on validation-repair calls.
+pub(crate) fn extraction_prompt_tokens(prompt: &str) -> usize {
+    estimate_tokens(&format!(
+        "{prompt}\n{}",
+        structured::WIRE_INSTRUCTION.trim_end()
+    ))
+}
+
+#[cfg(test)]
+mod wire_budget_tests {
+    #[test]
+    fn extraction_estimate_matches_the_preflight_wire_prompt() {
+        let prompt = crate::worker::extract_prompt(&[], &[]);
+        let (wire, _, _) = super::structured::prepare(&prompt).unwrap();
+        assert_eq!(
+            super::extraction_prompt_tokens(&prompt),
+            super::estimate_tokens(&wire)
+        );
+    }
+}
 
 #[async_trait]
 pub trait JsonModel: Send + Sync {
@@ -165,20 +188,53 @@ impl JsonModel for OllamaJsonModel {
         Some(self.limits)
     }
     fn cache_identity(&self) -> String {
-        format!("{}/ctx{}", self.identity(), self.limits.num_ctx)
+        format!(
+            "{}/ctx{}/nothink/structured-v2",
+            self.identity(),
+            self.limits.num_ctx
+        )
     }
     async fn generate(&self, prompt: &str) -> Result<Value, AppError> {
-        self.limits.preflight(prompt)?;
-        let response:Value=reqwest::Client::new().post(format!("{}/api/generate",self.base))
-            .timeout(Duration::from_secs(600)).json(&json!({"model":self.model,"system":WORKER_SYSTEM.trim_end_matches('\n'),"prompt":prompt,"format":"json","stream":false,"keep_alive":crate::providers::DEFAULT_KEEP_ALIVE,"options":self.limits.options(Some(0))}))
-            .send().await?.error_for_status()?.json().await?;
+        let (wire_prompt, schema, paired) = structured::prepare(prompt)?;
+        self.limits.preflight(&wire_prompt)?;
+        #[derive(serde::Serialize)]
+        struct Request<'a> {
+            model: &'a str,
+            system: &'a str,
+            prompt: &'a str,
+            format: &'a serde_json::value::RawValue,
+            think: bool,
+            stream: bool,
+            keep_alive: &'a str,
+            options: Value,
+        }
+        let body = Request {
+            model: &self.model,
+            system: WORKER_SYSTEM.trim_end_matches('\n'),
+            prompt: &wire_prompt,
+            format: &schema,
+            think: false,
+            stream: false,
+            keep_alive: crate::providers::DEFAULT_KEEP_ALIVE,
+            options: self.limits.options(Some(0)),
+        };
+        let response: Value = reqwest::Client::new()
+            .post(format!("{}/api/generate", self.base))
+            .timeout(Duration::from_secs(600))
+            .json(&body)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
         self.limits.check_response(&response)?;
-        serde_json::from_str(
+        let value = serde_json::from_str(
             response["response"]
                 .as_str()
                 .ok_or_else(|| AppError::Provider("Ollama response absent".into()))?,
         )
-        .map_err(|e| AppError::Provider(e.to_string()))
+        .map_err(|e| AppError::Provider(e.to_string()))?;
+        structured::canonicalize(value, paired)
     }
 }
 fn cache_key(model: &dyn JsonModel, version: &str, prompt: &str) -> String {
@@ -362,6 +418,9 @@ mod tests {
             limits: OllamaLimits::new(16384, 4096).unwrap(),
         };
         assert_eq!(local.identity(), "ollama/m");
-        assert_eq!(local.cache_identity(), "ollama/m/ctx16384");
+        assert_eq!(
+            local.cache_identity(),
+            "ollama/m/ctx16384/nothink/structured-v2"
+        );
     }
 }

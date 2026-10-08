@@ -154,8 +154,12 @@ async fn extract_window(
             Err(e) => {
                 last_validation_error = e.to_string();
                 tried.push(input.clone());
-                input = format!(
-                    "{prompt}\nRepair attempt {repair}. Previous response: {output}\nValidation error: {e}. Return the complete corrected JSON, preserving all valid claims and correcting attribution/quotes from the original events."
+                input = repair_prompt(
+                    &prompt,
+                    &output,
+                    &e.to_string(),
+                    repair,
+                    state.model.context_limits(),
                 );
             }
         }
@@ -172,4 +176,83 @@ async fn extract_window(
             "extraction failed validation after two repair attempts: {last_validation_error}"
         ))
     })
+}
+
+/// Keep all original source evidence when an invalid answer is too large to echo back.
+/// A regeneration with a bounded diagnostic is safer than truncating source events or
+/// repeatedly sending a repair that the model's preflight will always reject.
+fn repair_prompt(
+    prompt: &str,
+    output: &Value,
+    error: &str,
+    repair: usize,
+    limits: Option<crate::model::OllamaLimits>,
+) -> String {
+    let full = format!(
+        "{prompt}\nRepair attempt {repair}. Previous response: {output}\nValidation error: {error}. Return the complete corrected JSON, preserving all valid claims and correcting attribution/quotes from the original events."
+    );
+    let Some(limits) = limits else { return full };
+    let fits =
+        |value: &str| crate::model::extraction_prompt_tokens(value) <= limits.prompt_budget();
+    if fits(&full) {
+        return full;
+    }
+    let mut diagnostic: Vec<char> = error.chars().take(512).collect();
+    loop {
+        let bounded = format!(
+            "{prompt}\nRepair attempt {repair}. Validation error: {}. Generate the complete corrected JSON from the original evidence; the invalid previous answer was omitted to fit the context.",
+            diagnostic.iter().collect::<String>()
+        );
+        if fits(&bounded) {
+            return bounded;
+        }
+        if diagnostic.is_empty() {
+            // The original request still goes through the model's exact preflight. Never
+            // bypass that guard, even if the source prompt itself cannot fit.
+            return prompt.to_owned();
+        }
+        diagnostic.truncate(diagnostic.len() / 2);
+    }
+}
+
+#[cfg(test)]
+mod repair_tests {
+    use super::*;
+
+    #[test]
+    fn oversized_invalid_answer_keeps_all_evidence_and_fits_on_wire() {
+        let prompt = extract_prompt(
+            &[],
+            &[
+                json!({"source_index":0,"event":{"role":"user","content":"Maya lives in Chennai.","occurred_at":"2026-10-08T10:00:00Z","metadata":{}}}),
+            ],
+        );
+        let limits = crate::model::OllamaLimits::new(8192, 3072).unwrap();
+        let repaired = repair_prompt(
+            &prompt,
+            &json!({"claims":[{"statement":"x".repeat(40_000)}]}),
+            &"invalid quote ".repeat(2000),
+            1,
+            Some(limits),
+        );
+        assert!(repaired.starts_with(&prompt));
+        assert!(repaired.contains("previous answer was omitted"));
+        assert!(crate::model::extraction_prompt_tokens(&repaired) <= limits.prompt_budget());
+        assert!(!repaired.contains(&"x".repeat(100)));
+    }
+
+    #[test]
+    fn small_invalid_answer_remains_available_for_repair() {
+        let prompt = extract_prompt(&[], &[]);
+        let output = json!({"claims":[]});
+        let repaired = repair_prompt(
+            &prompt,
+            &output,
+            "missing evidence",
+            0,
+            Some(crate::model::OllamaLimits::new(16384, 4096).unwrap()),
+        );
+        assert!(repaired.starts_with(&prompt));
+        assert!(repaired.contains(&format!("Previous response: {output}")));
+    }
 }

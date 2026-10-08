@@ -1,6 +1,8 @@
 //! Extraction prompt and the existing-fact budget for local models.
 
-use crate::model::{OllamaLimits, estimate_tokens};
+#[cfg(test)]
+use crate::model::estimate_tokens;
+use crate::model::{OllamaLimits, extraction_prompt_tokens};
 use serde_json::Value;
 
 /// Tokens kept free for a repair prompt, which appends the previous answer and the validation
@@ -114,7 +116,7 @@ pub fn fit_existing_facts(
     let target = budget
         .saturating_sub(REPAIR_RESERVE_TOKENS.min(budget / 4))
         .min(MAX_PROMPT_TOKENS);
-    let fits = |facts: &[Value]| estimate_tokens(&extract_prompt(facts, events)) <= target;
+    let fits = |facts: &[Value]| extraction_prompt_tokens(&extract_prompt(facts, events)) <= target;
     if fits(existing) {
         return (existing.to_vec(), 0);
     }
@@ -238,7 +240,10 @@ mod tests {
     }
     #[test]
     fn oversized_snapshot_is_shrunk_to_the_budget_and_counts_drops() {
-        let limits = OllamaLimits::new(4096, 1024).unwrap();
+        // The expanded general-purpose prompt plus wire instructions consumes the
+        // repair-adjusted 4096-token context on its own. Use 5120 to test ranking
+        // when there is actually room for a nonempty snapshot.
+        let limits = OllamaLimits::new(5120, 1024).unwrap();
         let existing = facts(80);
         let events = batch("hello");
         assert!(estimate_tokens(&extract_prompt(&existing, &events)) > limits.prompt_budget());
@@ -247,8 +252,8 @@ mod tests {
         assert_eq!(kept.len() + dropped, 80);
         let prompt = extract_prompt(&kept, &events);
         assert!(
-            estimate_tokens(&prompt) + limits.num_predict <= limits.num_ctx,
-            "prompt must leave room for the answer"
+            extraction_prompt_tokens(&prompt) + limits.num_predict <= limits.num_ctx,
+            "wire prompt must leave room for the answer"
         );
         // Nothing but the oldest facts goes: the snapshot is newest first, so a kept prefix remains
         // in the original order.
@@ -258,11 +263,23 @@ mod tests {
         one_more.push(existing[kept.len()].clone());
         let budget = limits.prompt_budget();
         let target = budget - REPAIR_RESERVE_TOKENS.min(budget / 4);
-        assert!(estimate_tokens(&extract_prompt(&one_more, &events)) > target);
+        assert!(extraction_prompt_tokens(&extract_prompt(&one_more, &events)) > target);
+    }
+    #[test]
+    fn small_context_drops_snapshot_but_keeps_source_prompt_within_wire_budget() {
+        let limits = OllamaLimits::new(4096, 1024).unwrap();
+        let existing = facts(80);
+        let events = batch("Maya lives in Chennai.");
+        let (kept, dropped) = fit_existing_facts(&existing, &events, &limits);
+        assert!(kept.is_empty());
+        assert_eq!(dropped, existing.len());
+        let prompt = extract_prompt(&kept, &events);
+        assert!(prompt.contains("Maya lives in Chennai."));
+        assert!(extraction_prompt_tokens(&prompt) <= limits.prompt_budget());
     }
     #[test]
     fn facts_mentioned_in_the_batch_survive_so_corrections_still_resolve() {
-        let limits = OllamaLimits::new(4096, 1024).unwrap();
+        let limits = OllamaLimits::new(5120, 1024).unwrap();
         let existing = facts(80);
         let events = batch("Actually Subject 77 now prefers tea.");
         let (kept, dropped) = fit_existing_facts(&existing, &events, &limits);
@@ -281,7 +298,7 @@ mod tests {
         );
     }
     fn corrected_fact_scenario(text: &str) -> (Vec<Value>, Vec<Value>, OllamaLimits) {
-        let limits = OllamaLimits::new(4096, 1024).unwrap();
+        let limits = OllamaLimits::new(5120, 1024).unwrap();
         let mut existing: Vec<Value> = (0..79)
             .map(|n| {
                 let value = if n < 60 {
@@ -357,7 +374,7 @@ mod tests {
     }
     #[test]
     fn shrink_is_deterministic() {
-        let limits = OllamaLimits::new(4096, 1024).unwrap();
+        let limits = OllamaLimits::new(5120, 1024).unwrap();
         let existing = facts(80);
         let events = batch("Subject 5 and Subject 70");
         assert_eq!(
@@ -367,7 +384,7 @@ mod tests {
     }
     #[test]
     fn events_that_alone_exceed_the_budget_leave_no_facts() {
-        let limits = OllamaLimits::new(4096, 1024).unwrap();
+        let limits = OllamaLimits::new(5120, 1024).unwrap();
         let events = batch(&"word ".repeat(5000));
         let (kept, dropped) = fit_existing_facts(&facts(5), &events, &limits);
         assert!(kept.is_empty());

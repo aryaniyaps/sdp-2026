@@ -50,8 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
     // The model may be served from another machine than the embedder (a GPU workstation).
     let model_base = env::var("EXTRACTION_OLLAMA_URL").unwrap_or_else(|_| base.clone());
-    let extraction_model =
-        env::var("EXTRACTION_MODEL").unwrap_or_else(|_| "memex-extractor".into());
+    let extraction_model = env::var("EXTRACTION_MODEL").unwrap_or_else(|_| "mem-extractor".into());
     let ollama_limits = OllamaLimits::from_env()?;
     let planner = memory_engine::v2::TemporalPlanner::from_env()?;
     memory_engine::v2::set_temporal_planner(planner);

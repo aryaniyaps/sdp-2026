@@ -1,0 +1,1 @@
+Generation wire format: replace source_indices and quotes with source_quotes: [{"source_index":0,"quote":"exact text"}, ...]. Each item pairs one quote with its source. Other fields stay the same. The server converts these pairs into the canonical parallel arrays.
