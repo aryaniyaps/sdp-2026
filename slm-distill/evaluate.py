@@ -184,7 +184,8 @@ def main() -> None:
                 if not planted and not result["claims"]:
                     return {"planted": [], "claims": []}
                 return judge.grade_window(teacher, compact, planted, result["claims"],
-                                          f"judge:{args.label}:{window['timeline']}:{window['meta']['session']}:{window['meta']['window']}")
+                                          f"judge:{args.label}:{window['timeline']}:{window['meta']['session']}:{window['meta']['window']}",
+                                          existing=window["meta"]["existing"])
             with ThreadPoolExecutor(8) as pool:
                 graded = list(pool.map(grade, zip(windows, results)))
             visible = covered = nclaims = 0

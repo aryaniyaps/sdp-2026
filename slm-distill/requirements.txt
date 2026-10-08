@@ -1,4 +1,4 @@
-# Versions the pipeline was run with (Python 3.12, CUDA 13 wheels, RTX 5070 Ti / Blackwell).
+# Versions the pipeline was run with (Python 3.12, CUDA 13 wheels, RTX 4070 Laptop / Ada).
 torch==2.14.0
 transformers==5.16.1
 peft==0.20.0
@@ -11,3 +11,4 @@ numpy==2.5.3
 sentencepiece==0.2.2
 protobuf==7.36.2
 pytest==9.1.1
+bitsandbytes==0.50.2
