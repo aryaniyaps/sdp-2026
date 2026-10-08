@@ -9,7 +9,7 @@ import urllib.request
 import prompt
 
 
-def generate(base: str, model: str, user: str, *, num_ctx: int = 16384, num_predict: int = 4096,
+def generate(base: str, model: str, user: str, *, num_ctx: int = 12288, num_predict: int = 3072,
              timeout: int = 600) -> dict:
     """POST /api/generate with the engine's request body. Returns the parsed response plus wall seconds."""
     body = {

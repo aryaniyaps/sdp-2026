@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lends this machine's GPU to the Azure stack. A chisel client dials the VM over HTTPS (port 443,
-# nothing is opened on this machine) and publishes the local Ollama as gpu-tunnel:11436 inside the
+# nothing is opened on this machine) and publishes the local Ollama as gpu-tunnel.internal:11436 inside the
 # stack, where the memory engine reads it as EXTRACTION_OLLAMA_URL.
 #   gpu-tunnel.sh install   download the pinned chisel client into ~/.local/opt/chisel (checksum verified)
 #   gpu-tunnel.sh up        start the tunnel in the background

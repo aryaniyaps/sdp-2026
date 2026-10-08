@@ -1,6 +1,7 @@
 # Added to the proxy as conf.d/gpu-tunnel.caddy when the GPU tunnel is enabled. The tunnel client
 # authenticates with its own secret (see gpu-tunnel-users.json), so this route is outside the
-# access code.
-handle /_gpu/* {
+# access code. The client connects to exactly /_gpu.
+@gpu path /_gpu /_gpu/*
+handle @gpu {
 	reverse_proxy gpu-tunnel:9090
 }
