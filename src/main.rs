@@ -1,7 +1,7 @@
 use memory_engine::{
     AppState, api,
     graph::GraphStore,
-    model::OllamaLimits,
+    model::{OllamaJsonModel, OllamaLimits},
     providers::{self, OllamaEmbedder},
     store::Store,
 };
@@ -36,6 +36,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let graph_db = env::var("NEO4J_DATABASE").unwrap_or_else(|_| "neo4j".into());
     let base = env::var("OLLAMA_URL").unwrap_or_else(|_| "http://127.0.0.1:11434".into());
     let embedding = env::var("EMBEDDING_MODEL").unwrap_or_else(|_| "qwen3-embedding:0.6b".into());
+    // The worker is the fine-tuned student served by Ollama. Pi and its login are for the coding
+    // session only. A leftover setting for another provider must not be ignored quietly.
+    match env::var("MEMORY_MODEL_PROVIDER") {
+        Ok(provider) if provider != "ollama" => {
+            return Err(format!(
+                "MEMORY_MODEL_PROVIDER={provider} is no longer supported: the worker is always the local model served by Ollama (EXTRACTION_MODEL at EXTRACTION_OLLAMA_URL). Unset MEMORY_MODEL_PROVIDER."
+            )
+            .into());
+        }
+        Ok(_) | Err(env::VarError::NotPresent) => {}
+        Err(err) => return Err(format!("MEMORY_MODEL_PROVIDER is not usable: {err}").into()),
+    }
+    // The model may be served from another machine than the embedder (a GPU workstation).
+    let model_base = env::var("EXTRACTION_OLLAMA_URL").unwrap_or_else(|_| base.clone());
+    let extraction_model =
+        env::var("EXTRACTION_MODEL").unwrap_or_else(|_| "memex-extractor".into());
     let ollama_limits = OllamaLimits::from_env()?;
     let planner = memory_engine::v2::TemporalPlanner::from_env()?;
     memory_engine::v2::set_temporal_planner(planner);
@@ -75,20 +91,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     .unwrap_or_else(|_| providers::DEFAULT_KEEP_ALIVE.into()),
             ),
         ),
-        model: if env::var("MEMORY_MODEL_PROVIDER").as_deref() == Ok("ollama") {
-            Arc::new(memory_engine::model::OllamaJsonModel {
-                base,
-                model: env::var("EXTRACTION_MODEL")
-                    .unwrap_or_else(|_| "qwen2.5:14b-instruct-q4_K_M".into()),
-                limits: ollama_limits,
-            })
-        } else {
-            Arc::new(memory_engine::model::PiModel {
-                executable: env::var("PI_EXECUTABLE").unwrap_or_else(|_| "pi".into()),
-                provider: env::var("PI_PROVIDER").unwrap_or_else(|_| "openai".into()),
-                model: env::var("PI_MODEL").unwrap_or_else(|_| "gpt-5.6-sol".into()),
-            })
-        },
+        model: Arc::new(OllamaJsonModel {
+            base: model_base.clone(),
+            model: extraction_model.clone(),
+            limits: ollama_limits,
+        }),
     });
     let bind_addr = match env::var("BIND_ADDR") {
         Ok(addr) => addr,
@@ -98,6 +105,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .map_err(|err| format!("cannot listen on {bind_addr}: {err}"))?;
+    // Say at start-up, not at the first failed job, when the worker model is not served.
+    let (probe_base, probe_model) = (model_base.clone(), extraction_model.clone());
+    tokio::spawn(async move {
+        let shown = reqwest::Client::new()
+            .post(format!("{probe_base}/api/show"))
+            .timeout(std::time::Duration::from_secs(10))
+            .json(&serde_json::json!({"model": probe_model}))
+            .send()
+            .await;
+        match shown {
+            Ok(response) if response.status().is_success() => {
+                tracing::info!(model=%probe_model, base=%probe_base, "worker model is served")
+            }
+            Ok(response) => tracing::error!(
+                model=%probe_model, base=%probe_base, status=%response.status(),
+                "worker model is not available; extraction jobs will fail until it is. Run scripts/fetch-slm.sh"
+            ),
+            Err(err) => tracing::error!(
+                model=%probe_model, base=%probe_base, error=%err,
+                "worker model server is not reachable; extraction jobs will fail until it is"
+            ),
+        }
+    });
     // Load the embedding model now, so the first recall after a start does not pay for it.
     let warm = state.embedder.clone();
     tokio::spawn(async move {

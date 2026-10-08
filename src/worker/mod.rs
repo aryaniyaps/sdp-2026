@@ -18,9 +18,12 @@ mod consolidation;
 mod extraction;
 mod projection;
 mod prompts;
-pub use prompts::{extract_prompt, fit_existing_facts};
+mod window;
+pub use consolidation::{CONSOLIDATE_TEMPLATE, consolidate_prompt};
+pub use prompts::{EXTRACT_TEMPLATE, extract_prompt, fill_template, fit_existing_facts};
+pub use window::{WINDOW_EVENT_TOKENS, compact_event, shorten_content, windows};
 
-const EXTRACT_VERSION: &str = "extract-v2.3";
+const EXTRACT_VERSION: &str = "extract-v3.0";
 const CONSOLIDATE_VERSION: &str = "consolidate-v2.3";
 
 pub async fn embed_missing_chunks(

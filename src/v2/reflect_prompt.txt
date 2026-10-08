@@ -1,0 +1,3 @@
+Answer only from the following cited evidence. Contested assertions are not established facts. Return JSON {"answer":"...","citations":["retrieved UUID"],"insufficient_evidence":false}. If evidence is insufficient set insufficient_evidence=true. Never cite an ID not in the evidence. Question: {{QUESTION}}
+Evidence:
+{{EVIDENCE}}
