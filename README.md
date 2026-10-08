@@ -31,7 +31,7 @@ You need Docker with Compose, Node.js 22 with npm, Python 3, curl, and Pi with a
 ./scripts/run-memory.sh
 ```
 
-The script builds the frontend, starts PostgreSQL and Neo4j, prepares the Ollama embedding model, and installs the worker model `memex-extractor` from the project's GitHub release. The first run can take a while because it downloads images and model weights. Set `GPU=1` to give the Ollama container your NVIDIA GPU, or point `EXTRACTION_OLLAMA_URL` at an Ollama that already has one.
+The script builds the frontend, starts PostgreSQL and Neo4j, prepares the Ollama embedding model, and installs the worker model `mem-extractor` from [Hugging Face](https://huggingface.co/aryaniyaps/mem-extractor). The first run can take a while because it downloads images and model weights. Set `GPU=1` to give the Ollama container your NVIDIA GPU, or point `EXTRACTION_OLLAMA_URL` at an Ollama that already has one.
 
 Open these URLs after the service starts:
 
@@ -160,9 +160,9 @@ This deletes its evidence and facts and queues a graph cleanup. The command asks
 
 ## The worker model
 
-The memory worker (extraction, consolidation and reflection) is a fine-tuned Qwen3-1.7B served by Ollama. It is trained on synthetic Pi coding sessions labeled by a larger teacher, with the engine's own prompts and acceptance rules; see [slm-distill](slm-distill/README.md) for the pipeline and its measured results. Pi and its API key are used only for the live coding session.
+The general-purpose memory worker (extraction, consolidation and reflection) uses a fine-tuned Qwen3-4B-Instruct-2507 served by Ollama. Its corpus includes everyday and professional conversations labeled by a larger teacher, using the engine's shared prompts and acceptance rules; see [slm-distill](slm-distill/README.md) for the pipeline and its measured results. Pi and its API key are used only for the live coding session.
 
-`scripts/fetch-slm.sh` installs it into any Ollama over HTTP (`OLLAMA_URL`). The service reads one episode as windows of a few thousand tokens and checks every claim's quotes against the full events. If the model cannot be reached, extraction jobs fail with a clear error and are retried; nothing falls back to another model. To lend a GPU workstation to the Azure stack, see [deploy/azure](deploy/azure/README.md#lend-a-gpu-to-the-azure-stack).
+`scripts/fetch-slm.sh` downloads the release GGUF and verifies `SHA256SUMS`, then installs it into any Ollama over HTTP (`OLLAMA_URL`). `SLM_REVISION` selects an explicit Hugging Face commit; `SLM_FILE` installs an already downloaded local GGUF. The service reads one episode as windows of a few thousand tokens and checks every claim's quotes against the full events. If the model cannot be reached, extraction jobs fail with a clear error and are retried; nothing falls back to another model. To lend a GPU workstation to the Azure stack, see [deploy/azure](deploy/azure/README.md#lend-a-gpu-to-the-azure-stack).
 
 ## Configuration
 
@@ -172,7 +172,7 @@ The memory worker (extraction, consolidation and reflection) is a fine-tuned Qwe
 | `NEO4J_URI` | Neo4j HTTP endpoint; empty disables graph projection |
 | `OLLAMA_URL` | Ollama endpoint |
 | `EMBEDDING_MODEL` | Embedding model, default `qwen3-embedding:0.6b` |
-| `EXTRACTION_MODEL` | Worker model, default `memex-extractor` |
+| `EXTRACTION_MODEL` | Worker model, default `mem-extractor` |
 | `EXTRACTION_OLLAMA_URL` | Ollama that serves the worker model, default `OLLAMA_URL` |
 | `OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT` | Context window and output cap of worker calls; defaults 16384 and 4096 (the stacks here set 12288 and 3072) |
 | `MEMORY_WORKER_CONCURRENCY` | Extraction workers, default 4 |

@@ -23,7 +23,7 @@
   ],
   "judge_protocol": "upstream category prompts; subscription-backed model; not official GPT-4o scores",
   "worker_provider": "ollama",
-  "worker_model": "memex-extractor",
+  "worker_model": "mem-extractor",
   "worker_thinking": "none",
   "embedding_model": "qwen3-embedding:0.6b",
   "worker_concurrency": 4,

@@ -119,7 +119,7 @@ chmod 700 "$STATE"
 echo "Starting the databases and pulling the embedding model (about 640 MB the first time)"
 dc up -d postgres neo4j ollama
 dc up ollama-init
-echo "Installing the worker model into the stack's Ollama (about 1.8 GB the first time)"
+echo "Installing the worker model into the stack's Ollama (about 4.3 GB the first time)"
 OLLAMA_URL=http://127.0.0.1:${LOCAL_OLLAMA_PORT:-18434} "$REPO/scripts/fetch-slm.sh"
 if [ -n "$SEED" ]; then
   echo "Restoring the seed memory"
