@@ -4,6 +4,14 @@ Module-level, not function-level: every box is a Rust module that exists in the
 crate. Database tables are drawn with their actual columns so the panel can see
 what is stored, not just that "a database" exists.
 
+The input is real: Pi coding sessions (the one grey actor box, outside the crate).
+The Pi memory extension captures each
+session's user prompts, assistant messages and tool results (role, timestamp,
+metadata), sends them as evidence batches to the retain API, and before every
+prompt asks the recall API and injects the cited context back into the session.
+Extraction is done by the fine-tuned student SLM (Qwen3-1.7B served by Ollama on
+a GPU). Pi and its API key serve only the live coding session.
+
     python diagrams/arch.py && rsvg-convert -w 3200 diagrams/arch.svg -o diagrams/arch.png
 """
 
@@ -19,6 +27,7 @@ BOX_LINE = "#2F3B52"
 ACC = "#1F6FEB"  # accent: the SLM subsystem
 ACC_BG = "#EAF2FE"
 HDR = "#2F3B52"  # table header bar
+ACTOR_BG = "#E3E8EF"  # actor outside the crate (Pi coding sessions)
 
 SANS = "DejaVu Sans, Helvetica, Arial, sans-serif"
 MONO = "DejaVu Sans Mono, Menlo, Consolas, monospace"
@@ -95,6 +104,34 @@ def module(x, y, w, h, name, role, bullets, accent=False):
         ty += 40
 
 
+def actor(x, y, w, h, name, role, bullets):
+    """An actor outside the crate: grey fill, sans-serif name (not a Rust module)."""
+    e(
+        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="{ACTOR_BG}" '
+        f'stroke="{BOX_LINE}" stroke-width="2.5"/>'
+    )
+    e(
+        f'<text x="{x+24}" y="{y+52}" font-family="{SANS}" font-size="34" font-weight="700" '
+        f'fill="{INK}">{esc(name)}</text>'
+    )
+    e(
+        f'<text x="{x+24}" y="{y+92}" font-family="{SANS}" font-size="27" fill="{MUTED}">'
+        f"{esc(role)}</text>"
+    )
+    e(
+        f'<line x1="{x+24}" y1="{y+112}" x2="{x+w-24}" y2="{y+112}" stroke="#AEB6C4" '
+        f'stroke-width="1.5"/>'
+    )
+    ty = y + 152
+    for b in bullets:
+        e(f'<circle cx="{x+32}" cy="{ty-9}" r="4.5" fill="{MUTED}"/>')
+        e(
+            f'<text x="{x+50}" y="{ty}" font-family="{SANS}" font-size="26" fill="{INK}">'
+            f"{esc(b)}</text>"
+        )
+        ty += 40
+
+
 def table(x, y, w, h, name, cols, note=""):
     e(
         f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="#FFFFFF" '
@@ -152,6 +189,8 @@ e("</defs>")
 e(f'<rect width="{W}" height="{H}" fill="#FFFFFF"/>')
 
 # ---------------------------------------------------------------- 1 write path
+# The leftmost box of both paths is the real input and consumer: Pi coding sessions.
+PW, GAP = 440, 44  # width of the Pi box, gap that carries the arrows
 band(
     40,
     40,
@@ -159,10 +198,25 @@ band(
     430,
     "1",
     "WRITE PATH",
-    "crate modules that turn interaction text into versioned, cited memory",
+    "Pi session evidence into versioned, cited memory",
 )
-MW, MH, MY = 578, 310, 126
-xs = [66, 688, 1310, 1932, 2554]
+MH, MY = 310, 126
+MW = (3068 - PW - 5 * GAP) // 5
+xs = [66 + PW + GAP + i * (MW + GAP) for i in range(5)]
+actor(
+    66,
+    MY,
+    PW,
+    MH,
+    "Pi coding sessions",
+    "memory extension captures",
+    [
+        "user prompts",
+        "assistant messages",
+        "tool results",
+        "role, timestamp, metadata",
+    ],
+)
 module(
     xs[0],
     MY,
@@ -171,9 +225,9 @@ module(
     "api",
     "axum HTTP boundary",
     [
-        "POST /sessions/:id/events",
-        "validate, assign request_id",
-        "hand off to ingest worker",
+        "POST /api/v2/retain",
+        "1 to 1,000 events a batch",
+        "validate roles and sizes",
     ],
 )
 module(
@@ -184,9 +238,10 @@ module(
     "ingest",
     "normalise + chunk",
     [
-        "speaker, event_time, scope",
-        "split into evidence chunks",
+        "role, occurred_at, metadata",
+        "one chunk per event",
         "write raw_events + chunks",
+        "queue an extract job",
     ],
 )
 module(
@@ -195,11 +250,12 @@ module(
     MW,
     MH,
     "extract",
-    "typed memory extraction",
+    "src/worker/extraction.rs",
     [
-        "Qwen3-4B student, 4-bit local",
-        "JSON-schema constrained decode",
-        "confidence router -> teacher",
+        "Qwen3-1.7B student SLM",
+        "Ollama on a GPU, model.rs",
+        "prompt: worker/prompts.rs",
+        "not Pi, not a hosted LLM",
     ],
     accent=True,
 )
@@ -211,7 +267,7 @@ module(
     "identity",
     "canonicalise + dedupe",
     [
-        "entity_key = subject::predicate",
+        "key = subject::predicate",
         "cosine + hash near-dup match",
         "resolve to existing memory",
     ],
@@ -229,8 +285,16 @@ module(
         "both versions retained",
     ],
 )
-for i in range(4):
-    arrow(xs[i] + MW + 4, MY + MH / 2, xs[i + 1] - 6, MY + MH / 2)
+# Pi -> api, then api -> ingest -> extract -> identity -> versioning
+write_boxes = [66] + xs
+write_w = [PW] + [MW] * 5
+for i in range(5):
+    arrow(
+        write_boxes[i] + write_w[i] + 4,
+        MY + MH / 2,
+        write_boxes[i + 1] - 6,
+        MY + MH / 2,
+    )
 
 # --------------------------------------------------------------- 2 persistence
 band(
@@ -240,7 +304,7 @@ band(
     576,
     "2",
     "PERSISTENCE",
-    "one PostgreSQL 17 instance - tables and indexes as deployed",
+    "one PostgreSQL 17 instance, as deployed",
 )
 TY, TH = 572, 468
 table(
@@ -250,14 +314,16 @@ table(
     TH,
     "raw_events",
     [
-        ("id           uuid", "pk"),
-        ("session_id   uuid", ""),
-        ("speaker      text", ""),
-        ("body         text", ""),
-        ("event_time   timestamptz", ""),
-        ("ingested_at  timestamptz", ""),
+        ("id               uuid", "pk"),
+        ("session_id       uuid", ""),
+        ("role             text", ""),
+        ("content          text", ""),
+        ("occurred_at      timestamptz", ""),
+        ("metadata         jsonb", ""),
+        ("processing_state text", ""),
+        ("created_at       timestamptz", ""),
     ],
-    "immutable - never updated",
+    "content is never edited",
 )
 table(
     625,
@@ -268,9 +334,10 @@ table(
     [
         ("id           uuid", "pk"),
         ("raw_event_id ->raw_events", "fk"),
-        ("dia_id       text", ""),
-        ("text         text", ""),
-        ("token_count  int", ""),
+        ("ordinal      int", ""),
+        ("content      text", ""),
+        ("embedding    vector(1024) HNSW", "idx"),
+        ("search_vector tsvector GIN", "idx"),
     ],
     "the quoted evidence",
 )
@@ -329,21 +396,38 @@ table(
     "the audit edges",
 )
 
-arrow(977, MY + MH + 4, 977, TY - 8, "evidence")
-arrow(2843, MY + MH + 4, 2843, TY - 8, "versions + edges")
+# The evidence leaves ingest and lands in raw_events + chunks; the same x carries the
+# candidates back out of chunks into the read path.
+EVX = 1104
+arrow(EVX, MY + MH + 4, EVX, TY - 8, "evidence")
+arrow(xs[4] + MW // 2, MY + MH + 4, xs[4] + MW // 2, TY - 8, "versions + edges")
 
 # ----------------------------------------------------------------- 3 read path
-band(40, 1092, 2470, 462, "3", "READ PATH", "token-bounded, cited context")
-RW, RH, RY = 571, 340, 1182
-rxs = [66, 681, 1296, 1911]
+READ_W = 2548  # band width; leaves the cross-cutting band 532 px
+band(40, 1092, READ_W, 462, "3", "READ PATH", "token-bounded, cited context")
+RW, RH, RY = 470, 280, 1182
+rxs = [66 + PW + GAP + i * (RW + GAP) for i in range(4)]
+actor(
+    66,
+    RY,
+    PW,
+    RH,
+    "Pi coding sessions",
+    "before each prompt",
+    [
+        "extension asks for recall",
+        "gets cited context back",
+        "injects it into the session",
+    ],
+)
 module(
     rxs[0],
     RY,
     RW,
     RH,
     "api",
-    "GET /context",
-    ["query, session, time window", "returns quotes + provenance"],
+    "POST /api/v2/recall",
+    ["query, namespace, as_of", "returns quotes + provenance"],
 )
 module(
     rxs[1],
@@ -380,13 +464,35 @@ module(
     "token-budget assembly",
     ["greedy pack to <= 1000 tok", "attach chunk quotes", "attach timestamps + ids"],
 )
-for i in range(3):
-    arrow(rxs[i] + RW + 4, RY + RH / 2, rxs[i + 1] - 6, RY + RH / 2)
-arrow(966, TY + TH + 4, 966, RY - 8, "candidates")
+# Pi -> api (the recall request), then api -> search -> fusion -> pack
+read_boxes = [66] + rxs
+read_w = [PW] + [RW] * 4
+for i in range(4):
+    arrow(
+        read_boxes[i] + read_w[i] + 4,
+        RY + RH / 2,
+        read_boxes[i + 1] - 6,
+        RY + RH / 2,
+    )
+arrow(EVX, TY + TH + 4, EVX, RY - 8, "candidates")
+# The returning arrow: pack -> back under the modules -> up into the Pi session.
+RET_Y = RY + RH + 52
+pack_cx = rxs[3] + RW // 2
+pi_cx = 66 + PW // 2
+e(
+    f'<polyline points="{pack_cx},{RY+RH+4} {pack_cx},{RET_Y} {pi_cx},{RET_Y} {pi_cx},{RY+RH+10}" '
+    f'fill="none" stroke="{BOX_LINE}" stroke-width="3.5" stroke-linejoin="round" '
+    f'marker-end="url(#arr)"/>'
+)
+e(
+    f'<text x="{pi_cx+30}" y="{RET_Y-14}" font-family="{SANS}" font-size="24" '
+    f'fill="{MUTED}">context, injected into the Pi session before the prompt runs</text>'
+)
 
 # ------------------------------------------------------------- 4 cross-cutting
-band(2550, 1092, 610, 462, "4", "CROSS-CUTTING")
-cx, cw = 2576, 558
+CX0 = 40 + READ_W + 40
+band(CX0, 1092, 3160 - CX0, 462, "4", "CROSS-CUTTING")
+cx, cw = CX0 + 26, 3160 - CX0 - 52
 for i, (nm, txt) in enumerate(
     [
         ("embed", "qwen3-embedding 0.6b, 1024-d"),
