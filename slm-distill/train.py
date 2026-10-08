@@ -14,6 +14,7 @@ import random
 from pathlib import Path
 
 import torch
+import torch.nn.functional as F
 from datasets import Dataset
 from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, Trainer, TrainingArguments
@@ -40,6 +41,32 @@ def encode(tok, path: Path, tasks: set[str] | None = None) -> tuple[Dataset, int
         ids = p_ids + t_ids
         rows.append({"input_ids": ids, "labels": [-100] * len(p_ids) + t_ids, "attention_mask": [1] * len(ids)})
     return Dataset.from_list(rows), skipped
+
+
+class AnswerOnlyTrainer(Trainer):
+    """Cross entropy over the answer tokens only.
+
+    The default loss builds logits for every position: 8,000 tokens by a 152,000 word vocabulary
+    is 5 GB in float32, for a prompt whose loss is masked anyway. Here the output head is applied
+    only where there is a label.
+    """
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        labels = inputs["labels"]
+        inner = model.base_model.model  # Qwen3ForCausalLM under the PEFT wrapper
+        hidden = inner.model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]).last_hidden_state
+        shifted_labels = labels[:, 1:]
+        keep = shifted_labels != -100
+        logits = inner.lm_head(hidden[:, :-1][keep]).float()
+        total = F.cross_entropy(logits, shifted_labels[keep], reduction="sum")
+        loss = total / (num_items_in_batch if num_items_in_batch is not None else keep.sum().clamp(min=1))
+        return (loss, None) if return_outputs else loss
+
+    def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys=None):
+        # Evaluation only needs the loss on the answer tokens, not logits for every position.
+        with torch.no_grad():
+            loss = self.compute_loss(model, inputs)
+        return loss.detach(), None, None
 
 
 def main() -> None:
@@ -74,7 +101,7 @@ def main() -> None:
     model.print_trainable_parameters()
 
     steps_per_epoch = max(1, len(train_ds) // args.accum)
-    trainer = Trainer(
+    trainer = AnswerOnlyTrainer(
         model=model,
         args=TrainingArguments(
             output_dir=str(args.out), num_train_epochs=args.epochs, max_steps=args.max_steps,
