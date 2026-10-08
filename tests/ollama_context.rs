@@ -274,14 +274,21 @@ async fn healthz_reports_the_local_model_and_its_context() {
     assert_eq!(local["worker_num_ctx"], 16384);
     assert_eq!(local["worker_num_predict"], 4096);
 
-    let hosted = health(state(Arc::new(memory_engine::model::PiModel {
-        executable: "pi".into(),
-        provider: "p".into(),
-        model: "m".into(),
-    })))
-    .await;
-    assert_eq!(hosted["worker_model"], "pi/p/m");
-    assert!(hosted["worker_num_ctx"].is_null());
+    // A model without a known window reports none.
+    let unlimited = health(state(Arc::new(NoWindow))).await;
+    assert_eq!(unlimited["worker_model"], "no-window-fixture");
+    assert!(unlimited["worker_num_ctx"].is_null());
+}
+
+struct NoWindow;
+#[async_trait]
+impl JsonModel for NoWindow {
+    async fn generate(&self, _: &str) -> Result<Value, AppError> {
+        Err(AppError::Provider("not used".into()))
+    }
+    fn identity(&self) -> String {
+        "no-window-fixture".into()
+    }
 }
 
 // Opt in tests against a real Ollama.
@@ -441,7 +448,7 @@ fn snapshot_facts(count: usize) -> Vec<Value> {
         })
         .collect()
 }
-/// Retains one event, then turns its extract job into a running job owned by this test, so no
+/// Retains the events, then turns their extract job into a running job owned by this test, so no
 /// other job in the database can be claimed or disturbed. Returns the job and the evidence
 /// events as the worker will see them.
 async fn running_extract_job(
@@ -450,18 +457,27 @@ async fn running_extract_job(
     content: &str,
 ) -> (Job, Vec<EvidenceEvent>) {
     let ns = format!("ctx-extract-{}", Uuid::new_v4());
+    let events = vec![EvidenceEvent {
+        role: "user".into(),
+        content: format!("{content} ({ns})"),
+        occurred_at: chrono::Utc::now(),
+        metadata: json!({}),
+    }];
+    running_extract_job_for(store, facts, ns, events).await
+}
+async fn running_extract_job_for(
+    store: &Store,
+    facts: &[Value],
+    ns: String,
+    events: Vec<EvidenceEvent>,
+) -> (Job, Vec<EvidenceEvent>) {
     let (episode, job_id, _) = store
         .retain(&RetainRequest {
             namespace: ns.clone(),
             session_id: "s".into(),
             external_id: "e".into(),
             metadata: json!({}),
-            events: vec![EvidenceEvent {
-                role: "user".into(),
-                content: format!("{content} ({ns})"),
-                occurred_at: chrono::Utc::now(),
-                metadata: json!({}),
-            }],
+            events,
         })
         .await
         .unwrap();
@@ -512,7 +528,9 @@ async fn extract_with(
     let event_values = events
         .iter()
         .enumerate()
-        .map(|(index, event)| json!({"source_index":index,"event":event}))
+        .map(|(index, event)| {
+            json!({"source_index":index,"event":memory_engine::worker::compact_event(event)})
+        })
         .collect();
     (result, prompts[0].clone(), event_values, events)
 }
@@ -547,7 +565,7 @@ async fn worker_shrinks_the_snapshot_for_a_local_model_and_leaves_hosted_alone()
         estimate_tokens(&prompt) + small.num_predict <= small.num_ctx,
         "prompt must fit with room for the answer"
     );
-    assert!(prompt.starts_with("Extract durable explicit facts"));
+    assert!(prompt.starts_with("You are the extraction worker"));
     assert!(prompt.contains("Existing facts: ["));
     assert!(
         prompt.contains(facts[77]["id"].as_str().unwrap()),
@@ -558,7 +576,7 @@ async fn worker_shrinks_the_snapshot_for_a_local_model_and_leaves_hosted_alone()
         "the oldest fact that is not mentioned goes first"
     );
 
-    // Hosted models have no known window: every fact stays and the prompt is the old one.
+    // A model with no known window keeps every fact.
     let hosted = Arc::new(Recording {
         prompts: Mutex::new(Vec::new()),
         limits: None,
@@ -647,4 +665,114 @@ async fn refused_repair_prompt_forgets_the_invalid_reply_it_followed() {
             .await
             .unwrap();
     assert_eq!(cached, 0, "the invalid first reply must not stay cached");
+}
+
+/// Answers every window with one claim that quotes the marker of the window's last event.
+struct QuotesLastEvent {
+    prompts: Mutex<Vec<String>>,
+}
+#[async_trait]
+impl JsonModel for QuotesLastEvent {
+    async fn generate(&self, prompt: &str) -> Result<Value, AppError> {
+        self.prompts.lock().unwrap().push(prompt.into());
+        let events = &prompt[prompt.find("\nEvents: ").unwrap()..];
+        let local: usize = {
+            let tail = &events[events.rfind("\"source_index\":").unwrap() + 15..];
+            tail[..tail.find(|c: char| !c.is_ascii_digit()).unwrap()]
+                .parse()
+                .unwrap()
+        };
+        let at = events.rfind("marker-").unwrap();
+        let marker = &events[at..at + "marker-00".len()];
+        Ok(json!({"claims":[{
+            "subject":{"name":"Session","entity_type":"project","aliases":[]},
+            "predicate":format!("saw_{marker}"),"value":marker,"statement":format!("The session reached {marker}."),
+            "cardinality":"multiple","kind":"episode","confidence":0.9,
+            "source_indices":[local],"quotes":[marker],"entities":[],"correction":false,
+            "explanation":"quoted","related":[]
+        }]}))
+    }
+    fn identity(&self) -> String {
+        "quotes-last-event-fixture".into()
+    }
+    fn context_limits(&self) -> Option<OllamaLimits> {
+        Some(OllamaLimits::new(16384, 4096).unwrap())
+    }
+}
+
+#[tokio::test]
+async fn a_long_session_is_read_in_windows_and_claims_keep_episode_indices() {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("TEST_DATABASE_URL missing; worker test skipped");
+        return;
+    };
+    let store = Store::new(
+        PgPoolOptions::new()
+            .max_connections(4)
+            .connect(&url)
+            .await
+            .unwrap(),
+    );
+    store.migrate().await.unwrap();
+    let ns = format!("ctx-windows-{}", Uuid::new_v4());
+    // 14 events of about 4,000 characters: far more than one window, and each longer than the
+    // 1,600 characters the model is shown.
+    let events: Vec<EvidenceEvent> = (0..14)
+        .map(|n| EvidenceEvent {
+            role: "tool".into(),
+            content: format!("marker-{n:02} {}", "build output line\n".repeat(220)),
+            occurred_at: chrono::Utc::now(),
+            metadata: json!({"tool":"bash","tool_call_id":format!("call-{n}"),"input":{"command":"make"}}),
+        })
+        .collect();
+    let (job, _) = running_extract_job_for(&store, &[], ns.clone(), events).await;
+    let model = Arc::new(QuotesLastEvent {
+        prompts: Mutex::new(Vec::new()),
+    });
+    let state = AppState {
+        store: store.clone(),
+        graph: None,
+        embedder: Arc::new(Unused),
+        model: model.clone(),
+        worker_concurrency: 1,
+    };
+    let result = memory_engine::worker::process(&state, &job).await.unwrap();
+    store.finish_job(&job, Ok(result.clone())).await.unwrap();
+    let windows = result["windows"].as_u64().unwrap() as usize;
+    assert!(windows >= 4, "{result}");
+    let prompts = model.prompts.lock().unwrap().clone();
+    assert_eq!(prompts.len(), windows, "one call per window, no repairs");
+    for prompt in &prompts {
+        assert!(
+            !prompt.contains("call-"),
+            "tool call ids are not shown to the model"
+        );
+        assert!(
+            memory_engine::model::estimate_tokens(prompt) < 6000,
+            "every window prompt stays small"
+        );
+        assert!(
+            prompt.contains("\"source_index\":0"),
+            "indices restart in each window"
+        );
+    }
+    // Each window's claim was checked against its own events; the stored evidence must point at
+    // the event that really holds the quote, which only holds if the indices were shifted.
+    let rows: Vec<(String, String)> = sqlx::query_as(
+        "SELECT s.quote, e.content FROM assertion_sources s \
+         JOIN assertions a ON a.id = s.assertion_id \
+         JOIN chunks c ON c.id = s.chunk_id \
+         JOIN raw_events e ON e.id = c.raw_event_id WHERE a.namespace = $1",
+    )
+    .bind(&ns)
+    .fetch_all(&store.pool)
+    .await
+    .unwrap();
+    assert_eq!(rows.len(), windows);
+    for (quote, content) in &rows {
+        assert!(
+            content.contains(quote),
+            "{quote} is not in its source event"
+        );
+    }
 }

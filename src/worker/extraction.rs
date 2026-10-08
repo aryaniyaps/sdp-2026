@@ -31,33 +31,76 @@ LIMIT 80
         }
         snapshot
     };
-    let event_values: Vec<Value> = events
-        .iter()
-        .enumerate()
-        .map(|(index, event)| json!({"source_index":index,"event":event}))
-        .collect();
-    // Only a model with a known context window gets a shrunk snapshot. Hosted models
-    // see every existing fact, so their prompt is unchanged.
-    let (existing, dropped_facts) = match state.model.context_limits() {
-        Some(limits) => {
-            let (kept, dropped) = fit_existing_facts(&existing, &event_values, &limits);
-            if dropped > 0 {
-                tracing::warn!(
-                    namespace=%job.namespace, job_id=%job.id, dropped, kept=kept.len(),
-                    num_ctx=limits.num_ctx,
-                    "existing facts shrunk to fit the local model context; raise OLLAMA_NUM_CTX to keep more"
-                );
+    // The model reads shortened events in windows of a few thousand tokens. Claims are still
+    // checked against the full events, so a quote from the part that was shown is accepted.
+    let compact: Vec<Value> = events.iter().map(|event| compact_event(event)).collect();
+    let ranges = windows(&compact);
+    let mut claims = Vec::new();
+    let mut dropped_facts = 0;
+    for range in &ranges {
+        let event_values: Vec<Value> = compact[range.clone()]
+            .iter()
+            .enumerate()
+            .map(|(index, event)| json!({"source_index":index,"event":event}))
+            .collect();
+        // Only a model with a known context window gets a shrunk snapshot.
+        let (window_existing, dropped) = match state.model.context_limits() {
+            Some(limits) => {
+                let (kept, dropped) = fit_existing_facts(&existing, &event_values, &limits);
+                if dropped > 0 {
+                    tracing::warn!(
+                        namespace=%job.namespace, job_id=%job.id, dropped, kept=kept.len(),
+                        num_ctx=limits.num_ctx,
+                        "existing facts shrunk to fit the local model context; raise OLLAMA_NUM_CTX to keep more"
+                    );
+                }
+                (kept, dropped)
             }
-            (kept, dropped)
+            None => (existing.clone(), 0),
+        };
+        dropped_facts += dropped;
+        let window_events: Vec<EvidenceEvent> =
+            events[range.clone()].iter().map(|e| (*e).clone()).collect();
+        let extraction =
+            extract_window(state, &window_existing, &event_values, &window_events).await?;
+        // Window-local source indices become indices into the whole episode.
+        for mut claim in extraction.claims {
+            for index in &mut claim.source_indices {
+                *index += range.start;
+            }
+            claims.push(claim);
         }
-        None => (existing, 0),
-    };
-    let prompt = extract_prompt(&existing, &event_values);
+    }
+    let parsed = Extraction { claims };
+    embed_missing_chunks(state, &evidence).await?;
+    let mut vectors = Vec::new();
+    for claim in &parsed.claims {
+        vectors.push(state.embedder.embed(&claim.statement).await.ok());
+    }
+    let result = state
+        .store
+        .apply_extraction(job, &parsed, vectors, &state.model.identity())
+        .await?;
+    let mut outcome = json!({"enhanced":result,"windows":ranges.len()});
+    if dropped_facts > 0 {
+        outcome["existing_facts_dropped"] = json!(dropped_facts);
+    }
+    Ok(outcome)
+}
+
+/// Ask the model about one window and return claims whose quotes are verified against the window's
+/// full events. A reply that fails validation is sent back with the error, twice at most.
+async fn extract_window(
+    state: &AppState,
+    existing: &[Value],
+    event_values: &[Value],
+    validation_events: &[EvidenceEvent],
+) -> Result<Extraction, AppError> {
+    let prompt = extract_prompt(existing, event_values);
     let mut input = prompt.clone();
     let mut validated = None;
     let mut last_validation_error = String::new();
     let mut tried: Vec<String> = Vec::new();
-    let validation_events: Vec<_> = events.iter().map(|e| (*e).clone()).collect();
     for repair in 0..3 {
         let output = match cached_generate(
             &state.store,
@@ -83,7 +126,7 @@ LIMIT 80
             .map_err(|e| AppError::Provider(format!("extraction schema: {e}")))
             .and_then(|extraction| {
                 for claim in &extraction.claims {
-                    validate_claim(claim, &validation_events)?;
+                    validate_claim(claim, validation_events)?;
                     if claim.related.iter().any(|relation| {
                         !existing.iter().any(|fact| {
                             fact["id"].as_str() == Some(&relation.assertion_id.to_string())
@@ -117,23 +160,9 @@ LIMIT 80
             forget_generated(&state.store, state.model.as_ref(), EXTRACT_VERSION, attempt).await?;
         }
     }
-    let parsed = validated.ok_or_else(|| {
+    validated.ok_or_else(|| {
         AppError::Provider(format!(
             "extraction failed validation after two repair attempts: {last_validation_error}"
         ))
-    })?;
-    embed_missing_chunks(state, &evidence).await?;
-    let mut vectors = Vec::new();
-    for claim in &parsed.claims {
-        vectors.push(state.embedder.embed(&claim.statement).await.ok());
-    }
-    let result = state
-        .store
-        .apply_extraction(job, &parsed, vectors, &state.model.identity())
-        .await?;
-    let mut outcome = json!({"enhanced":result});
-    if dropped_facts > 0 {
-        outcome["existing_facts_dropped"] = json!(dropped_facts);
-    }
-    Ok(outcome)
+    })
 }

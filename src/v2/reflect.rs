@@ -42,6 +42,22 @@ pub async fn reflect_engine(s: &AppState, r: RecallRequest) -> Result<Value, App
     }
     result
 }
+/// The reflection prompt text; `slm-distill/aux_tasks.py` renders the same file.
+pub const REFLECT_TEMPLATE: &str = include_str!("reflect_prompt.txt");
+
+pub fn reflect_prompt(query: &str, context: &str) -> String {
+    crate::worker::fill_template(
+        REFLECT_TEMPLATE.trim_end_matches('\n'),
+        &[
+            (
+                "QUESTION",
+                &serde_json::to_string(query).expect("question serializes"),
+            ),
+            ("EVIDENCE", context),
+        ],
+    )
+}
+
 async fn perform_reflect(s: &AppState, r: RecallRequest) -> Result<Value, AppError> {
     let query = r.query.clone();
     let recall = recall_engine(s, r).await?;
@@ -50,11 +66,7 @@ async fn perform_reflect(s: &AppState, r: RecallRequest) -> Result<Value, AppErr
             json!({"answer":"Insufficient evidence.","citations":[],"insufficient_evidence":true,"recall":recall}),
         );
     }
-    let prompt = format!(
-        "Answer only from the following cited evidence. Contested assertions are not established facts. Return JSON {{\"answer\":\"...\",\"citations\":[\"retrieved UUID\"],\"insufficient_evidence\":false}}. If evidence is insufficient set insufficient_evidence=true. Never cite an ID not in the evidence. Question: {}\nEvidence:\n{}",
-        serde_json::to_string(&query).unwrap(),
-        recall.context
-    );
+    let prompt = reflect_prompt(&query, &recall.context);
     let output = cached_generate(&s.store, s.model.as_ref(), "reflect-v2.1", &prompt).await?;
     let citations: Vec<Uuid> = serde_json::from_value(output["citations"].clone())
         .map_err(|e| AppError::Provider(e.to_string()))?;
@@ -71,4 +83,28 @@ async fn perform_reflect(s: &AppState, r: RecallRequest) -> Result<Value, AppErr
     Ok(
         json!({"answer":output["answer"],"citations":citations,"insufficient_evidence":output["insufficient_evidence"],"recall":recall}),
     )
+}
+
+#[cfg(test)]
+mod prompt_tests {
+    use super::*;
+
+    #[test]
+    fn reflect_prompt_matches_the_fixture_shared_with_the_training_code() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/extract_prompt_parity.json"
+        ))
+        .unwrap();
+        for case in fixture["reflect"].as_array().unwrap() {
+            assert_eq!(
+                reflect_prompt(
+                    case["question"].as_str().unwrap(),
+                    case["context"].as_str().unwrap()
+                ),
+                case["prompt"].as_str().unwrap(),
+                "case {}",
+                case["name"]
+            );
+        }
+    }
 }
