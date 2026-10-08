@@ -1,33 +1,22 @@
 # Pi session and live graph demo
 
-The demo at `/demo` is a React page with a real Pi terminal beside the memory graph. Switch between `payments-api`, `mobile-app`, and `scratch` to start fresh coding sessions that share the selected namespace. Applying another namespace restarts the terminal and opens that namespace in the graph. Pi's `/memory-namespace` and `/memory-clear` commands are available in the terminal; after changing namespaces inside Pi, select the same namespace in the page to view its graph.
+The demo at `/demo` is a React page with a real Pi terminal beside the memory graph. Fresh installations start with `payments-api`, `mobile-app`, and `scratch`, with `payments-api` selected initially. These starter projects appear while the catalog loads; project controls enable once loading finishes. Create additional projects from the page; the catalog lives in PostgreSQL and terminal directories are created under `/work` in a persistent volume. Each project defaults to `project:<project name>`. Applying a namespace updates the corresponding running Pi session without restarting it; Pi's `/memory-namespace` command also updates the page and graph automatically. Pi checks for namespace changes every 250 ms, including during an active turn, and displays the active namespace in its status bar. The page shows pending/synced acknowledgement. Use the dashboard’s **Clear namespace** button or Pi’s `/memory-clear` command to delete the selected namespace with exact typed confirmation. The dashboard refreshes the graph after success; external changes also appear through polling.
 
 The UI lives in `frontend/src/demo`: `DemoPage.tsx` owns the controls and panes, `session.ts` builds the terminal and graph URLs, and `demo.css` handles the layout. The graph retains its separate React page and canvas modules. There is no separate static landing page.
 
 ## Run locally
 
-With Docker Compose, Python 3, openssl, curl, and an authenticated Pi installation:
-
-```sh
-./deploy/azure/run-local.sh
-```
-
-Open http://127.0.0.1:18088/ and sign in as `reviewer`. The script prints the path to the access code, normally `~/.local/state/sdp-hosted-local/access.code`. It builds the frontend, backend, and Pi image, then starts the terminal, proxy, databases, and an Ollama that holds the embedding model and the worker model (downloaded once, about 4.3 GB, from the pinned Hugging Face release; `SLM_FILE` uses a GGUF you already have, `GPU=1` gives that Ollama your NVIDIA GPU). These databases are separate from the stack started by `scripts/run-memory.sh` and the root Compose file.
-
-The terminal uses the provider and model in Pi's `settings.json`; set both `PI_PROVIDER` and `PI_MODEL` to override them. The memory worker never uses Pi or its login: it is the fine-tuned student model served by Ollama. `PI_AGENT_DIR` changes the source Pi login directory; `LOCAL_PORT` changes the browser port, `LOCAL_TERMINAL_PORT` changes the loopback terminal port (default 7681), `LOCAL_ENGINE_PORT` changes the loopback API port (default 18080), and `SDP_LOCAL_STATE` changes the generated state directory. Pi's coding requests use the chosen provider; Ollama supplies the local embeddings and the worker model.
-
-```sh
-./deploy/azure/run-local.sh down       # stop the demo, retaining memory
-./deploy/azure/run-local.sh destroy    # delete the demo stack and its memory
-```
-
-For frontend development, start the demo stack and run `MEMORY_API_URL=http://127.0.0.1:18080 npm run dev` in `frontend`. Open http://127.0.0.1:5173/demo; Vite proxies the terminal and WebSocket to port 7681. The API proxy then uses the demo engine. Without `MEMORY_API_URL`, Vite targets the root backend on port 8080. `PI_TERMINAL_URL` overrides its terminal target.
+See the [local startup instructions in the root README](../../README.md#running-locally-including-offline).
+Run `./deploy/azure/run-local.sh prepare` once while online; later
+`./deploy/azure/run-local.sh` starts the saved stack without builds or downloads.
+`check` verifies installed images, models and endpoints; `down` preserves memory.
+Existing custom configuration is preserved during preparation.
 
 ## Services and modules
 
 | Service or file | Responsibility |
 | --- | --- |
-| `term` | ttyd starts Pi with the memory extension for each browser connection. Repeated URL arguments pass the project directory and namespace to `pi-session.sh`. |
+| `term` | ttyd starts Pi with the memory extension for each browser connection. Repeated URL arguments pass the project directory, namespace and session binding UUID to `pi-session.sh`. |
 | `engine` | Stores evidence, extracts facts with the worker model, serves the React UI, and exposes graph APIs internally. It has no Pi login. |
 | `gpu-tunnel` | Optional (profile `gpu-tunnel`). A chisel server that a GPU workstation dials into over HTTPS; the workstation's Ollama then appears as `gpu-tunnel.internal:11436`. |
 | `postgres`, `neo4j` | Authoritative evidence storage and graph projection. |
@@ -42,11 +31,11 @@ For frontend development, start the demo stack and run `MEMORY_API_URL=http://12
 | `gpu-tunnel.sh` | Runs on the workstation: installs the chisel client, starts and stops the tunnel. |
 | `make-seed.sh` / `reset-seed.sh` | Optional seed preparation and restoration. |
 
-The hosted proxy preserves the branch's restricted API exposure: only graph reads are forwarded. Pi reaches retain, recall, namespace clear, and jobs over the internal network. The graph's Clear button is hidden in the demo; use `/memory-clear` inside Pi with typed confirmation.
+The hosted proxy preserves the branch's restricted API exposure: graph reads, project/session controls, and confirmed namespace-clear POST requests are forwarded. Namespace synchronization uses versioned writes so stale clients cannot overwrite newer changes. Pi reaches retain, recall, and jobs over the internal network. The dashboard provides the clear confirmation dialog; the embedded graph stays read-only.
 
 ## Validation
 
-`frontend/e2e/demo.spec.ts` checks session switching, shared namespaces, safe URL encoding, reload behavior, and mobile layout without model calls. `deploy/azure/e2e.js` additionally exercises two actual Pi sessions and memory extraction against a running stack, including an initially empty graph. It calls your model provider.
+`frontend/e2e/demo.spec.ts` checks project creation, project defaults, namespace switching without terminal restarts, reload behavior, and mobile layout without model calls. `frontend/e2e/dashboard-live.spec.ts` runs real Pi RPC commands against a live isolated service and checks the visible graph after clear (`LIVE_DASHBOARD=1 MEMORY_API_URL=http://127.0.0.1:18081 npm run test:e2e -- dashboard-live.spec.ts`). It substitutes only ttyd rendering and does not call a model provider. `deploy/azure/e2e.js` additionally exercises two actual Pi sessions and memory extraction against a running stack, including an initially empty graph. It calls your model provider.
 
 ```sh
 (cd frontend && npm test && npm run test:e2e)

@@ -3,7 +3,9 @@
 # behind the same proxy and access code, at http://127.0.0.1:18088/ (user reviewer). It is the
 # stack of docker-compose.yml with a local proxy address, and it keeps its own databases, so it
 # does not touch the memory of scripts/run-memory.sh.
-#   run-local.sh [up]   build the image, start everything, print the address (the default)
+#   run-local.sh [up]   start the prepared stack offline (the default)
+#   run-local.sh prepare   build/download while online, then start
+#   run-local.sh check   verify local images, installed models and endpoints
 #   run-local.sh down   stop it, keeping the memory
 #   run-local.sh destroy   stop it and delete the memory and the generated files
 # Needs Docker Compose 2.24 or newer, openssl, curl, and a Pi that is logged in on this machine. The
@@ -24,7 +26,7 @@ STATE=${SDP_LOCAL_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/sdp-hosted-local}
 PORT=${LOCAL_PORT:-18088}
 PI_DIR=${PI_AGENT_DIR:-$HOME/.pi/agent}
 SEED=${SEED_DUMP:-}
-export COMPOSE_PROJECT_NAME=sdp-memory-local
+export COMPOSE_PROJECT_NAME=${SDP_LOCAL_PROJECT:-sdp-memory-local}
 . "$HERE/lib.sh"
 
 dc() { (cd "$STATE" && docker compose "$@"); }
@@ -40,8 +42,9 @@ case "${1:-up}" in
     rm -rf "$STATE"
     echo "removed the stack, its memory and $STATE"
     exit 0 ;;
-  up) ;;
-  *) echo "usage: run-local.sh [up|down|destroy]" >&2; exit 2 ;;
+  up|check) exec python3 "$REPO/scripts/local-stack.py" "${1:-up}" ;;
+  prepare) ;;
+  *) echo "usage: run-local.sh [up|prepare|check|down|destroy]" >&2; exit 2 ;;
 esac
 
 for tool in docker openssl python3 curl; do
@@ -57,6 +60,27 @@ ctx=$(mktemp -d)
 trap 'rm -rf "$ctx"' EXIT
 pack_context "$ctx"
 docker build -t sdp-memory-app:local "$ctx"
+rm -rf "$ctx"
+trap - EXIT
+
+# An existing installation may use host Ollama, a custom subnet or custom ports.
+# Rebuild the app but preserve that configuration and all volumes.
+if [ -f "$STATE/docker-compose.yml" ]; then
+  dc config --images | sort -u | while read -r image; do
+    [ "$image" = sdp-memory-app:local ] || docker image inspect "$image" >/dev/null 2>&1 || docker pull "$image"
+  done
+  # Refresh managed routes/launcher together with the application image. Keep
+  # passwords, custom ports, host Ollama and network settings in the saved override.
+  hash=$(docker run --rm --pull never caddy:2 caddy hash-password --plaintext "$(cat "$STATE/access.code")")
+  sed -e 's#__SITE_ADDRESS__#:80#' -e "s#__ACCESS_HASH__#$hash#" -e 's/admin /reviewer /' "$HERE/Caddyfile.template" > "$STATE/Caddyfile"
+  cp "$HERE/pi-session.sh" "$STATE/pi-session.sh"
+  chmod 644 "$STATE/Caddyfile"
+  chmod 755 "$STATE/pi-session.sh"
+  if dc ps --status running --services | grep -qx caddy; then
+    dc exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+  fi
+  exec python3 "$REPO/scripts/local-stack.py" up
+fi
 
 umask 077
 mkdir -p "$STATE/pi-agent"
@@ -71,7 +95,7 @@ grep -E '^(POSTGRES|NEO4J)_PASSWORD=' "$STATE/.env" > "$STATE/.env.new" && mv "$
 hash=$(docker run --rm caddy:2 caddy hash-password --plaintext "$(cat "$STATE/access.code")")
 
 cp "$HERE/docker-compose.yml" "$HERE/pi-session.sh" "$STATE/"
-sed -e 's#__SITE_ADDRESS__#:80#' -e "s#__ACCESS_HASH__#$hash#" "$HERE/Caddyfile.template" > "$STATE/Caddyfile"
+sed -e 's#__SITE_ADDRESS__#:80#' -e "s#__ACCESS_HASH__#$hash#" -e 's/admin /reviewer /' "$HERE/Caddyfile.template" > "$STATE/Caddyfile"
 mkdir -p "$STATE/conf.d"
 # A previous run handed this folder to uid 10001, so take it back before refreshing the login.
 docker run --rm --user root --entrypoint chown -v "$STATE/pi-agent:/d" sdp-memory-app:local -R "$(id -u):$(id -g)" /d
@@ -128,19 +152,6 @@ if [ -n "$SEED" ]; then
   dc up -d engine
   SDP_DIR=$STATE SUDO='' "$STATE/reset-seed.sh"
 fi
-dc up -d
+dc up -d engine term caddy
 
-echo "Waiting for the page"
-code=$(cat "$STATE/access.code")
-for _ in $(seq 1 60); do
-  if dc exec -T engine curl -fsS -o /dev/null 'http://127.0.0.1:8080/api/v2/status?namespace=local-readiness' &&
-     curl -fsS -o /dev/null -u "reviewer:$code" "http://127.0.0.1:$PORT/demo" &&
-     curl -fsS -o /dev/null -u "reviewer:$code" "http://127.0.0.1:$PORT/term/"; then ready=1; break; fi
-  sleep 2
-done
-[ "${ready:-0}" = 1 ] || { echo "the page did not come up; see: cd $STATE && docker compose logs" >&2; exit 1; }
-cat <<DONE
-
-Open http://127.0.0.1:$PORT/   user: reviewer   access code file: $STATE/access.code
-Stop: deploy/azure/run-local.sh down      Remove everything: deploy/azure/run-local.sh destroy
-DONE
+exec python3 "$REPO/scripts/local-stack.py" check

@@ -111,6 +111,7 @@ services:
       - ${PI_AGENT_DIR:-./pi-agent}:/home/pi/.pi/agent
       - ./pi-session.sh:/usr/local/bin/pi-session:ro
       - evidence_spool:/home/pi/.sdp-memory
+      - projects:/work
 
   caddy:
     image: caddy:2
@@ -124,6 +125,7 @@ services:
       - caddy_config:/config
 
 volumes:
+  projects:
   evidence_spool:
   pgdata:
   neo4j_data:

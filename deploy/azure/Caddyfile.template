@@ -1,5 +1,5 @@
 # Everything except the GPU tunnel sits behind one access code. Only the landing page, the terminal
-# and the read-only graph routes are reachable; the memory API itself (retain, recall, jobs) is not
+# project/session controls, graph reads and confirmed namespace clears are reachable; the memory API itself (retain, recall, jobs) is not
 # exposed. conf.d/*.caddy adds routes that carry their own authentication (the GPU tunnel).
 __SITE_ADDRESS__ {
 	encode zstd gzip
@@ -24,6 +24,20 @@ __SITE_ADDRESS__ {
 			path /api/v2/graph/projection /api/v2/graph/memories
 		}
 		handle @graphapi {
+			reverse_proxy engine:8080
+		}
+		@dashboardapi {
+			method GET POST
+			path_regexp dashboard ^/api/v2/(projects|dashboard/sessions(/[0-9a-f-]+)?)$
+		}
+		handle @dashboardapi {
+			reverse_proxy engine:8080
+		}
+		@clearapi {
+			method POST
+			path /api/v2/graph/clear
+		}
+		handle @clearapi {
 			reverse_proxy engine:8080
 		}
 		handle / {

@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 use uuid::Uuid;
 
+mod dashboard;
 mod graph;
 mod recall;
 mod reflect;
@@ -79,6 +80,19 @@ pub struct ApiDoc;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .route(
+            "/api/v2/projects",
+            get(dashboard::projects).post(dashboard::create_project),
+        )
+        .route(
+            "/api/v2/dashboard/sessions",
+            post(dashboard::create_session),
+        )
+        .route(
+            "/api/v2/dashboard/sessions/{id}",
+            get(dashboard::session).post(dashboard::change),
+        )
+        .route("/api/v2/dashboard/sessions/{id}/ack", post(dashboard::ack))
         .route("/api/v2/retain", post(retain))
         .route("/api/v2/recall", post(recall))
         .route("/api/v2/reflect", post(reflect))
