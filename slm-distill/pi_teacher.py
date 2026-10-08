@@ -1,7 +1,7 @@
 """Run the existing distillation stages through an authenticated, tool-free Pi.
 
-No credentials are copied to the dataset. Requests contain synthetic sessions
-only, are cached, and record usage/model provenance. Provider/model must be
+No credentials are copied to the dataset. Requests contain selected synthetic
+or public-source training/evaluation evidence, are cached, and record usage/model provenance. Provider/model must be
 available through this user's Pi installation. This adapter keeps Azure teacher
 configuration and the serving model independent.
 

@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 import json, hashlib, re, ast, sys
 import pandas as pd
 import matplotlib.pyplot as plt
-from IPython.display import display, Markdown
+from IPython.display import display, Markdown, Image
 ROOT = next(p for p in [Path.cwd(), *Path.cwd().parents] if (p / 'Cargo.toml').exists())
 SLM = ROOT / 'slm-distill'
 DATA = SLM / 'data/research-v2'
@@ -42,6 +42,35 @@ def show(value):
     display(pd.DataFrame(value)) if isinstance(value, list) else display(value)
 def digest(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def missing(label): display(Markdown(f'**Pending / unavailable:** {label}. No result is inferred.'))
+def show_acceptance(receipt):
+    identity=receipt.get('deployment_identity_before',{})
+    show([{'worker_model':receipt.get('worker_model',receipt.get('health',{}).get('worker_model')),
+           'passed':receipt.get('passed'),'served_gguf_sha256':identity.get('served_gguf_sha256'),
+           'started_at':receipt.get('started_at'),'finished_at':receipt.get('finished_at')}])
+    show([{'check':name,'passed':value} for name,value in receipt.get('checks',{}).items()])
+    graph=receipt.get('steps',{}).get('correction_graph',{})
+    assertions=graph.get('assertions',[])
+    observations=[a for a in assertions if a.get('kind')=='observation']
+    supports=[e for e in graph.get('edges',[]) if e.get('relation') in ('supports','derives')]
+    projection=receipt.get('projection',{})
+    show([{'assertions':len(assertions),'active_assertions':sum(a.get('status')=='active' for a in assertions),
+           'observations':len(observations),'support_edges':len(supports),
+           'observations_with_two_distinct_supports':sum(len({e['to_id'] for e in supports if e['from_id']==a['id']})>=2 for a in observations),
+           'projected_nodes':len(projection.get('nodes',[])),'projected_relationships':len(projection.get('relationships',[]))}])
+    examples=[]
+    for topic in ('location','preference'):
+        recalled=receipt.get('steps',{}).get(topic+'_recall',{}).get('results',[])
+        hit=next((r for r in recalled if any(source.get('quote') for source in r.get('sources',[]))),None)
+        if hit:
+            examples.append({'query_topic':topic,'recalled_statement':hit.get('statement'),
+                             'source_quote':next(source['quote'] for source in hit['sources'] if source.get('quote'))})
+    if examples: show(examples)
+    show([{'query_topic':topic,'answer':receipt.get('steps',{}).get(topic+'_reflect',{}).get('answer'),
+           'citation_count':len(receipt.get('steps',{}).get(topic+'_reflect',{}).get('citations',[]))}
+          for topic in ('location','preference')])
+    if receipt.get('error'): print('Acceptance error:',receipt['error'])
+    display(Markdown('Full jobs, graph and retrieval responses remain in the local acceptance receipt. Quoted examples aid inspection; the check results above determine acceptance.'))
+
 print('Report refreshed:', datetime.now(timezone.utc).isoformat())
 print('Python:', sys.version.split()[0])
 ''')
@@ -245,7 +274,7 @@ On 8 October 2026, the originally blocked extraction job `731699d3-52c1-4d08-af6
 
 The graph UI's body-scoped theme variables were also fixed and browser-tested. Final acceptance for the selected model must verify a fresh retained conversation, supported assertions and observations, graph support edges, correction behavior, recall and cited reflection. Pending acceptance must remain visible.''')
 code('''receipt=read(DATA/'receipts/final-acceptance.json')
-if receipt: display(receipt)
+if receipt: show_acceptance(receipt)
 else: missing('final selected-model end-to-end acceptance receipt')
 ''')
 md('''## 12b. Scope correction and Hindsight-informed extraction
@@ -310,8 +339,13 @@ for label in ('base-general-64','student-general-64','base-external-locomo-16','
             print(label,kind); display(result)
         else: missing(f'{label} {kind} evaluation')
 acceptance=read(GENERAL/'final-acceptance.json')
-if acceptance: display(acceptance)
+if acceptance: show_acceptance(acceptance)
 else: missing('general-purpose selected-model live extraction and graph acceptance')
+final_graph=GENERAL/'final-graph.png'
+if final_graph.exists():
+    display(Markdown('**Captured final graph UI:**'))
+    display(Image(filename=str(final_graph)))
+else: missing('final selected-model graph screenshot')
 release=read(GENERAL/'release-receipt.json')
 if release: display(release)
 else: missing('final Hugging Face release receipt')

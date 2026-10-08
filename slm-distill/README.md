@@ -30,6 +30,7 @@ bash slm-distill/setup.sh
 uv pip install --python slm-distill/.venv/bin/python -r slm-distill/requirements-notebook.txt
 env -u PYTHONPATH slm-distill/.venv/bin/python -m ipykernel install --user --name sdp-distill --display-name 'SDP distillation (.venv)'
 env -u PYTHONPATH slm-distill/.venv/bin/python slm-distill/build_notebook.py --execute
+env -u PYTHONPATH slm-distill/.venv/bin/jupyter lab slm-distill/Finetuning_Iteration_Report.ipynb
 ```
 
 Clear externally injected `PYTHONPATH` when running the virtual environment. Notebook Run All refreshes local evidence and figures; it does not start training, call a paid teacher, mutate databases or publish a model.
