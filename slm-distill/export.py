@@ -1,6 +1,6 @@
 """Turn the LoRA adapter into a model Ollama serves.
 
-    python export.py --adapter out/worker-lora/final --name memex-extractor --quant q8_0
+    python export.py --base Qwen/Qwen3-4B-Instruct-2507 --adapter out/local-4b-general/final --name mem-extractor:general-v1 --quant q8_0
 
 Steps: merge the adapter into the bf16 base, convert to GGUF with the pinned llama.cpp converter
 (tools/fetch-llamacpp.sh), then create through Ollama's API with the chat
@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 import prompt
@@ -70,6 +71,28 @@ def served_gguf(base: str, model: str) -> Path:
     if not path.is_file():
         raise RuntimeError("--gguf-out requires local access to the Ollama server's served model blob")
     return path
+
+
+def create_uploaded_model(base: str, body: dict, recovery_file: Path) -> dict:
+    """Preserve the exact import request so a server failure never requires remerging."""
+    recovery_file.write_text(json.dumps(body, indent=2) + "\n")
+    digest = ", ".join(body["files"].values())
+    recovery = (f"Uploaded blob {digest} remains on this Ollama server. "
+                f"After resolving the server error, POST {recovery_file} as JSON to /api/create "
+                "on the same server. Reuse the uploaded blob; do not remerge or retrain.")
+    request = urllib.request.Request(base + "/api/create", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=600) as response:
+            result = json.load(response)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:8192]
+        raise RuntimeError(f"Ollama import HTTP {exc.code}: {detail}\n{recovery}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Ollama import connection failed: {exc.reason}\n{recovery}") from exc
+    if result.get("status") != "success":
+        raise RuntimeError(f"Ollama import failed: {result}\n{recovery}")
+    return result
 
 
 def main() -> None:
@@ -142,12 +165,7 @@ def main() -> None:
     body = {"model": args.name, "files": {gguf.name: digest}, "stream": False, **spec()}
     if args.quant not in ("f16", "q8_0"):
         body["quantize"] = args.quant
-    request = urllib.request.Request(base + "/api/create", data=json.dumps(body).encode(),
-                                     headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=600) as response:
-        result = json.load(response)
-    if result.get("status") != "success":
-        raise RuntimeError(f"Ollama import failed: {result}")
+    create_uploaded_model(base, body, merged / "ollama-create-recovery.json")
     if args.gguf_out:
         args.gguf_out.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(served_gguf(base, args.name), args.gguf_out)

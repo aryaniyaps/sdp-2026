@@ -189,7 +189,7 @@ impl JsonModel for OllamaJsonModel {
     }
     fn cache_identity(&self) -> String {
         format!(
-            "{}/ctx{}/nothink/structured-v2",
+            "{}/ctx{}/nothink/structured-v3",
             self.identity(),
             self.limits.num_ctx
         )
@@ -420,7 +420,7 @@ mod tests {
         assert_eq!(local.identity(), "ollama/m");
         assert_eq!(
             local.cache_identity(),
-            "ollama/m/ctx16384/nothink/structured-v2"
+            "ollama/m/ctx16384/nothink/structured-v3"
         );
     }
 }
