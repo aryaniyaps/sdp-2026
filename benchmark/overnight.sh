@@ -66,6 +66,12 @@ EOF
 
 note "overnight run $RUN starting at commit $(git rev-parse --short HEAD)"
 python3 benchmark/run.py fetch >> "$LOG" 2>&1 || { note "fetch failed"; exit 1; }
+if [ ! -d "benchmark/runs/$RUN/ingestion" ]; then
+  # A fresh run builds every bank with the model, not from answers cached by dev runs, so its
+  # ingestion times are real. A resumed run keeps the cache and its progress.
+  rows=$(docker exec sdp-bench-postgres-1 psql -U memory -d memory -tAc "WITH d AS (DELETE FROM model_cache RETURNING 1) SELECT count(*) FROM d")
+  note "cleared $rows cached model answers before building memory"
+fi
 stage ingest bench ingest || exit 1
 stage recall bench recall || exit 1
 

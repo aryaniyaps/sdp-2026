@@ -1,0 +1,44 @@
+{
+  "source": "Chhikara et al., Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory, arXiv:2504.19413 (ECAI 2025), Tables 1 and 2",
+  "url": "https://arxiv.org/html/2504.19413",
+  "accessed": "2026-10-20",
+  "caveat": "Published numbers use GPT-4o-mini to answer. Their judge is gpt-4o-mini in Mem0's released evaluation code (vendored in vendor/mem0/llm_judge.py). This benchmark answers with Claude Haiku 5.5, so absolute scores are not directly comparable; compare the gap to each paper's own full-context baseline.",
+  "locomo_overall_j": {
+    "Full-context": 72.90,
+    "Mem0g": 68.44,
+    "Mem0": 66.88,
+    "Zep": 65.99,
+    "RAG (best, k=2, 256-token chunks)": 60.97,
+    "LangMem": 58.10,
+    "OpenAI": 52.90,
+    "A-Mem": 48.38
+  },
+  "locomo_context_tokens": {
+    "Full-context": 26031,
+    "Mem0": 1764,
+    "Mem0g": 3616,
+    "Zep": 3911,
+    "OpenAI": 4437,
+    "A-Mem": 2520,
+    "LangMem": 127
+  },
+  "locomo_total_latency_seconds_p50_p95": {
+    "Full-context": [9.870, 17.117],
+    "Mem0": [0.708, 1.440],
+    "Mem0g": [1.091, 2.590],
+    "Zep": [1.292, 2.926],
+    "RAG (best, k=2, 256-token chunks)": [0.802, 1.907],
+    "A-Mem": [1.410, 4.374],
+    "LangMem": [18.53, 60.40],
+    "OpenAI": [0.466, 0.889]
+  },
+  "locomo_category_j": {
+    "categories": ["single_hop", "multi_hop", "open_domain", "temporal"],
+    "Mem0": [67.13, 51.15, 72.93, 55.51],
+    "Mem0g": [65.71, 47.19, 75.71, 58.13],
+    "Zep": [61.70, 41.35, 76.60, 49.31],
+    "LangMem": [62.23, 47.92, 71.12, 23.43],
+    "OpenAI": [63.79, 42.92, 62.29, 21.71],
+    "A-Mem*": [39.79, 18.85, 54.05, 49.91]
+  }
+}

@@ -1,248 +1,114 @@
-# Benchmark runbook
+# Memory benchmark
 
-This is the handoff for running the complete experiment. Execution was delegated to
-the project team on 2026-10-05 after the local subscription-sharing quota was exhausted.
-The implementation and native three-session Pi demonstration have been exercised;
-**the full memory benchmark is unfinished and no improvement is claimed.**
+This directory measures whether the memory engine helps an agent answer questions about long conversations, and
+records enough to let anyone check the numbers. The results are in `Benchmark_Report.ipynb` (an executed copy
+is `Benchmark_Report.html`). Every number in it is recomputed from the stored run records.
 
-## 1. Prepare your machine and model access
+## What is measured
 
-Use Linux or a suitable Linux environment, Docker with Compose, Node.js 22.19 or
-newer, npm, Python 3, `curl`, `rg`, and Git. The supplied runtime builds a Linux Rust
-binary inside Docker and runs it on the host; the supplied test script uses host
-networking. Running these scripts directly on macOS or Windows is not equivalent.
+**LoCoMo** [Maharana et al., ACL 2024] has ten long two-person conversations (272 sessions, about 16k tokens
+each) and 1,540 scored questions in four categories: single-hop, multi-hop, temporal and open-domain. Category 5
+(adversarial) has no gold answer and is left out, as in the Mem0 evaluation. Each conversation is retained into the
+engine as its own memory bank, session by session in date order. Each question is then answered by the same reader
+model under each condition:
 
-Install the pinned harness and authenticate with your own provider:
-
-```sh
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.0.2
-pi --version
-pi
-# Inside Pi, use /login for your supported subscription or API-key provider.
-# Exit Pi after authentication.
-pi --list-models
-```
-
-Never copy another person's credentials into the repository. The model aliases in
-`config.json` (`openai/gpt-5.6-sol` and `openai/gpt-6.1-sol`) worked in the original
-environment; do not assume a fresh Pi installation exposes them. Select models that
-your own authenticated provider actually supports. Before starting a **new** run,
-edit these fields in `config.json`:
-
-| Fields | Purpose |
+| condition | what the reader is given |
 |---|---|
-| `worker_provider`, `worker_model` | Extraction and consolidation: `ollama` and the installed model name (default `mem-extractor`) |
-| `worker_thinking` | `none`: the worker is the fine-tuned model served by Ollama, which does not think |
-| `reader_provider`, `reader_model`, `thinking` | Same reader for all conditions; `thinking` also applies to the judge |
-| `judge_provider`, `judge_model` | Blinded category-rubric judging |
-| `worker_concurrency`, `ingestion_concurrency` | Parallel independent memory banks |
+| `enhanced` | the engine's recall: extracted assertions with source quotes, inferences, graph neighbours and temporal planning, packed into 8,192 tokens |
+| `raw_hybrid` | the engine's lexical and vector search over raw source chunks only: plain retrieval-augmented generation |
+| `recent_window` | the newest 8,192 tokens of the conversation: what an agent without memory keeps when history overflows |
+| `full_context` | the whole conversation: an upper reference, and the most expensive |
+| `no_memory` | the question only |
+| `no_graph`, `no_consolidation` | `enhanced` without one module, on a 300-question sample stratified by category |
 
-Keep the chosen configuration unchanged after freezing. The reader needs sufficient
-context capacity for complete histories: the largest history is 540,498 characters
-in this dataset (about 135,125 tokens under the runner's character estimate).
-The original reader advertises a 272K context window. An estimate is not an exact
-tokenizer count; a context-limit error must be resolved with a suitable configuration
-and a new run, not by quietly truncating the full-history baseline.
+The reader is Claude Haiku 5.5 through the Pi coding agent (`claude-bridge` provider, a Claude subscription). The
+reader prompt is Mem0's single-store answer prompt (`vendor/mem0/prompts.py`, `ANSWER_PROMPT_ZEP`) with one line
+added that asks for the final answer as JSON. Two judges grade every answer against the gold answer with Mem0's
+LoCoMo rubric (`vendor/mem0/llm_judge.py`, `ACCURACY_PROMPT`), and never see the condition:
 
-This is a substantial workload. It retains 23,867 complete episodes, issues 2,500
-retrieval requests, and produces 3,000 reader answers and 3,000 judgments across the
-planned conditions and repetitions, plus extraction/consolidation inference and
-repairs. Subscription limits can interrupt it. API-key providers may bill usage;
-check your provider's allowance before running. The reported Pi cost fields are
-model estimates, not proof of a subscription charge.
+- **Jev** (TypeSafe), a decision model, is the primary judge. It returns the probability that the answer is
+  correct under the rubric; 0.5 is the threshold. TypeSafe serves only the `jev-latest` alias, so each judgment
+  stores the model version the API reports.
+- **gpt-4o-mini**, called exactly as Mem0 called it (one message, JSON output, temperature 0), so the numbers line up
+  with published LoCoMo tables.
 
-## 2. Start and validate the service
+Mem0's token F1 and BLEU-1 are computed without any model. Retrieval is scored against LoCoMo's evidence labels
+(which session and dialogue turns answer each question), and every source quote a recall returns is checked
+against the dataset turn it cites.
 
-From the repository root, make sure the worker model named in `config.json` is installed (`run-memory.sh` does that) and match the concurrency:
+**Property suite** (`properties.py`): 40 scripted conversations, generated from templates with a fixed seed, check
+the behaviours the report claims on the engine's stored state, with no judge: a knowledge update keeps the old value
+as history and `as_of` recall returns it; a relative day ("yesterday") is resolved to a date; reflect abstains
+without evidence; a relative's move does not overwrite the user's own city; an API key is never stored. It is a
+functional test of the engine, not an independent benchmark.
 
-```sh
-export EXTRACTION_MODEL='mem-extractor'
-export MEMORY_WORKER_CONCURRENCY=4
-./scripts/run-memory.sh
-```
+**Statistics.** Differences against `enhanced` are paired bootstrap intervals (2,000 resamples) over questions, and
+over whole conversations (cluster bootstrap), because questions about one conversation share a memory bank. The
+success criteria use the cluster interval. Repeats 1 and 2 re-ask the reader on the 300-question sample to measure
+run-to-run noise. The two judges' agreement is reported as Cohen's kappa.
 
-Use the configuration's concurrency value if you changed it. Keep this terminal
-running. The script starts PostgreSQL/Neo4j, obtains local
-`qwen3-embedding:0.6b` embeddings and builds the pinned Rust toolchain in Docker.
-Ports are 8080 (API/UI), 55432 (PostgreSQL), 7474/7687 (Neo4j), and 11434 (Ollama).
-The embedding model produces 1,024-dimensional vectors.
+**Pre-registration.** The conditions, thresholds (`criteria` in `config.json`) and protocol were committed before
+the test run; `git log -p benchmark/config.json` shows the order. The test run's manifest records the commit and a
+fingerprint of all code and configuration, and a test run refuses to continue if either changes.
 
-In another terminal:
+**Dev and test.** Faults were diagnosed only on the first two conversations (conv-26 and conv-30, the dev split).
+`iterations.json` records each change, why it was made, and the dev numbers before and after. The test run uses
+all ten conversations with the final version; the report also gives the eight conversations never used for
+diagnosis on their own (`held_out`).
 
-```sh
-curl -fsS http://127.0.0.1:8080/healthz
-./scripts/test.sh
-```
+## Reproducing
 
-Check database and embedder readiness, worker identity, embedding model and worker
-concurrency. The worker is the Ollama model named in `config.json`; the reader and judge still run through Pi. A model identity mismatch stops ingestion. The normal
-runtime is `run-memory.sh`; the Compose `full` API profile uses a different Ollama
-worker configuration and is not the pinned subscription experiment.
+Requirements: Linux, Docker with Compose, Rust (the version in `rust-toolchain.toml`), Node.js 22 or newer, Python
+3, `uv`, `curl`, Ollama with the GPU, and these accounts:
 
-## 3. Fetch, pilot, then freeze a new full run
-
-```sh
-python3 benchmark/run.py fetch
-python3 benchmark/run.py all --run friend-pilot-10 --limit 10
-```
-
-`fetch` verifies the dataset SHA-256 and pins the current upstream rubric revision.
-It can update the vendored rubric; do this **before** freezing. Do not call it to
-refresh an existing frozen run. The dataset is about 277 MB and is intentionally
-excluded from Git.
-
-Inspect the pilot's jobs, answers and traces. A pilot is a development run and cannot
-satisfy full completion. Resolve failures before starting the full experiment:
+- a Claude subscription logged in to Pi (`npm install -g @earendil-works/pi-coding-agent@1.0.2`, then
+  `pi install npm:pi-claude-bridge`, then log in to Claude Code), for the reader;
+- `TYPESAFE_API_KEY` and `OPENAI_API_KEY` in the environment or in the repository's untracked `.env`, for the judges.
 
 ```sh
-python3 benchmark/run.py prepare --run friend-review-full
-python3 benchmark/run.py all --run friend-review-full > benchmark-friend.log 2>&1
+scripts/fetch-slm.sh                          # the fine-tuned worker, checked against its SHA-256
+ollama pull qwen3-embedding:0.6b               # the embedder
+python3 benchmark/run.py fetch                 # LoCoMo at a pinned commit, checked against its SHA-256
+benchmark/engine.sh &                          # engine on 127.0.0.1:8090 with its own Postgres and Neo4j
+python3 -m unittest discover -s benchmark      # protocol tests
+benchmark/overnight.sh locomo-test             # every stage, unattended; progress in runs/locomo-test.status
 ```
 
-The full command has **no `--limit`** and uses all primary conditions and ablations.
-`prepare` freezes a source archive, configuration, dataset/rubric provenance, Pi
-version, question IDs and the deterministic 100-question repeat sample. Changes to
-the fingerprinted code/config or question set require a new run ID. The archive is
-the authoritative code snapshot when the Git checkout was dirty at freeze time.
+`overnight.sh` keeps the machine awake, restarts the engine if its health check fails, and retries each stage.
+Every stage writes one file per unit of work under `runs/<run>/` and skips what exists, so any stage can be
+re-run after an interruption. Rate limits pause every worker of that provider (honouring `Retry-After`, otherwise
+backing off up to 15 minutes) and are retried for up to six hours. On the laptop used here (RTX 4070, 8 GB) the run
+takes about seven hours, most of it building memory.
 
-The `all` command runs ingestion, retrieval, primary answers/judgments, both extra
-repetitions, reporting and audit-packet generation. It waits for ingestion of all
-questions before starting its own retrieval phase. Do not run duplicate writers for
-the same run/condition/repeat. The optional independent full-history reader can run
-early, but the simplest reproducible workflow is the single `all` process above.
+Single stages: `python3 benchmark/run.py {ingest,recall,answer,judge,report,verify} --split test --run locomo-test`,
+with `--conditions`, `--judges` and `--repeat N` to narrow them.
 
-The original resolver baseline was retired with the V1 API. Existing runs remain
-historical artifacts; start a new run for the current three-condition protocol.
-
-## 4. What is being compared
-
-| Condition | Retrieval / context | Answer count |
-|---|---|---:|
-| `raw_hybrid` | Lexical/vector search over retained source chunks | 500 + 100 + 100 |
-| `enhanced` | Temporal assertions, supported inferences and bounded graph expansion | 500 + 100 + 100 |
-| `full_history` | Complete timestamped histories, without memory retrieval | 500 + 100 + 100 |
-| `no_graph` | Enhanced retrieval with graph expansion disabled | 100 |
-| `no_consolidation` | Enhanced retrieval with inferences excluded | 100 |
-
-Each retrieval condition runs on all 500 questions, including both ablations.
-Repetitions 1 and 2 use only the fixed 100-question sample; repeat 0 already contains
-those questions. Ablation answers use that same sample. All readers are fresh,
-tool-free Pi processes. Ingestion excludes questions, reference answers and evidence
-labels. Repeated dataset session IDs keep their original provenance/scoring identity
-but receive distinct episode idempotency keys.
-
-The judge uses pinned upstream category rubrics with the configured subscription
-model, without condition names in its prompts. These are custom experimental scores,
-not official GPT-4o LongMemEval scores or a reproduction of a vendor's leaderboard.
-
-## 5. Inspect and resume safely
+## Checking the results
 
 ```sh
-curl -fsS 'http://127.0.0.1:8080/api/v2/status?namespace=longmemeval:friend-review-full:QUESTION_ID'
-curl -fsS 'http://127.0.0.1:8080/api/v2/jobs?namespace=longmemeval:friend-review-full:QUESTION_ID'
+python3 benchmark/run.py verify --split test --run locomo-test            # offline consistency check
+python3 benchmark/run.py verify --split test --run locomo-test --live 20  # re-asks the models on 20 items
+cd benchmark && uv run python build_notebook.py --execute                 # rebuilds the report notebook
 ```
 
-Pending/running/failed jobs make a bank unready. Readiness with missing embeddings
-also fails the benchmark. Inspect job errors and the UI traces rather than dropping
-questions, replacing failed answers with defaults, or accepting degraded retrieval.
-The job listing shows the latest 100 jobs; the status endpoint still counts all work.
+`verify` rebuilds each stored reader prompt from the stored recall (or the pinned dataset) and checks its hash,
+checks that each stored answer occurs in the stored model output, and rebuilds each judge rubric from the gold answer
+and the stored answer. Changing any stored answer makes it fail. With `--live N` it also re-runs recall on N random
+items against the engine and re-asks the reader and both judges, and reports how often they agree with the stored
+records. The notebook's spot-check section prints random items in full so they can be graded by hand.
 
-After a terminal interruption, rerun the same command with the same run ID. Completed
-artifacts are skipped, and immutable episode requests are idempotent. A live process
-that has not printed recently is not automatically failed: inspect its process and
-job status before starting another writer.
+## Layout
 
-For subscription-quota failures on the matching existing database:
+| path | content |
+|---|---|
+| `config.json` | dataset pin, engine settings, reader, judges, conditions, criteria |
+| `run.py` | the LoCoMo runner (standard library only) |
+| `properties.py` | the deterministic property suite |
+| `overnight.sh`, `engine.sh`, `docker-compose.bench.yml` | unattended run, engine launcher, the benchmark's own stores |
+| `iterations.json` | every change made because of a dev finding |
+| `vendor/mem0/` | Mem0's evaluation prompts and metrics at a pinned commit, with SHA-256 |
+| `build_notebook.py`, `pyproject.toml`, `uv.lock` | the report notebook and its pinned environment |
+| `runs/<run>/` | `manifest.json`, `source.tar.gz` (frozen code), `ingestion/`, `recall/`, `answers/`, `judgments/`, `repeats/`, `report.json`, `items.jsonl`, `verification.json` |
+| `demo/` | the separate three-session Pi coding demonstration |
 
-```sh
-python3 scripts/resume-evaluation.py --run friend-review-full --check
-# After access resets:
-python3 scripts/resume-evaluation.py --run friend-review-full
-```
-
-The helper checks the freeze, Pi version, service identity, and failed-job scope.
-It probes the required models before any retries, retries only quota failures in this
-run, then resumes `all`. Add `--resume-demo` only to finish processing an existing local
-demo with all three sessions already recorded. It stops for non-quota job failures
-that need investigation. It assumes the provided Compose PostgreSQL service and
-`memory_app` database. It does not switch providers or use new credentials for you.
-
-The original `review-full-v3` partial run has 102 primary full-history answers, 27
-repeat-1 answers, 17 repeat-2 answers and 90 primary full-history judgments. These are
-incomplete artifacts, not an improvement result. Earlier runs containing
-`retired.json` must not be used for final reporting.
-
-**On another machine, use a new run ID and rebuild all banks.** Dataset, run artifacts,
-model cache and retained source events are not in Git. Copying only the run folder is
-insufficient: `ingestion.json` can say a bank is complete while the new database has
-none of its source events. Resuming the original run requires the matching PostgreSQL
-database, artifacts and exact freeze; reconstruct the Neo4j projection if necessary.
-
-## 6. Complete the human audit and final report
-
-After all answers and judgments finish:
-
-```sh
-python3 benchmark/run.py audit --run friend-review-full
-```
-
-`audit/packet.json` must contain 300 items: the fixed 100 questions across three primary
-conditions at repeat 0. Keep `audit/key.json` with the coordinator, away from reviewers.
-Two actual people independently assess the hypothesis against its question/reference
-and category rubric. Record their decisions as JSON Booleans in `reviewer_1` and
-`reviewer_2`; leave `adjudicated` null when they agree. For disagreements, a separate
-adjudication records a Boolean in `adjudicated`. Keep reviewer identities and notes
-in your review records. Do not use model-generated labels as human reviews.
-
-Regenerating the packet preserves existing labels and rejects changed answer content.
-Once human review is complete, regenerate the report:
-
-```sh
-python3 benchmark/run.py report --run friend-review-full
-```
-
-Inspect `report.json` and the raw files, not just one accuracy number. The report
-contains category accuracy, abstention results, session-retrieval recall/nDCG,
-packed-context recall, paired bootstrap intervals, repeat variability, operational
-timing and human/judge agreement.
-
-Final completion requires:
-
-- 500 complete history banks and all 2,500 retrieval artifacts.
-- 500 repeat-0 answers/judgments for each primary condition.
-- 100 answers/judgments for each primary condition at repetitions 1 and 2.
-- 100 answer/judgment artifacts for each ablation.
-- 300 independently double-reviewed audit items, with every disagreement resolved.
-- `report.json` has `primary_complete`, `repeats_complete` and `complete` equal to true.
-- Raw artifacts and model/configuration provenance support those counts; report flags
-  alone do not verify every requirement in `project-requirements.json`.
-
-For an improvement claim, inspect the paired difference against each baseline and
-its 95% interval, category results and sample coverage. Report negative or inconclusive
-outcomes honestly. A favorable anecdote or partial subset does not prove improvement.
-
-## 7. Deliverable bundle and native coding demo
-
-Preserve the run's `manifest.json`, `source.tar.gz`, `service.json`, `ingestion.json`,
-retrieval/answer/judgment files, `report.json`, audit packet/key, logs and human review
-records. Do not publish credential files. The audit key is for the coordinator.
-
-The separate actual Pi coding demonstration is reproducible with:
-
-```sh
-python3 benchmark/demo/run.py
-python3 benchmark/demo/verify.py
-```
-
-Its harness/model settings are currently fixed in `demo/run.py`, so check their
-availability before running on another machine. It uses a disposable repository and
-three fresh sessions. The existing local demonstration passed seven unit tests and
-twelve independent API checks, with the microsecond correction injected into session
-three. Processing of the final session's source events stopped at the subscription quota. See
-[`docs/pi-demo-results.md`](../docs/pi-demo-results.md).
-
-The demo proves native integration and remembered decisions across sessions; it has
-no paired no-memory coding control. The controlled experiment above measures memory
-QA performance. Use [`docs/subsystem-review.md`](../docs/subsystem-review.md) for the
-four subsystem explanations and [`docs/completion-audit.md`](../docs/completion-audit.md)
-for the implementation/evaluation boundary.
+LoCoMo is licensed CC BY-NC 4.0; the run records quote it and are shared for non-commercial academic use.

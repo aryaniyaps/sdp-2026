@@ -35,10 +35,11 @@ def build(test_run, properties_run):
 
     | condition | what the reader sees |
     |---|---|
-    | `no_memory` | the question only |
-    | `full_context` | the whole conversation (an upper reference, and the most expensive) |
-    | `raw_hybrid` | the engine's lexical + vector search over raw source chunks (plain RAG) |
     | `enhanced` | the full engine: extracted assertions with source quotes, inferences, graph, temporal planning |
+    | `raw_hybrid` | the engine's lexical + vector search over raw source chunks (plain RAG) |
+    | `recent_window` | the newest 8,192 tokens of the conversation, the same budget as the engine: what an agent without memory keeps |
+    | `full_context` | the whole conversation (an upper reference, and the most expensive) |
+    | `no_memory` | the question only |
     | `no_graph`, `no_consolidation` | `enhanced` without one module (300-question stratified sample) |
 
     Two judges from different model families grade every answer with Mem0's LoCoMo rubric: TypeSafe **Jev**, a decision
@@ -84,7 +85,7 @@ def build(test_run, properties_run):
     display(pd.DataFrame([{
         'run': RUN.name, 'split': manifest['split'], 'created': manifest['created_at'], 'commit': manifest['commit'],
         'code_fingerprint': manifest['code_fingerprint'][:16], 'worker': manifest['service']['worker_model'],
-        'worker digest': (manifest['ollama_digests'].get(CONFIG['engine']['worker_model']) or '')[:16],
+        'worker digest': (manifest.get('ollama_digests', {}).get(CONFIG['engine']['worker_model']) or '')[:16],
         'embedder': manifest['service']['embedding_model'], 'reader': f"{CONFIG['reader']['provider']}/{CONFIG['reader']['model']}",
         'gpu': manifest['hardware']['gpu'], 'items': len(manifest['item_ids'])}]).T.rename(columns={0: 'value'}))
     ''')
@@ -143,8 +144,37 @@ def build(test_run, properties_run):
     for judge, table in report['paired_vs_enhanced'].items():
         for c, ci in table.items():
             if ci: rows.append({'judge': judge, 'baseline': c, 'n': ci['n'], 'enhanced minus baseline': ci['difference'],
-                                'ci95 low': ci['ci95'][0], 'ci95 high': ci['ci95'][1]})
+                                'per-question ci95': f"[{ci['ci95'][0]:+.3f}, {ci['ci95'][1]:+.3f}]",
+                                'per-conversation ci95': f"[{ci['cluster_ci95'][0]:+.3f}, {ci['cluster_ci95'][1]:+.3f}]"})
     display(pd.DataFrame(rows).style.format(precision=3))
+    ''')
+    md('''
+    ### Held-out conversations
+
+    Faults were diagnosed on conv-26 and conv-30 only (see section 11). The same table for the other eight
+    conversations, which no fix ever looked at:
+    ''')
+    code('''
+    if 'held_out' in report:
+        h = report['held_out']
+        display(Markdown('Conversations: ' + ', '.join(h['conversations'])))
+        display(pd.DataFrame([{'condition': c, 'n': h['conditions'][c]['answered'], 'Jev': h['conditions'][c].get('jev_accuracy'),
+                               'gpt-4o-mini': h['conditions'][c].get('gpt4omini_accuracy'), 'F1': h['conditions'][c]['f1']}
+                              for c in ORDER if c in h['conditions']]).set_index('condition').style.format(precision=3))
+        display(pd.Series(h['criteria'], name='criteria on held-out').to_frame())
+    ''')
+
+    md('''
+    ### Run-to-run noise
+
+    Repeats 1 and 2 re-ask the reader on the same 300-question sample. If the spread here is small next to the
+    differences above, those differences are not reader noise.
+    ''')
+    code('''
+    display(pd.DataFrame([{'condition': c, 'questions': v['questions'],
+                           **{f'repeat {k}': a for k, a in enumerate(v['accuracy_by_repeat'])},
+                           'stdev': v['accuracy_stdev'], 'verdict flip rate': v['verdict_flip_rate']}
+                          for c, v in report['repeats'].items()]).set_index('condition').style.format(precision=3, na_rep='–'))
     ''')
 
     md('## 6. By question category')
@@ -168,11 +198,14 @@ def build(test_run, properties_run):
     display(pd.DataFrame(rows).set_index('condition').style.format(precision=3))
     ''')
 
-    md('## 8. Judge agreement\n\nThe two judges never see the condition. Cohen\\'s kappa measures their agreement beyond chance.')
+    md('## 8. Judge agreement\n\nThe two judges never see the condition. Cohen’s kappa measures their agreement beyond chance.')
     code('''
-    display(pd.Series(report['judge_agreement'], name='value').to_frame())
-    both = items.dropna(subset=['jev', 'gpt4omini'])
-    display(pd.crosstab(both['jev'], both['gpt4omini'], rownames=['Jev'], colnames=['gpt-4o-mini']))
+    if report['judge_agreement'] and {'jev', 'gpt4omini'} <= set(items.columns):
+        display(pd.Series(report['judge_agreement'], name='value').to_frame())
+        both = items.dropna(subset=['jev', 'gpt4omini'])
+        display(pd.crosstab(both['jev'], both['gpt4omini'], rownames=['Jev'], colnames=['gpt-4o-mini']))
+    else:
+        display(Markdown('Only one judge has graded this run.'))
     ''')
 
     md('## 9. Cost of building memory\n\nIngestion runs once per conversation on the 8 GB laptop GPU; recall is per question.')
@@ -182,7 +215,7 @@ def build(test_run, properties_run):
                            **{f'{k} (GPU-busy hours)': v / 3.6e6 for k, v in ing['worker_ms'].items()}}]).T.rename(columns={0: 'value'}))
     ''')
 
-    md('## 10. Deterministic property suite\n\nScripted conversations checked against the engine\\'s stored state and responses; no judge is involved. '
+    md('## 10. Deterministic property suite\n\nScripted conversations checked against the engine’s stored state and responses; no judge is involved. '
        'The reader comparison asks the same questions over three contexts and scores answers by string match.')
     code('''
     if (PROPS / 'summary.json').exists():
@@ -208,13 +241,37 @@ def build(test_run, properties_run):
         rows = items[items['id'] == qid]
         first = rows.iloc[0]
         display(Markdown(f"**{qid}** ({first['category']}) · *{first['question']}* · gold: **{first['answer']}**"))
-        display(rows[['condition', 'hypothesis', 'jev', 'gpt4omini', 'f1']].set_index('condition'))
+        display(rows[[c for c in ['condition', 'hypothesis', 'jev', 'gpt4omini', 'f1'] if c in rows]].set_index('condition'))
         recall = RUN / 'recall' / 'enhanced' / f'{qid}.json'
         if recall.exists():
             print(read(recall)['context'][:1500], '\\n...')
     ''')
 
-    md('## 13. Verification')
+    md('''
+    ## 13. Comparison with published systems
+
+    Published LoCoMo results from the Mem0 paper (Chhikara et al., 2025, Tables 1 and 2), checked against the paper and
+    stored in `benchmark/published.json`. They answer with GPT-4o-mini and this benchmark answers with Claude Haiku 5.5,
+    so absolute scores are not comparable. The fair comparison is each system's distance from its own full-context
+    baseline and the context it needs.
+    ''')
+    code('''
+    pub = read(BENCH / 'published.json')
+    ours = report['conditions']
+    rows = [{'system': f'{k} (published)', 'judge accuracy': v, 'gap to own full context': v - pub['locomo_overall_j']['Full-context'],
+             'context tokens': pub['locomo_context_tokens'].get(k.split(' (')[0])}
+            for k, v in pub['locomo_overall_j'].items()]
+    fc = ours['full_context']['gpt4omini_accuracy'] if ours['full_context'].get('gpt4omini_accuracy') is not None else ours['full_context']['jev_accuracy']
+    for c in ('full_context', 'enhanced', 'raw_hybrid', 'recent_window'):
+        if c in ours:
+            a = ours[c].get('gpt4omini_accuracy') if ours[c].get('gpt4omini_accuracy') is not None else ours[c]['jev_accuracy']
+            rows.append({'system': f'this engine: {c}', 'judge accuracy': 100 * a, 'gap to own full context': 100 * (a - fc),
+                         'context tokens': ours[c]['context_tokens_mean']})
+    display(Markdown(pub['caveat']))
+    display(pd.DataFrame(rows).set_index('system').style.format(precision=1, na_rep='–'))
+    ''')
+
+    md('## 14. Verification')
     code('''
     v = RUN / 'verification.json'
     display(pd.Series({k: (len(x) if isinstance(x, list) else x) for k, x in read(v).items() if k != 'live'}, name='value').to_frame() if v.exists()
