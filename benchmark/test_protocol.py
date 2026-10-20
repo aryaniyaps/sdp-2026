@@ -99,11 +99,52 @@ class ProtocolTests(unittest.TestCase):
         out = {"primary_judge": "jev", "conditions": {
             "enhanced": {"jev_accuracy": 0.7, "context_tokens_mean": 1000, "quote_exactness": 1.0},
             "no_memory": {"jev_accuracy": 0.0}, "full_context": {"jev_accuracy": 0.75, "context_tokens_mean": 16000}},
-            "paired_vs_enhanced": {"jev": {"raw_hybrid": {"ci95": [-0.01, 0.05]}}}}
+            "paired_vs_enhanced": {"jev": {"raw_hybrid": {"ci95": [0.01, 0.05], "cluster_ci95": [-0.01, 0.06]},
+                                           "recent_window": {"ci95": [0.1, 0.2], "cluster_ci95": [0.05, 0.25]}}}}
         result = run.criteria(out)
         self.assertTrue(result["beats_no_memory"] and result["not_below_raw_hybrid"] and result["quotes_exact"])
+        # The per-conversation interval decides, so a per-question win alone is not enough.
         self.assertFalse(result["above_raw_hybrid"])
+        self.assertTrue(result["beats_recent_window"])
         self.assertTrue(result["within_full_context"] and result["token_share_ok"])
+
+    def test_recent_window_keeps_the_newest_turns_within_budget(self):
+        banks, _ = run.load()
+        bank = banks["conv-26"]
+        window = run.recent_window(bank, 2000)
+        self.assertLessEqual(len(window), 2000 * 4)
+        self.assertTrue(window.rstrip().endswith(bank["sessions"][-1]["turns"][-1]["content"]))
+        self.assertGreater(len(window), 2000 * 4 * 0.9)
+        self.assertEqual(run.recent_window(bank, 10**7), run.transcript(bank))
+
+    def test_cluster_bootstrap_is_wider_when_conversations_disagree(self):
+        # Enhanced wins every question of one conversation and loses every question of the other.
+        left = {f"a:q{i}": 1 for i in range(50)} | {f"b:q{i}": 0 for i in range(50)}
+        right = {f"a:q{i}": 0 for i in range(50)} | {f"b:q{i}": 1 for i in range(50)}
+        ci = run.paired_ci(left, right)
+        self.assertEqual(ci["conversations"], 2)
+        width = lambda pair: pair[1] - pair[0]
+        self.assertGreater(width(ci["cluster_ci95"]), width(ci["ci95"]))
+
+    def test_failed_jobs_are_retried_then_recorded(self):
+        calls, jobs = [], [{"id": "j1", "kind": "extract", "status": "failed", "error": "cap"}]
+
+        def fake(base, path, body=None, timeout=300):
+            calls.append(path)
+            if path.startswith("/api/v2/status"):
+                return {"embedding_gaps": {}, "ready": False}
+            if path.startswith("/api/v2/jobs?"):
+                return jobs
+            return {"retry": True}
+
+        real_api, real_sleep = run.api, run.time.sleep
+        run.api, run.time.sleep = fake, lambda s: None
+        try:
+            status = run.wait_ready("http://x", "ns", poll=0)
+        finally:
+            run.api, run.time.sleep = real_api, real_sleep
+        self.assertEqual(sum("/retry" in c for c in calls), 2)
+        self.assertEqual(status["permanently_failed_jobs"][0]["id"], "j1")
 
     def test_dev_run_records_changes_but_test_run_refuses(self):
         with tempfile.TemporaryDirectory() as directory:

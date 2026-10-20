@@ -58,11 +58,13 @@
   "context_budget": 8192,
   "top_k": 20,
   "conditions": {
-    "no_memory": {
-      "recall": null
-    },
-    "full_context": {
-      "recall": null
+    "enhanced": {
+      "recall": {
+        "raw_only": false,
+        "graph": true,
+        "inferences": true,
+        "temporal": true
+      }
     },
     "raw_hybrid": {
       "recall": {
@@ -72,13 +74,14 @@
         "temporal": false
       }
     },
-    "enhanced": {
-      "recall": {
-        "raw_only": false,
-        "graph": true,
-        "inferences": true,
-        "temporal": true
-      }
+    "recent_window": {
+      "recall": null
+    },
+    "full_context": {
+      "recall": null
+    },
+    "no_memory": {
+      "recall": null
     },
     "no_graph": {
       "recall": {
@@ -100,11 +103,22 @@
     }
   },
   "criteria": {
-    "note": "Fixed before the test run (git history shows the commit order). Judged on the primary judge; the second judge is reported beside it.",
+    "note": "Fixed before the test run; git history shows the commit order. Evaluated on the primary judge (Jev) over all ten conversations; the second judge and the eight held-out conversations are reported beside it. Revised once before any test result: the token-share bound went from 0.25 to 0.50 because LoCoMo histories average about 16k tokens against the engine default budget of 8,192, and the equal-budget recent_window comparison was added.",
     "beats_no_memory_by": 0.3,
+    "beats_recent_window": true,
     "not_below_raw_hybrid": true,
     "within_full_context_by": 0.1,
-    "max_token_share_of_full_context": 0.25,
+    "max_token_share_of_full_context": 0.5,
     "quote_exactness": 1.0
+  },
+  "repeats": {
+    "count": 2,
+    "conditions": [
+      "enhanced",
+      "raw_hybrid",
+      "recent_window",
+      "full_context"
+    ],
+    "note": "Repeats 1 and 2 re-ask the reader on the 300-question stratified sample, to measure run-to-run noise."
   }
 }

@@ -324,15 +324,28 @@ def retain_payload(run, bank, session):
     }
 
 
-def wait_ready(base, ns, poll=15):
+def wait_ready(base, ns, poll=15, job_retries=2):
+    """Waits until every job of a namespace has finished. A failed job is retried through the API up to
+    job_retries times (the engine has already tried it several times); after that it is returned as a
+    permanent failure, so one bad session is recorded instead of stopping the whole run."""
+    retried = collections.Counter()
     while True:
         status = api(base, f"/api/v2/status?namespace={urllib.parse.quote(ns)}")
-        failed = [g for g in status["jobs"] if g["status"] == "failed"]
-        if failed:
-            raise RuntimeError(f"failed jobs, see /api/v2/jobs?namespace={ns}: {failed}")
-        if status["ready"] and status["outstanding_jobs"] == 0:
-            if any(status.get("embedding_gaps", {}).values()):
-                raise RuntimeError(f"{ns}: embedding gaps: {status['embedding_gaps']}")
+        jobs = api(base, f"/api/v2/jobs?namespace={urllib.parse.quote(ns)}")
+        failed = [j for j in jobs if j["status"] == "failed"]
+        for job in failed:
+            if retried[job["id"]] < job_retries:
+                retried[job["id"]] += 1
+                log(stage="retry_job", namespace=ns, job=job["id"], kind=job["kind"], error=str(job.get("error"))[:200])
+                api(base, f"/api/v2/jobs/{job['id']}/retry?namespace={urllib.parse.quote(ns)}", {})
+        active = [j for j in jobs if j["status"] in ("pending", "running")]
+        if not active and all(retried[j["id"]] >= job_retries for j in failed):
+            if any(status.get("embedding_gaps", {}).values()) and not failed:
+                # Chunks are embedded in the background; wait for them unless a job is stuck.
+                time.sleep(poll)
+                continue
+            status["permanently_failed_jobs"] = [
+                {"id": j["id"], "kind": j["kind"], "error": j.get("error")} for j in failed]
             return status
         time.sleep(poll)
 
@@ -345,6 +358,8 @@ def ingest(run, banks, base):
         ns, start = namespace(run, bank["bank"]), time.monotonic()
         jobs = [api(base, "/api/v2/retain", retain_payload(run, bank["bank"], s))["job_id"] for s in bank["sessions"]]
         status = wait_ready(base, ns)
+        if status["permanently_failed_jobs"]:
+            log(stage="bank_incomplete", bank=bank["bank"], failed=status["permanently_failed_jobs"])
         atomic_json(
             path,
             {
@@ -384,11 +399,11 @@ def recall(run, items, base, conditions):
             "top_k": CONFIG["top_k"],
             **CONDITIONS[condition]["recall"],
         }
-        response = api(base, "/api/v2/recall", request, timeout=900)
+        response = retry(lambda: api(base, "/api/v2/recall", request, timeout=900), "engine")
         response["request"] = request
         if response["degraded_reasons"]:
-            atomic_json(path.with_suffix(".failed.json"), response)
-            raise RuntimeError(f"{condition}/{item['id']}: degraded retrieval: {response['degraded_reasons']}")
+            # Kept and counted in the report (degraded_recalls) rather than stopping the run.
+            log(stage="degraded_recall", condition=condition, id=item["id"], reasons=response["degraded_reasons"])
         atomic_json(path, response)
 
     tasks = [(c, i) for c in conditions if CONDITIONS[c]["recall"] for i in items if wanted(run, c, i)]
@@ -412,11 +427,33 @@ def transcript(bank):
     )
 
 
+def recent_window(bank, tokens):
+    """The newest turns that fit in `tokens` (estimated as characters / 4), oldest first, with their
+    session headers: what an agent without memory keeps when the history overflows its budget."""
+    budget, kept = tokens * 4, []
+    for s in reversed(bank["sessions"]):
+        header = f"[{s['external_id']} | {s['date']}]"
+        turns = []
+        for t in reversed(s["turns"]):
+            if budget - len(t["content"]) - 1 < len(header):
+                break
+            budget -= len(t["content"]) + 1
+            turns.append(t["content"])
+        if turns:
+            budget -= len(header) + 2
+            kept.append(header + "\n" + "\n".join(reversed(turns)))
+        if len(turns) < len(s["turns"]):
+            break
+    return "\n\n".join(reversed(kept))
+
+
 def memories(run, condition, item, banks):
     if condition == "no_memory":
         return "(no memories are available)"
     if condition == "full_context":
         return transcript(banks[item["bank"]])
+    if condition == "recent_window":
+        return recent_window(banks[item["bank"]], CONFIG["context_budget"])
     return read_json(run / "recall" / condition / f"{item['id']}.json")["context"]
 
 
@@ -568,10 +605,24 @@ def read_answer(prompt):
     return text, hypothesis, usage
 
 
-def answer(run, items, banks, conditions):
+def output_root(run, repeat):
+    """Repeat 0 is the primary result; later repeats re-ask the reader on the stratified sample."""
+    return run if repeat == 0 else run / "repeats" / f"r{repeat}"
+
+
+def repeat_tasks(run, items, conditions, repeat):
+    if repeat == 0:
+        return [(c, i) for c in conditions for i in items if wanted(run, c, i)]
+    sample = set(read_json(run / "manifest.json")["ablation_ids"])
+    return [(c, i) for c in conditions if c in CONFIG["repeats"]["conditions"] for i in items if i["id"] in sample]
+
+
+def answer(run, items, banks, conditions, repeat=0):
+    root = output_root(run, repeat)
+
     def one(task):
         condition, item = task
-        path = run / "answers" / condition / f"{item['id']}.json"
+        path = root / "answers" / condition / f"{item['id']}.json"
         if path.exists():
             return
         context = memories(run, condition, item, banks)
@@ -591,10 +642,9 @@ def answer(run, items, banks, conditions):
                 "usage": usage,
             },
         )
-        log(stage="answered", condition=condition, id=item["id"])
+        log(stage="answered", condition=condition, repeat=repeat, id=item["id"])
 
-    tasks = [(c, i) for c in conditions for i in items if wanted(run, c, i)]
-    parallel(one, tasks, CONFIG["reader"]["concurrency"])
+    parallel(one, repeat_tasks(run, items, conditions, repeat), CONFIG["reader"]["concurrency"])
 
 
 def secret(name):
@@ -655,21 +705,23 @@ def gpt_call(rubric):
 JUDGES = {"jev": jev_call, "gpt4omini": gpt_call}
 
 
-def judge(run, items, conditions, judges):
+def judge(run, items, conditions, judges, repeat=0):
+    root = output_root(run, repeat)
+
     def one(task):
         name, condition, item = task
-        path = run / "judgments" / name / condition / f"{item['id']}.json"
+        path = root / "judgments" / name / condition / f"{item['id']}.json"
         if path.exists():
             return
-        hypothesis = read_json(run / "answers" / condition / f"{item['id']}.json")["hypothesis"]
+        hypothesis = read_json(root / "answers" / condition / f"{item['id']}.json")["hypothesis"]
         rubric = judge_prompt(item, hypothesis)
         label, detail = retry(lambda: JUDGES[name](rubric), name)
         # A judge sees the question, gold answer and hypothesis only, never the condition.
         atomic_json(path, {"id": item["id"], "label": label, "rubric_sha256": sha(rubric), **detail})
-        log(stage="judged", judge=name, condition=condition, id=item["id"])
+        log(stage="judged", judge=name, condition=condition, repeat=repeat, id=item["id"])
 
     for name in judges:
-        tasks = [(name, c, i) for c in conditions for i in items if (run / "answers" / c / f"{i['id']}.json").exists()]
+        tasks = [(name, c, i) for c in conditions for i in items if (root / "answers" / c / f"{i['id']}.json").exists()]
         random.Random(CONFIG["seed"]).shuffle(tasks)
         parallel(one, tasks, CONFIG["judges"][name]["concurrency"])
 
@@ -738,14 +790,32 @@ def quote_check(response, banks, bank):
     return checked, exact
 
 
+def bank_of(item_id):
+    return item_id.rsplit(":q", 1)[0]
+
+
 def paired_ci(left, right):
+    """Paired bootstrap of the accuracy difference, two ways: resampling questions, and resampling whole
+    conversations (cluster bootstrap). Questions about one conversation share a memory bank, so the
+    cluster interval is the honest one when banks differ in quality."""
     ids = sorted(set(left) & set(right))
     if not ids:
         return None
-    diffs = [int(left[i]) - int(right[i]) for i in ids]
+    diffs = {i: int(left[i]) - int(right[i]) for i in ids}
+    values = list(diffs.values())
     rng = random.Random(CONFIG["seed"])
-    samples = sorted(statistics.mean(rng.choices(diffs, k=len(diffs))) for _ in range(2000))
-    return {"n": len(ids), "difference": statistics.mean(diffs), "ci95": [samples[49], samples[1949]]}
+    samples = sorted(statistics.mean(rng.choices(values, k=len(values))) for _ in range(2000))
+    clusters = collections.defaultdict(list)
+    for i, d in diffs.items():
+        clusters[bank_of(i)].append(d)
+    groups = list(clusters.values())
+    cluster_samples = []
+    for _ in range(2000):
+        pooled = [d for g in rng.choices(groups, k=len(groups)) for d in g]
+        cluster_samples.append(statistics.mean(pooled))
+    cluster_samples.sort()
+    return {"n": len(ids), "conversations": len(groups), "difference": statistics.mean(values),
+            "ci95": [samples[49], samples[1949]], "cluster_ci95": [cluster_samples[49], cluster_samples[1949]]}
 
 
 def cohen_kappa(a, b):
@@ -768,16 +838,15 @@ def mean(values):
     return statistics.mean(values) if values else None
 
 
-def report(run, items, banks):
-    manifest = read_json(run / "manifest.json")
-    judges = list(CONFIG["judges"])
-    rows, labels = [], {j: collections.defaultdict(dict) for j in judges}
+def answer_rows(run, items, banks, repeat=0):
+    root, judges, rows = output_root(run, repeat), list(CONFIG["judges"]), []
     for condition in CONDITIONS:
         for item in items:
-            path = run / "answers" / condition / f"{item['id']}.json"
+            path = root / "answers" / condition / f"{item['id']}.json"
             if not path.exists():
                 continue
             record = read_json(path)
+            usage = record["usage"].get("usage", {})
             row = {
                 "id": item["id"], "bank": item["bank"], "condition": condition, "category": item["category"],
                 "question": item["question"], "answer": item["answer"], "hypothesis": record["hypothesis"],
@@ -785,22 +854,31 @@ def report(run, items, banks):
                 "bleu1": bleu1(record["hypothesis"], item["answer"]),
                 "context_tokens": record["context_tokens_estimated"],
                 "reader_seconds": record["usage"]["seconds"],
+                "reader_tokens": usage.get("totalTokens"),
             }
             recall_path = run / "recall" / condition / f"{item['id']}.json"
-            if recall_path.exists():
+            if repeat == 0 and recall_path.exists():
                 response = read_json(recall_path)
                 row["recall_ms"] = response["elapsed_ms"]
+                row["degraded"] = bool(response["degraded_reasons"])
                 row["retrieval"] = retrieval_metrics(item, response)
                 row["quotes_checked"], row["quotes_exact"] = quote_check(response, banks, item["bank"])
             for j in judges:
-                jpath = run / "judgments" / j / condition / f"{item['id']}.json"
+                jpath = root / "judgments" / j / condition / f"{item['id']}.json"
                 if jpath.exists():
                     row[j] = int(read_json(jpath)["label"])
-                    labels[j][condition][item["id"]] = row[j]
             rows.append(row)
-    primary = judges[0]
-    out = {"run": run.name, "split": manifest["split"], "items": len(items), "primary_judge": primary,
-           "conditions": {}, "paired_vs_enhanced": {}}
+    return rows
+
+
+def summarize(rows):
+    judges = list(CONFIG["judges"])
+    out = {"conditions": {}, "paired_vs_enhanced": {}}
+    labels = {j: collections.defaultdict(dict) for j in judges}
+    for r in rows:
+        for j in judges:
+            if j in r:
+                labels[j][r["condition"]][r["id"]] = r[j]
     for condition in CONDITIONS:
         subset = [r for r in rows if r["condition"] == condition]
         if not subset:
@@ -813,11 +891,13 @@ def report(run, items, banks):
         summary["f1"] = mean(r["f1"] for r in subset)
         summary["bleu1"] = mean(r["bleu1"] for r in subset)
         summary["context_tokens_mean"] = mean(r["context_tokens"] for r in subset)
+        summary["reader_tokens_mean"] = mean(r["reader_tokens"] for r in subset if r["reader_tokens"] is not None)
         summary["reader_seconds_p50"] = percentile([r["reader_seconds"] for r in subset], 0.5)
         summary["reader_seconds_p95"] = percentile([r["reader_seconds"] for r in subset], 0.95)
         if any("recall_ms" in r for r in subset):
             summary["recall_ms_p50"] = percentile([r["recall_ms"] for r in subset], 0.5)
             summary["recall_ms_p95"] = percentile([r["recall_ms"] for r in subset], 0.95)
+            summary["degraded_recalls"] = sum(r["degraded"] for r in subset)
             metrics = [r["retrieval"] for r in subset if r.get("retrieval")]
             summary["retrieval"] = {k: mean(m[k] for m in metrics) for k in (metrics[0] if metrics else {})}
             checked = sum(r["quotes_checked"] for r in subset)
@@ -838,40 +918,80 @@ def report(run, items, banks):
         }
     flat = lambda j: {f"{c}/{i}": v for c, d in labels[j].items() for i, v in d.items()}
     out["judge_agreement"] = cohen_kappa(flat(judges[0]), flat(judges[1]))
+    return out
+
+
+def repeat_variance(run, items, banks, primary):
+    """Accuracy of each repeat on the stratified sample, and how often the same question's verdict flips."""
+    sample = set(read_json(run / "manifest.json")["ablation_ids"])
+    runs = [[r for r in answer_rows(run, items, banks, k) if r["id"] in sample] for k in range(CONFIG["repeats"]["count"] + 1)]
+    out = {}
+    for condition in CONFIG["repeats"]["conditions"]:
+        verdicts = [{r["id"]: r[primary] for r in rows if r["condition"] == condition and primary in r} for rows in runs]
+        common = set.intersection(*(set(v) for v in verdicts)) if all(verdicts) else set()
+        accuracies = [mean(v[i] for i in common) for v in verdicts] if common else []
+        out[condition] = {
+            "questions": len(common),
+            "accuracy_by_repeat": accuracies,
+            "accuracy_stdev": statistics.stdev(accuracies) if len(accuracies) > 1 else None,
+            "verdict_flip_rate": mean(len({v[i] for v in verdicts}) > 1 for i in common) if common else None,
+        }
+    return out
+
+
+def report(run, items, banks):
+    manifest = read_json(run / "manifest.json")
+    primary = list(CONFIG["judges"])[0]
+    rows = answer_rows(run, items, banks)
+    dev = set(sorted(banks)[: DATASET["dev_banks"]])
+    out = {"run": run.name, "split": manifest["split"], "items": len(items), "primary_judge": primary,
+           **summarize(rows)}
+    if manifest["split"] == "test":
+        # Fixes after the first test run were diagnosed on the two dev conversations only, so the other
+        # eight are reported apart as held-out evidence.
+        out["held_out"] = {"conversations": sorted(set(banks) - dev),
+                           **summarize([r for r in rows if r["bank"] not in dev])}
+    out["repeats"] = repeat_variance(run, items, banks, primary)
     ingested = [read_json(p) for p in sorted((run / "ingestion").glob("*.json"))]
     operations = sorted({o["operation"] for x in ingested for o in x["status"]["worker_operations"]})
     out["ingestion"] = {
         "banks": len(ingested), "sessions": sum(x["sessions"] for x in ingested),
         "turns": sum(x["turns"] for x in ingested), "characters": sum(x["characters"] for x in ingested),
         "bank_seconds_sum": sum(x["seconds"] for x in ingested),
+        "permanently_failed_jobs": sum(len(x["status"].get("permanently_failed_jobs", [])) for x in ingested),
         "worker_ms": {
             op: sum(o["total_ms"] for x in ingested for o in x["status"]["worker_operations"] if o["operation"] == op)
             for op in operations
         },
     }
     out["criteria"] = criteria(out)
+    if "held_out" in out:
+        out["held_out"]["criteria"] = criteria({"primary_judge": primary, **out["held_out"]})
     atomic_json(run / "report.json", out)
     with (run / "items.jsonl").open("w") as handle:
         for r in rows:
             handle.write(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n")
-    print(json.dumps({k: out[k] for k in ("conditions", "judge_agreement", "criteria")}, indent=2))
+    print(json.dumps({k: out.get(k) for k in ("conditions", "judge_agreement", "criteria", "repeats")}, indent=2))
     return out
 
 
 def criteria(out):
-    """Evaluates the success criteria fixed in config.json before the test run, on the primary judge."""
+    """Evaluates the success criteria fixed in config.json before the test run, on the primary judge.
+    A comparison passes on the cluster (per-conversation) bootstrap interval, the stricter of the two."""
     rule, c, j = CONFIG["criteria"], out["conditions"], out["primary_judge"]
     acc = lambda name: c.get(name, {}).get(f"{j}_accuracy")
     if acc("enhanced") is None:
         return None
     result = {}
+    paired = out["paired_vs_enhanced"][j]
     if acc("no_memory") is not None:
         result["beats_no_memory"] = acc("enhanced") - acc("no_memory") >= rule["beats_no_memory_by"]
-    ci = out["paired_vs_enhanced"][j].get("raw_hybrid")
-    if ci:
-        # Not below: the paired 95% interval of enhanced minus raw_hybrid does not lie wholly below zero.
-        result["not_below_raw_hybrid"] = ci["ci95"][1] >= 0
-        result["above_raw_hybrid"] = ci["ci95"][0] > 0
+    if paired.get("recent_window"):
+        result["beats_recent_window"] = paired["recent_window"]["cluster_ci95"][0] > 0
+    if paired.get("raw_hybrid"):
+        # Not below: the interval of enhanced minus raw_hybrid does not lie wholly below zero.
+        result["not_below_raw_hybrid"] = paired["raw_hybrid"]["cluster_ci95"][1] >= 0
+        result["above_raw_hybrid"] = paired["raw_hybrid"]["cluster_ci95"][0] > 0
     if acc("full_context") is not None:
         result["within_full_context"] = acc("full_context") - acc("enhanced") <= rule["within_full_context_by"]
         share = c["enhanced"]["context_tokens_mean"] / c["full_context"]["context_tokens_mean"]
@@ -896,19 +1016,20 @@ def verify(run, items, banks, live=0, base=None):
         raise RuntimeError("source archive checksum mismatch")
     by_id = {i["id"]: i for i in items}
     problems, answers, judgments = [], 0, 0
-    for path in sorted((run / "answers").glob("*/*.json")):
-        record, item = read_json(path), by_id[path.stem]
-        answers += 1
-        if sha(reader_prompt(item, memories(run, record["condition"], item, banks))) != record["prompt_sha256"]:
-            problems.append(f"answer prompt mismatch: {path.relative_to(run)}")
-        if last_json(record["output"], "hypothesis") != record["hypothesis"]:
-            problems.append(f"hypothesis not in stored output: {path.relative_to(run)}")
-    for path in sorted((run / "judgments").glob("*/*/*.json")):
-        record, item = read_json(path), by_id[path.stem]
-        hypothesis = read_json(run / "answers" / path.parent.name / path.name)["hypothesis"]
-        judgments += 1
-        if sha(judge_prompt(item, hypothesis)) != record["rubric_sha256"]:
-            problems.append(f"judge rubric mismatch: {path.relative_to(run)}")
+    for root in [run, *sorted((run / "repeats").glob("r*"))]:
+        for path in sorted((root / "answers").glob("*/*.json")):
+            record, item = read_json(path), by_id[path.stem]
+            answers += 1
+            if sha(reader_prompt(item, memories(run, record["condition"], item, banks))) != record["prompt_sha256"]:
+                problems.append(f"answer prompt mismatch: {path.relative_to(run)}")
+            if last_json(record["output"], "hypothesis") != record["hypothesis"]:
+                problems.append(f"hypothesis not in stored output: {path.relative_to(run)}")
+        for path in sorted((root / "judgments").glob("*/*/*.json")):
+            record, item = read_json(path), by_id[path.stem]
+            hypothesis = read_json(root / "answers" / path.parent.name / path.name)["hypothesis"]
+            judgments += 1
+            if sha(judge_prompt(item, hypothesis)) != record["rubric_sha256"]:
+                problems.append(f"judge rubric mismatch: {path.relative_to(run)}")
     result = {"answers_checked": answers, "judgments_checked": judgments, "problems": problems}
     if live:
         stored = sorted((run / "answers").glob("*/*.json"))
@@ -951,6 +1072,7 @@ def main():
     parser.add_argument("--base", default=f"http://{CONFIG['engine']['bind']}")
     parser.add_argument("--conditions", default=",".join(CONDITIONS))
     parser.add_argument("--judges", default=",".join(CONFIG["judges"]))
+    parser.add_argument("--repeat", type=int, default=0, help="answer/judge: 0 is the primary result; 1..N re-ask the sample")
     parser.add_argument("--live", type=int, default=0, help="verify: re-run N random stored items against the models")
     args = parser.parse_args()
     if args.stage == "fetch":
@@ -969,10 +1091,12 @@ def main():
         ingest(run, banks, args.base)
     if args.stage in ("recall", "all"):
         recall(run, items, args.base, conditions)
-    if args.stage in ("answer", "all"):
-        answer(run, items, banks, conditions)
-    if args.stage in ("judge", "all"):
-        judge(run, items, conditions, judges)
+    repeats = range(CONFIG["repeats"]["count"] + 1) if args.stage == "all" else [args.repeat]
+    for repeat in repeats:
+        if args.stage in ("answer", "all"):
+            answer(run, items, banks, conditions, repeat)
+        if args.stage in ("judge", "all"):
+            judge(run, items, conditions, judges, repeat)
     if args.stage == "all":
         report(run, items, banks)
 
