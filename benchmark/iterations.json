@@ -1,0 +1,15 @@
+{
+  "note": "Every change made because of a dev run, in order. Dev runs use the first two LoCoMo conversations (233 questions); the test run uses only the final version.",
+  "iterations": [
+    {
+      "version": "v1-window-split",
+      "date": "2026-10-20",
+      "dev_run": "locomo-dev-v1",
+      "finding": "Ingesting conv-30 failed: on one crowded session the extractor's answer hit the 3,072-token output cap (OLLAMA_NUM_PREDICT). The job failed all 5 attempts identically (temperature 0), and every later session of that conversation queued behind it, so the whole memory bank stalled.",
+      "change": "A window whose answer is cut off at the output cap is split in half and each half is extracted on its own; only a single event that still does not fit fails the job. New error variant AppError::OutputLimit; regression test a_window_whose_answer_hits_the_output_cap_is_split_until_each_part_fits.",
+      "files": ["src/lib.rs", "src/model.rs", "src/worker/extraction.rs", "tests/assertion_graph.rs"],
+      "dev_before": "conv-30 bank could not be built",
+      "dev_after": "pending"
+    }
+  ]
+}

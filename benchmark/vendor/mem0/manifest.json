@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/mem0ai/mem0",
+  "revision": "aae5989e78a6188b3b047c104d960c9ad0927e75",
+  "note": "Last revision before evaluation/ was retired upstream (9315e30). Only prompt strings and the token-F1 rule are used; the files are never imported.",
+  "files": {
+    "llm_judge.py": {
+      "source_url": "https://raw.githubusercontent.com/mem0ai/mem0/aae5989e78a6188b3b047c104d960c9ad0927e75/evaluation/metrics/llm_judge.py",
+      "sha256": "ac2e242f6ea0b817ba1b229ff9e5271f6846b7b8a9aefa8a5a5a81ea58df3b3c"
+    },
+    "prompts.py": {
+      "source_url": "https://raw.githubusercontent.com/mem0ai/mem0/aae5989e78a6188b3b047c104d960c9ad0927e75/evaluation/prompts.py",
+      "sha256": "407bea1c1453dc6832c234bb1ed936d401d796fabcc0b28337a47ba63517d3ba"
+    },
+    "utils.py": {
+      "source_url": "https://raw.githubusercontent.com/mem0ai/mem0/aae5989e78a6188b3b047c104d960c9ad0927e75/evaluation/metrics/utils.py",
+      "sha256": "83f3fc14e4eff62be1ab07501ba61a912f15aa20856c7a008bb8799706e0e11d"
+    }
+  }
+}

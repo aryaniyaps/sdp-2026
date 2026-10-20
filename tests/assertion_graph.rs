@@ -3437,3 +3437,71 @@ async fn dashboard_projects_persist_and_session_namespace_changes_are_isolated_a
         .await
         .unwrap();
 }
+/// Answers an extraction prompt with no claims when it shows one event, and stops at the output cap
+/// when it shows more, as the student did on a crowded LoCoMo session.
+struct CrowdedWindows(std::sync::Mutex<Vec<usize>>);
+#[async_trait]
+impl JsonModel for CrowdedWindows {
+    async fn generate(&self, prompt: &str) -> Result<Value, AppError> {
+        let shown = prompt.matches("\"source_index\":").count();
+        self.0.lock().unwrap().push(shown);
+        if shown > 1 {
+            return Err(AppError::OutputLimit("fixture output cap".into()));
+        }
+        Ok(json!({"claims":[]}))
+    }
+    fn identity(&self) -> String {
+        format!("crowded-windows-{}", Uuid::new_v4())
+    }
+}
+#[tokio::test]
+async fn a_window_whose_answer_hits_the_output_cap_is_split_until_each_part_fits() {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("TEST_DATABASE_URL missing; integration skipped");
+        return;
+    };
+    let store = Store::new(
+        PgPoolOptions::new()
+            .max_connections(4)
+            .connect(&url)
+            .await
+            .unwrap(),
+    );
+    store.migrate().await.unwrap();
+    let ns = format!("crowded-{}", Uuid::new_v4());
+    let model = Arc::new(CrowdedWindows(Default::default()));
+    let state = AppState {
+        store: store.clone(),
+        graph: None,
+        embedder: Arc::new(ConstantEmbedder),
+        model: model.clone(),
+        worker_concurrency: 1,
+    };
+    let ready = READY_EXTRACT_JOBS.read().await;
+    let (_, job, _) = store
+        .retain(&RetainRequest {
+            namespace: ns.clone(),
+            session_id: "session".into(),
+            external_id: "crowded".into(),
+            metadata: json!({}),
+            events: (0..4)
+                .map(|i| SourceEvent {
+                    role: "user".into(),
+                    content: format!("Ann: news number {i} about my week"),
+                    occurred_at: Utc::now(),
+                    metadata: json!({}),
+                })
+                .collect(),
+        })
+        .await
+        .unwrap();
+    sqlx::query("UPDATE memory_jobs SET status='running',attempts=1,lease_token=gen_random_uuid(),lease_until=now()+interval '15 minutes' WHERE id=$1").bind(job).execute(&store.pool).await.unwrap();
+    sqlx::query("INSERT INTO memory_namespace_leases SELECT namespace,id,lease_token,lease_until FROM memory_jobs WHERE id=$1 ON CONFLICT(namespace) DO UPDATE SET job_id=excluded.job_id,lease_token=excluded.lease_token,lease_until=excluded.lease_until").bind(job).execute(&store.pool).await.unwrap();
+    drop(ready);
+    let job = store.job(&ns, job).await.unwrap();
+    let outcome = memory_engine::worker::process(&state, &job).await.unwrap();
+    // One window of four, then two of two, then four of one: every event is read exactly once.
+    assert_eq!(outcome["windows"], 4, "{outcome}");
+    assert_eq!(outcome["split_windows"], 3, "{outcome}");
+    assert_eq!(*model.0.lock().unwrap(), vec![4, 2, 1, 1, 2, 1, 1]);
+}

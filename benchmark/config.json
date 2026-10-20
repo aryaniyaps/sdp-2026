@@ -1,31 +1,110 @@
 {
-  "dataset": "longmemeval_s_cleaned.json",
-  "dataset_url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json",
-  "dataset_sha256": "d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442",
-  "reader_provider": "openai",
-  "reader_model": "gpt-5.6-sol",
-  "judge_provider": "openai",
-  "judge_model": "gpt-6.1-sol",
-  "thinking": "medium",
+  "seed": 20261005,
+  "engine": {
+    "bind": "127.0.0.1:8090",
+    "worker_model": "mem-extractor:general-v1",
+    "embedding_model": "qwen3-embedding:0.6b",
+    "num_ctx": 12288,
+    "num_predict": 3072,
+    "worker_concurrency": 4,
+    "images": {
+      "pgvector/pgvector:pg17": "sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f",
+      "neo4j:5.26": "sha256:d9cfe82983d27f5a75b3aaae8f316d04f9a698a3b7f6103a508f7caf8362f255"
+    }
+  },
+  "dataset": {
+    "file": "locomo10.json",
+    "url": "https://raw.githubusercontent.com/snap-research/locomo/3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376/data/locomo10.json",
+    "sha256": "79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4",
+    "license": "CC-BY-NC-4.0",
+    "categories": {
+      "1": "multi_hop",
+      "2": "temporal",
+      "3": "open_domain",
+      "4": "single_hop",
+      "5": "adversarial"
+    },
+    "scored_categories": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "ablation_sample": 300,
+    "dev_banks": 2
+  },
+  "reader": {
+    "provider": "claude-bridge",
+    "model": "claude-haiku-5-5",
+    "extension": "~/.pi/agent/npm/node_modules/pi-claude-bridge/src/index.ts",
+    "concurrency": 6
+  },
+  "judges": {
+    "jev": {
+      "url": "https://api.typesafe.ai/v1/systemone",
+      "model": "jev-latest",
+      "key_env": "TYPESAFE_API_KEY",
+      "threshold": 0.5,
+      "concurrency": 8,
+      "note": "TypeSafe serves only the jev-latest and jev-preview aliases; the model id each response reports is stored with every judgment."
+    },
+    "gpt4omini": {
+      "url": "https://api.openai.com/v1/chat/completions",
+      "model": "gpt-4o-mini",
+      "key_env": "OPENAI_API_KEY",
+      "concurrency": 6
+    }
+  },
   "context_budget": 8192,
   "top_k": 20,
-  "seed": 20261005,
-  "repeat_sample_size": 100,
-  "repeats": 3,
-  "conditions": [
-    "raw_hybrid",
-    "enhanced",
-    "full_history"
-  ],
-  "ablations": [
-    "no_graph",
-    "no_consolidation"
-  ],
-  "judge_protocol": "upstream category prompts; subscription-backed model; not official GPT-4o scores",
-  "worker_provider": "ollama",
-  "worker_model": "mem-extractor",
-  "worker_thinking": "none",
-  "embedding_model": "qwen3-embedding:0.6b",
-  "worker_concurrency": 4,
-  "ingestion_concurrency": 4
+  "conditions": {
+    "no_memory": {
+      "recall": null
+    },
+    "full_context": {
+      "recall": null
+    },
+    "raw_hybrid": {
+      "recall": {
+        "raw_only": true,
+        "graph": false,
+        "inferences": false,
+        "temporal": false
+      }
+    },
+    "enhanced": {
+      "recall": {
+        "raw_only": false,
+        "graph": true,
+        "inferences": true,
+        "temporal": true
+      }
+    },
+    "no_graph": {
+      "recall": {
+        "raw_only": false,
+        "graph": false,
+        "inferences": true,
+        "temporal": true
+      },
+      "ablation": true
+    },
+    "no_consolidation": {
+      "recall": {
+        "raw_only": false,
+        "graph": true,
+        "inferences": false,
+        "temporal": true
+      },
+      "ablation": true
+    }
+  },
+  "criteria": {
+    "note": "Fixed before the test run (git history shows the commit order). Judged on the primary judge; the second judge is reported beside it.",
+    "beats_no_memory_by": 0.3,
+    "not_below_raw_hybrid": true,
+    "within_full_context_by": 0.1,
+    "max_token_share_of_full_context": 0.25,
+    "quote_exactness": 1.0
+  }
 }

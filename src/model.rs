@@ -159,7 +159,7 @@ impl OllamaLimits {
             )));
         }
         if response["done_reason"].as_str() == Some("length") {
-            return Err(AppError::Provider(format!(
+            return Err(AppError::OutputLimit(format!(
                 "Ollama stopped at its token limit after {} generated tokens (OLLAMA_NUM_PREDICT {}, OLLAMA_NUM_CTX {}); the answer is incomplete",
                 response["eval_count"].as_u64().unwrap_or(0),
                 self.num_predict,

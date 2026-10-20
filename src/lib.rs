@@ -39,6 +39,9 @@ pub enum AppError {
     Conflict(String),
     #[error("provider error: {0}")]
     Provider(String),
+    /// The model's answer was cut off at its output cap; a smaller input may fit.
+    #[error("provider error: {0}")]
+    OutputLimit(String),
     #[error("dependency unavailable: {0}")]
     Unavailable(String),
     #[error("not found")]
@@ -57,7 +60,7 @@ impl IntoResponse for AppError {
             Self::Validation(_) => StatusCode::BAD_REQUEST,
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::NotFound => StatusCode::NOT_FOUND,
-            Self::Provider(_) | Self::Http(_) => StatusCode::BAD_GATEWAY,
+            Self::Provider(_) | Self::OutputLimit(_) | Self::Http(_) => StatusCode::BAD_GATEWAY,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };

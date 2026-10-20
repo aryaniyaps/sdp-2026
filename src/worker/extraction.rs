@@ -39,10 +39,13 @@ LIMIT 80
     // The model reads shortened events in windows of a few thousand tokens. Claims are still
     // checked against the full events, so a quote from the part that was shown is accepted.
     let compact: Vec<Value> = events.iter().map(|event| compact_event(event)).collect();
-    let ranges = windows(&compact);
+    // A window whose claims do not fit the model's output cap is split in half and each half is
+    // extracted on its own. Only a single event whose claims still do not fit fails the job.
+    let mut pending: Vec<std::ops::Range<usize>> = windows(&compact).into_iter().rev().collect();
+    let (mut extracted_windows, mut split_windows) = (0, 0);
     let mut claims = Vec::new();
     let mut dropped_assertions = 0;
-    for range in &ranges {
+    while let Some(range) = pending.pop() {
         let event_values: Vec<Value> = compact[range.clone()]
             .iter()
             .enumerate()
@@ -63,12 +66,29 @@ LIMIT 80
             }
             None => (existing.clone(), 0),
         };
-        dropped_assertions += dropped;
         let window_events: Vec<SourceEvent> =
             events[range.clone()].iter().map(|e| (*e).clone()).collect();
-        let extraction =
-            extract_window(state, &window_existing, &event_values, &window_events).await?;
-        let extraction = super::review::review(state, extraction, &window_events).await?;
+        let reviewed =
+            match extract_window(state, &window_existing, &event_values, &window_events).await {
+                Ok(extraction) => super::review::review(state, extraction, &window_events).await,
+                Err(error) => Err(error),
+            };
+        let extraction = match reviewed {
+            Err(AppError::OutputLimit(reason)) if range.len() > 1 => {
+                tracing::warn!(
+                    namespace=%job.namespace, job_id=%job.id, events=range.len(), %reason,
+                    "window answer hit the output cap; extracting its halves separately"
+                );
+                let middle = range.start + range.len() / 2;
+                pending.push(middle..range.end);
+                pending.push(range.start..middle);
+                split_windows += 1;
+                continue;
+            }
+            other => other?,
+        };
+        extracted_windows += 1;
+        dropped_assertions += dropped;
         // Window-local source indices become indices into the whole episode.
         for mut claim in extraction.claims {
             if leaks_secret(&claim.statement) {
@@ -94,7 +114,10 @@ LIMIT 80
         .store
         .apply_extraction(job, &parsed, vectors, &state.model.identity())
         .await?;
-    let mut outcome = json!({"enhanced":result,"windows":ranges.len()});
+    let mut outcome = json!({"enhanced":result,"windows":extracted_windows});
+    if split_windows > 0 {
+        outcome["split_windows"] = json!(split_windows);
+    }
     if dropped_assertions > 0 {
         outcome["existing_assertions_dropped"] = json!(dropped_assertions);
     }
