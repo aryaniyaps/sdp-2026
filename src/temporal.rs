@@ -321,7 +321,9 @@ pub fn mentioned_day(text: &str, said: DateTime<Utc>) -> Option<NaiveDate> {
             },
             _ => match (number(w), word(i + 1), word(i + 2)) {
                 (Some(n), Some("day" | "days"), Some("ago")) => Some(today - Duration::days(n)),
-                (Some(n), Some("week" | "weeks"), Some("ago")) => Some(today - Duration::days(7 * n)),
+                (Some(n), Some("week" | "weeks"), Some("ago")) => {
+                    Some(today - Duration::days(7 * n))
+                }
                 _ => None,
             },
         };
@@ -344,7 +346,10 @@ mod tests {
         let said = Utc.with_ymd_and_hms(2023, 5, 8, 13, 56, 0).unwrap();
         let day = |y, m, d| NaiveDate::from_ymd_opt(y, m, d);
         for (text, expected) in [
-            ("I went to a LGBTQ support group yesterday.", day(2023, 5, 7)),
+            (
+                "I went to a LGBTQ support group yesterday.",
+                day(2023, 5, 7),
+            ),
             ("I will run a half marathon tomorrow.", day(2023, 5, 9)),
             ("I passed my driving test two days ago", day(2023, 5, 6)),
             ("I'll adopt a kitten in three days", day(2023, 5, 11)),

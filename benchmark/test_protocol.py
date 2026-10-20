@@ -132,8 +132,12 @@ class ProtocolTests(unittest.TestCase):
         def fake(base, path, body=None, timeout=300):
             calls.append(path)
             if path.startswith("/api/v2/status"):
-                return {"embedding_gaps": {}, "ready": False}
+                # The job list is capped, so failures must be read from the status counts.
+                return {"embedding_gaps": {}, "ready": False,
+                        "jobs": [{"kind": "extract", "status": "failed", "count": 1},
+                                 {"kind": "project", "status": "succeeded", "count": 500}]}
             if path.startswith("/api/v2/jobs?"):
+                assert "status=failed" in path, path
                 return jobs
             return {"retry": True}
 

@@ -54,7 +54,7 @@
         "src/worker/mod.rs"
       ],
       "dev_before": "18 of 28 consolidations failed across the two dev banks",
-      "dev_after": "pending"
+      "dev_after": "all 38 consolidations of the two dev banks succeed; on conv-26 one job kept the newest 38 of 81 assertions"
     },
     {
       "version": "v3-harness-engine-restarts",
@@ -68,6 +68,21 @@
       ],
       "dev_before": "ingest stage exited on an engine restart",
       "dev_after": "resumed ingest waits through restarts"
+    },
+    {
+      "version": "v3-failed-job-visibility",
+      "date": "2026-10-20",
+      "dev_run": "locomo-dev-v2",
+      "finding": "Harness and API fault: /api/v2/jobs returns only the newest 100 jobs, and a LoCoMo bank makes hundreds of projection jobs, so the harness never saw conv-26's 12 failed consolidations and marked the bank ready.",
+      "change": "/api/v2/jobs accepts status=failed (and any other status). The harness decides readiness from the status endpoint, which counts every job, and fetches failed jobs by status to retry them.",
+      "files": [
+        "src/knowledge_store/jobs.rs",
+        "src/v2/mod.rs",
+        "benchmark/run.py",
+        "benchmark/test_protocol.py"
+      ],
+      "dev_before": "conv-26 reported ready with 12 failed consolidations",
+      "dev_after": "the 12 were found, retried on the v3 engine and succeeded; both dev banks have all 19 extractions and 19 consolidations"
     }
   ]
 }

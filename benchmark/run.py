@@ -337,15 +337,15 @@ def wait_ready(base, ns, poll=15, job_retries=2):
     retried = collections.Counter()
     while True:
         status = engine(base, f"/api/v2/status?namespace={urllib.parse.quote(ns)}")
-        jobs = engine(base, f"/api/v2/jobs?namespace={urllib.parse.quote(ns)}")
-        failed = [j for j in jobs if j["status"] == "failed"]
+        # The status counts every job; the job list is only the newest 100, so failures are fetched by status.
+        count = lambda *states: sum(g["count"] for g in status["jobs"] if g["status"] in states)
+        failed = engine(base, f"/api/v2/jobs?namespace={urllib.parse.quote(ns)}&status=failed") if count("failed") else []
         for job in failed:
             if retried[job["id"]] < job_retries:
                 retried[job["id"]] += 1
                 log(stage="retry_job", namespace=ns, job=job["id"], kind=job["kind"], error=str(job.get("error"))[:200])
                 engine(base, f"/api/v2/jobs/{job['id']}/retry?namespace={urllib.parse.quote(ns)}", {})
-        active = [j for j in jobs if j["status"] in ("pending", "running")]
-        if not active and all(retried[j["id"]] >= job_retries for j in failed):
+        if not count("pending", "running") and all(retried[j["id"]] >= job_retries for j in failed):
             if any(status.get("embedding_gaps", {}).values()) and not failed:
                 # Chunks are embedded in the background; wait for them unless a job is stuck.
                 time.sleep(poll)

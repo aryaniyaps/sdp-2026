@@ -144,12 +144,19 @@ async fn retain(
         json!({"episode_id":episode_id,"job_id":job_id,"created":created}),
     ))
 }
-#[utoipa::path(get,path="/api/v2/jobs",responses((status=200,body=Vec<Job>)),tag="Memory",params(("namespace"=String,Query)))]
+#[derive(Deserialize)]
+struct JobsQuery {
+    namespace: String,
+    status: Option<String>,
+}
+#[utoipa::path(get,path="/api/v2/jobs",responses((status=200,body=Vec<Job>)),tag="Memory",params(("namespace"=String,Query),("status"=Option<String>,Query)))]
 async fn jobs(
     State(s): State<Arc<AppState>>,
-    Query(q): Query<Namespace>,
+    Query(q): Query<JobsQuery>,
 ) -> Result<Json<Value>, AppError> {
-    Ok(Json(json!(s.store.jobs(&q.namespace).await?)))
+    Ok(Json(json!(
+        s.store.jobs(&q.namespace, q.status.as_deref()).await?
+    )))
 }
 #[utoipa::path(get,path="/api/v2/jobs/{id}",responses((status=200,body=Job)),tag="Memory",params(("namespace"=String,Query),("id"=Uuid,Path)))]
 async fn job(

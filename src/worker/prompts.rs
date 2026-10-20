@@ -197,9 +197,16 @@ mod tests {
         let render = |kept: &[Value]| crate::worker::consolidate_prompt(kept);
         let (kept, dropped) = fit_newest(&items, &limits, render);
         assert!(dropped > 0 && kept.len() >= 2, "kept {}", kept.len());
-        assert_eq!(kept[..], items[..kept.len()], "the newest are kept, in order");
+        assert_eq!(
+            kept[..],
+            items[..kept.len()],
+            "the newest are kept, in order"
+        );
         assert!(extraction_prompt_tokens(&render(&kept)) <= MAX_PROMPT_TOKENS);
-        assert_eq!(fit_newest(&items[..3], &limits, render), (items[..3].to_vec(), 0));
+        assert_eq!(
+            fit_newest(&items[..3], &limits, render),
+            (items[..3].to_vec(), 0)
+        );
     }
 
     use super::*;

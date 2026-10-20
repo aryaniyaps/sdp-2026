@@ -11,11 +11,14 @@ impl Store {
                 .ok_or(AppError::NotFound)?,
         ))
     }
-    pub async fn jobs(&self, namespace: &str) -> Result<Vec<Job>, AppError> {
+    /// The newest 100 jobs of a namespace, or of one status when `status` is given, so failed jobs
+    /// can be found however many projection jobs came after them.
+    pub async fn jobs(&self, namespace: &str, status: Option<&str>) -> Result<Vec<Job>, AppError> {
         Ok(sqlx::query(
-            "SELECT * FROM memory_jobs WHERE namespace=$1 ORDER BY created_at DESC LIMIT 100",
+            "SELECT * FROM memory_jobs WHERE namespace=$1 AND ($2::text IS NULL OR status=$2) ORDER BY created_at DESC LIMIT 100",
         )
         .bind(namespace)
+        .bind(status)
         .fetch_all(&self.pool)
         .await?
         .into_iter()
