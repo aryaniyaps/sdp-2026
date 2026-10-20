@@ -27,6 +27,8 @@ class PiTeacher:
     def __init__(self, cache_dir, usage_log=None, effort='low', attempts=2):
         self.provider = os.environ.get('PI_TEACHER_PROVIDER', 'openai')
         self.model = os.environ.get('PI_TEACHER_MODEL', 'gpt-5.6-sol')
+        # A provider that Pi loads as an extension (claude-bridge) is named by its entry file.
+        self.extension = os.environ.get('PI_TEACHER_EXTENSION')
         self.cache_dir = Path(cache_dir)/'pi'
         self.usage_log = usage_log
         self.effort = effort
@@ -47,8 +49,12 @@ class PiTeacher:
             cmd = ['pi', '--provider', self.provider, '--model', self.model,
                    '--no-extensions', '--no-skills', '--no-prompt-templates', '--no-context-files',
                    '--no-builtin-tools', '--no-session', '--thinking', body['effort'],
-                   '--system-prompt', instructions, '--mode', 'json', user]
-            result = subprocess.run(cmd, cwd=folder, capture_output=True, text=True, timeout=300)
+                   '--system-prompt', instructions, '--mode', 'json']
+            if self.extension:
+                cmd += ['-e', os.path.expanduser(self.extension)]
+            cmd.append(user)
+            result = subprocess.run(cmd, cwd=folder, capture_output=True, text=True,
+                                    timeout=int(os.environ.get('PI_TEACHER_TIMEOUT', '300')))
         if result.returncode:
             raise teacher.TeacherError(f'Pi exited {result.returncode}: {result.stderr[-500:]}')
         messages = []
