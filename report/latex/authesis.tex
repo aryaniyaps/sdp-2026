@@ -1,0 +1,258 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Long-Term Memory Engine for AI Agents -- B.Tech project report
+%% Built on the Anna University UG thesis template (BTECH_2026) by
+%% Dr. Bama Srinivasan: https://github.com/Bama-S/auist_thesis_template
+%%
+%% Compile:  latexmk -pdf authesis.tex
+%%     or :  pdflatex authesis; bibtex authesis; pdflatex authesis; pdflatex authesis
+%%
+%% Chapters live in the folders 1/ .. 5/, figures in figures/,
+%% references in publication.bib.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[13 pt,a4paper]{aureportm}
+\usepackage{needspace}
+\usepackage{mathptm}\usepackage{etex}
+\reserveinserts{28}
+\renewcommand{\normalsize}{\fontsize{13 pt}{14.6 pt}\selectfont}
+\usepackage[numbers,sort]{natbib}
+\usepackage{auphd}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage[none]{hyphenat}
+\usepackage[chapter]{algorithm}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{latexsym}
+\usepackage{verbatim}
+\usepackage{fancyvrb}
+\usepackage{ifthen}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{pslatex}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage[subfigure]{tocloft}
+\usepackage{subfigure}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{lscape}
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+
+\usepackage[format=hang,labelfont=bf,textfont=bf]{caption}
+\PassOptionsToPackage{linktocpage}{hyperref}
+\hypersetup{hidelinks}
+\tocloftpagestyle{myheadings}
+\newcommand{\PreserveBackslash}[1]{\let\temp=\\#1\let\\=\temp}
+\let\PBS=\PreserveBackslash
+
+\usepackage{colortbl}
+
+\floatstyle{ruled}
+\newfloat{algorithm}{htp}{loa}[chapter]
+\floatname{algorithm}{Algorithm}
+
+\pagenumbering{roman}
+\setcounter{page}{3}
+\renewcommand{\baselinestretch}{1.5}
+\providecommand{\tabularnewline}{\\}
+\newcommand{\bigsize}{\fontsize{15pt}{20pt}\selectfont}
+
+\author{M. Krithikraj, Alston S, Aryan I, Hari Srinivasan}
+\hypersetup{
+  pdftitle={Long-Term Memory Engine for AI Agents: Project Report},
+  pdfauthor={M. Krithikraj, Alston S, Aryan I, Hari Srinivasan}}
+
+\renewcommand{\cfttoctitlefont}{\bfseries\Large}
+\renewcommand{\cftlottitlefont}{\bfseries\Large}
+\renewcommand{\cftloftitlefont}{\bfseries\Large}
+
+\makeatletter
+\renewcommand{\@dotsep}{10}
+\makeatother
+\renewcommand{\cftdot}{ }
+\cftsetrmarg{1.2in}
+
+\titleformat{\section}[hang]{\bfseries}{\makebox[20mm][l]{\thesection}}{0pt}{}{}
+\titleformat{\subsection}[hang]{\bfseries}{\makebox[20mm][l]{\thesubsection}}{0pt}{}{}
+\titleformat{\subsubsection}[hang]{\normalsize\bfseries}{\makebox[20mm][l]{\thesubsubsection}}{0pt}{}{}
+\titleformat{\paragraph}[hang]{\normalsize\bfseries}{\makebox[20mm][l]{\theparagraph}}{0pt}{}{}
+\titleformat{\subparagraph}[hang]{\normalsize\bfseries}{\makebox[20mm][l]{\thesubparagraph}}{0pt}{}{}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Report-specific helpers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Indented "Maya example" block. The optional argument replaces the label,
+% e.g. \begin{maya}[Module 1 output on Maya.] ... \end{maya}
+\newenvironment{maya}[1][Maya example.]
+  {\begin{list}{}{\leftmargin=10mm\rightmargin=0mm\itemindent=0mm
+     \topsep=0.5\baselineskip\parsep=0.5\baselineskip}%
+   \item[]\textbf{#1}\ }
+  {\end{list}}
+
+% Code-like identifiers (namespaces, tables, API paths, model names)
+\newcommand{\code}[1]{\texttt{#1}}
+
+% Pseudocode box used inside the algorithm float
+\DefineVerbatimEnvironment{pseudo}{Verbatim}
+  {fontsize=\small,frame=single,framesep=3mm,xleftmargin=0mm}
+
+% Table helpers: small text, ragged columns, grid lines
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newenvironment{reporttable}
+  {\linespread{1}\small\renewcommand{\arraystretch}{1.25}\setlength{\tabcolsep}{4pt}}
+  {}
+
+\renewcommand{\topfraction}{0.9}\renewcommand{\bottomfraction}{0.8}\renewcommand{\textfraction}{0.07}\renewcommand{\floatpagefraction}{0.85}
+\setlength{\emergencystretch}{3em}
+\begin{document}
+
+\pagenumbering{roman}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Title page
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\thispagestyle{empty}
+\begin{center}
+  \LARGE
+  \textbf{LONG-TERM MEMORY ENGINE\\FOR AI AGENTS} \\
+  \vspace{0.6\baselineskip}
+  \bigsize{\textbf{A PROJECT REPORT}}\\
+  \vspace{0.4\baselineskip}
+  \normalsize{\textit{\textbf{Submitted by}}}\\
+  \vspace{0.5\baselineskip}
+  {\large
+  \begin{tabular}{@{}l@{\hspace{8mm}}l@{}}
+    \textbf{M. KRITHIKRAJ}    & \textbf{2023115004} \\
+    \textbf{ALSTON S}         & \textbf{2023115006} \\
+    \textbf{ARYAN I}          & \textbf{2023115021} \\
+    \textbf{HARI SRINIVASAN}  & \textbf{2023115022} \\
+  \end{tabular}}\\
+  \vspace{0.6\baselineskip}
+  \normalsize{\textit{submitted to the Faculty of}} \\
+  \vspace{0.5\baselineskip}
+  \normalsize{\textbf{COMPUTER SCIENCE AND}}\\
+  \normalsize{\textbf{INFORMATION ENGINEERING}} \\
+  \vspace{1\baselineskip}
+  \normalsize{\textit{in partial fulfillment for the award of the degree of}}\\
+  \vspace{.2\baselineskip}
+  \bigsize{{\textbf{BACHELOR OF TECHNOLOGY}}}\\
+  \normalsize{\textit{\textbf{in}}}\\
+  \bigsize{{\textbf{INFORMATION TECHNOLOGY}}}\\
+\end{center}
+\begin{center}
+  \includegraphics[scale=0.7]{auemblem.pdf} \\
+  \normalsize{\textbf{DEPARTMENT OF INFORMATION SCIENCE}}\\
+  \normalsize{\textbf{AND TECHNOLOGY}}\\
+  \normalsize{\textbf{COLLEGE OF ENGINEERING, GUINDY}}\\
+  \normalsize{\textbf{ANNA UNIVERSITY}}\\
+  \normalsize{\textbf{CHENNAI -- 600 025}}\\
+  \vspace{0.5\baselineskip}
+  \normalsize{\textbf{OCTOBER 2026}}
+\end{center}
+\pagebreak
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Bona fide certificate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter*{ANNA UNIVERSITY\\
+CHENNAI -- 600 025\\
+BONA FIDE CERTIFICATE}
+\newlength{\datewidth}
+\settowidth{\datewidth}{Chennai 600 025}
+
+\begin{spacing}{1.5}
+  \begin{sloppypar}
+  \fontsize{13}{14.5}\selectfont Certified that this project report titled
+  \textbf{LONG-TERM MEMORY ENGINE FOR AI AGENTS} is the bona fide work of
+  \textbf{M. KRITHIKRAJ (2023115004), ALSTON S (2023115006), ARYAN I (2023115021)}
+  and \textbf{HARI SRINIVASAN (2023115022)} who carried out the project work under
+  my supervision. Certified further that to the best of my knowledge and belief, the
+  work reported herein does not form part of any other thesis or dissertation on the
+  basis of which a degree or an award was conferred on an earlier occasion on this or
+  any other candidate.
+  \end{sloppypar}
+\end{spacing}
+\vspace{-0.3 cm}
+\begin{flushleft}
+ \parbox[t]{\datewidth}{\small{\textbf{PLACE: }}Chennai\\[1cm]
+ \small{\textbf{DATE: }}}
+ \hfill
+ \parbox[t]{7 cm}{\small{\textbf{DR. BAMA SRINIVASAN}} \\
+ \small{\textbf{PROJECT GUIDE}}\\
+ \small{Department of Information Science and Technology}\\
+ \small{College of Engineering, Guindy}\\
+ \small{Anna University, Chennai -- 600 025}
+ }
+\end{flushleft}
+\begin{center}
+ \small{\textbf{COUNTERSIGNED}}\\
+  \vspace{1.5 cm}
+ \small{\textbf{HEAD OF THE DEPARTMENT}}\\
+ \small{Department of Information Science and Technology}\\
+ \small{College of Engineering, Guindy}\\
+ \small{Anna University, Chennai -- 600 025}
+\end{center}
+
+\include{Abstract/abstract}
+\include{acknowl}
+
+\setlength\cftparskip{0pt}
+\setlength{\cftbeforetoctitleskip}{-3em}
+\setlength{\cftbeforelottitleskip}{-3em}
+\setlength{\cftbeforeloftitleskip}{-3em}
+\cftsetindents{chapter}{0 mm}{10 mm}
+\cftsetindents{section}{10 mm}{10 mm}
+\cftsetindents{subsection}{20 mm}{10 mm}
+\cftsetindents{subsubsection}{30 mm}{15 mm}
+\cftsetindents{paragraph}{40 mm}{20 mm}
+\cftsetindents{subparagraph}{50 mm} {20  mm}
+\cftsetindents{table}{10 mm}{10 mm}
+\cftsetindents{figure}{10 mm}{10 mm}
+
+\begin{onehalfspacing}
+\tableofcontents
+
+\pagebreak
+
+\addcontentsline{toc}{section}{\bfseries LIST OF TABLES}
+\listoftables
+
+\clearpage \addcontentsline{toc}{section}{\bfseries
+LIST OF FIGURES} \listoffigures
+\end{onehalfspacing}
+
+\include{Acronyms/acronyms}
+\include{Glossary/glossary}
+
+\pagenumbering{arabic}
+
+% Fix the reference numbering to the order used in the report
+\nocite{liu2024lost,wu2025longmemeval,packer2023memgpt,rasmussen2025zep,
+chhikara2025mem0,daga2026supermemory,latimer2025hindsight,neo4j2026http,
+zechner2026pi,postgres2026fts,kane2026pgvector,cormack2009rrf,
+zhang2025qwen3emb,dettmers2023qlora,maharana2024locomo}
+
+\ausection
+\include{1/Chapter1}
+\include{2/Chapter2}
+\include{3/Chapter3}
+\include{4/Chapter4}
+\include{5/Chapter5}
+
+\bibliographystyle{IEEEtran}
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{REFERENCES}
+\begin{spacing}{1}
+\bibliography{publication}
+\end{spacing}
+
+\end{document}

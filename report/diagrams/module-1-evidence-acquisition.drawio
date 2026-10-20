@@ -1,0 +1,109 @@
+<mxfile host="Electron">
+  <diagram name="Page-1" id="0">
+    <mxGraphModel grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="pi" parent="1" style="rounded=1;arcSize=12;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=19;fontFamily=Helvetica;whiteSpace=wrap;html=1;" value="Evidence collector&lt;br&gt;(Pi agent)" vertex="1">
+          <mxGeometry height="60" width="249" x="74" y="12" as="geometry" />
+        </mxCell>
+        <mxCell id="spool" parent="1" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#f5f5f5;strokeColor=#666666;fontSize=19;fontFamily=Helvetica;whiteSpace=wrap;html=1;" value="Local spool" vertex="1">
+          <mxGeometry height="80" width="170" x="113.5" y="197" as="geometry" />
+        </mxCell>
+        <mxCell id="api" parent="1" style="rounded=1;arcSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=19;fontFamily=Helvetica;whiteSpace=wrap;html=1;" value="Retain API" vertex="1">
+          <mxGeometry height="60" width="170" x="113.5" y="402" as="geometry" />
+        </mxCell>
+        <mxCell id="wr" parent="1" style="rounded=1;arcSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=19;fontFamily=Helvetica;whiteSpace=wrap;html=1;" value="Evidence writer&lt;br&gt;(validate, dedupe)" vertex="1">
+          <mxGeometry height="60" width="294" x="51.5" y="507" as="geometry" />
+        </mxCell>
+        <mxCell id="pg" parent="1" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#f5f5f5;strokeColor=#666666;fontSize=19;fontFamily=Helvetica;whiteSpace=wrap;html=1;" value="PostgreSQL&lt;br&gt;(episodes, chunks)" vertex="1">
+          <mxGeometry height="80" width="275" x="12" y="692" as="geometry" />
+        </mxCell>
+        <mxCell id="jobs" parent="1" style="shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#f5f5f5;strokeColor=#666666;fontSize=19;fontFamily=Helvetica;whiteSpace=wrap;html=1;" value="Job queue" vertex="1">
+          <mxGeometry height="80" width="170" x="317" y="692" as="geometry" />
+        </mxCell>
+        <mxCell id="emb" parent="1" style="rounded=1;arcSize=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=19;fontFamily=Helvetica;whiteSpace=wrap;html=1;" value="Qwen3 embedding" vertex="1">
+          <mxGeometry height="60" width="172" x="46.33" y="897" as="geometry" />
+        </mxCell>
+        <mxCell id="wk" parent="1" style="rounded=1;arcSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=19;fontFamily=Helvetica;whiteSpace=wrap;html=1;" value="Tokio workers&lt;br&gt;(lease, retry)" vertex="1">
+          <mxGeometry height="60" width="235" x="284.5" y="897" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" parent="1" style="rounded=1;arcSize=12;dashed=1;fillColor=#ffffff;strokeColor=#333333;fontSize=19;fontFamily=Helvetica;whiteSpace=wrap;html=1;" value="Module 2" vertex="1">
+          <mxGeometry height="50" width="150" x="327" y="1002" as="geometry" />
+        </mxCell>
+        <mxCell id="edge1" edge="1" parent="1" source="pi" style="rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="spool" value="messages">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="198.5" y="134.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge2" edge="1" parent="1" source="spool" style="rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="api" value="POST /retain">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="198.5" y="339.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge3" edge="1" parent="1" source="api" style="rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="wr" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="198.5" y="484.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge4" edge="1" parent="1" source="wr" style="rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.3333;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="pg" value="save evidence">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="149.5" y="629.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge5" edge="1" parent="1" source="wr" style="rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.6667;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="jobs" value="extract job">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="30.75" y="46.5" as="offset" />
+            <Array as="points">
+              <mxPoint x="247.5" y="583" />
+              <mxPoint x="402" y="583" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge6" edge="1" parent="1" source="pg" style="rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.6667;exitY=1;entryX=0.6667;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="emb" value="chunk text">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint y="-17.16" as="offset" />
+            <Array as="points">
+              <mxPoint x="195.33" y="868" />
+              <mxPoint x="161" y="868" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge7" edge="1" parent="1" source="emb" style="rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.3334;exitY=0;entryX=0.3333;entryY=1;edgeStyle=orthogonalEdgeStyle;" target="pg" value="vectors">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="103.67" y="834.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge8" edge="1" parent="1" source="jobs" style="rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="wk" value="claim">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="402" y="834.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge9" edge="1" parent="1" source="wk" style="rounded=0;html=1;endArrow=block;endFill=1;strokeColor=#333333;fontSize=16;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="m2" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="402" y="979.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

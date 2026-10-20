@@ -1,0 +1,74 @@
+% Chapter 1
+
+\chapter{\uppercase{Introduction}}
+\label{ch:intro}
+AI agents are now used for coding projects that go on for weeks over many sessions,
+and every new session starts with an empty prompt. Whatever the user told the agent last
+week  is simply gone unless the user types it in
+again.  This project gives the agent a long-term memory outside the model.
+
+\section{\uppercase{Background}}
+The obvious fix is to paste the whole history into the prompt every time. This does
+not work well. Liu et al.\ \cite{liu2024lost} showed that language models use long inputs unevenly
+and miss details that sit in the middle of the context. Old statements also sit right next
+to their corrections with no rule for which one is current.
+
+So a memory component has to decide what to keep and what to give back for a
+question. We built this as a separate service for a coding
+agent (Pi \cite{zechner2026pi}). It stores the original messages, pulls facts out of them, remembers
+when a fact changed, and when the agent asks, returns only the relevant facts along with
+the quote they came from.
+
+The word \emph{memory} in this report always means this kind of stored knowledge
+about the user and the project, not RAM or any other computer memory. Since a few
+other terms are also used in a specific sense, they are listed in the Glossary.
+
+The engine has five modules: M1 saves the original messages (Evidence Acquisition
+and Processing), M2 pulls facts out of them (Knowledge Extraction and Consolidation),
+M3 stores the facts with their history (Temporal Knowledge and Graph Management),
+M4 finds the right facts for a question (Hybrid Retrieval and Grounded Reasoning) and
+M5 trains the small local model the others use (Model Training and Evaluation). M1 to
+M4 make up the memory service and M5 is an offline pipeline.
+
+\section{\uppercase{Problem Statement}}
+Agents without persistent memory lose instructions and project decisions when a task
+continues across sessions, and when an instruction changes they may reuse the old
+value. Users end up repeating context and fixing the same mistakes again.
+
+Throughout the report we use one small example, a user called Maya. On 1 October
+2026 she tells the agent ``My name is Maya. I live in Chennai. I work as a software
+engineer at NovaTech, and I work remotely.'' (we call this message E1). On 10 October
+she says she has moved to Bengaluru (E3). On 13 October she asks what the agent
+remembers about where she lives, her previous city and her work (E5).
+
+An agent with no memory can't answer E5, and one that only kept E1 would
+confidently say Chennai, which is worse. We want it to know Bengaluru replaced
+Chennai on 10 October and still keep Chennai as her previous city.
+
+\section{\uppercase{Objectives}}
+\begin{enumerate}[itemsep=0pt]
+\item Retain useful information for AI agents across sessions.
+\item Keep the updated instruction while preserving the earlier versions.
+\item Link every stored fact back to the original message so it can be verified.
+\item Fine-tune a small local model to extract facts, combine related facts and answer
+from evidence.
+\item Retrieve relevant information quickly within a limited context size.
+\item Evaluate memory accuracy and retrieval with repeatable tests, including the
+LongMemEval-S benchmark \cite{wu2025longmemeval}.
+\end{enumerate}
+
+\section{\uppercase{Challenges Faced}}
+On the fine-tuning side, our early models did well on generated test data but
+struggled on real conversations (only 18 of 33 conversation segments passed the
+extraction checks). The models also mixed up quotations, source references and dates.
+ We revised the data, prompts and validation several times. One issue we have not solved: fine-tuning made combining facts and answering
+questions much better, but fact coverage dropped from 50/55 to 41/55.
+
+On the integration side the model sometimes re-extracted an outdated value, so
+correction handling had to be reworked. Repeated messages made duplicates and one failed job could block the rest. The
+hardest bug to notice was that the deployed model silently cut off inputs longer than its
+limit, so now we check input length and split long conversations into smaller pieces.
+
+\section{\uppercase{Organisation of the Report}}
+Chapter~\ref{ch:survey} reviews existing memory systems, Chapter~\ref{ch:design} the architecture and modules,
+Chapter~\ref{ch:impl} the tools and algorithms, and Chapter~\ref{ch:results} the data, fine-tuning, demo and results.

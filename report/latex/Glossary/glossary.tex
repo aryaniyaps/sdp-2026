@@ -1,0 +1,43 @@
+\chapter*{GLOSSARY}
+\addcontentsline{toc}{section}{\bfseries GLOSSARY}
+
+Some everyday computing words are used with a narrower meaning in this report.
+The meanings below are the ones we use throughout.
+
+\setlongtables
+\begin{longtable}
+  {>{\PBS\raggedright\hspace{0pt}\bfseries}p{3.6cm}@{}%
+    >{\PBS\raggedright\hspace{0pt}}p{10.6cm}@{}}
+  Memory        & Knowledge about a user or project that the agent keeps across sessions (facts, observations and the messages they came from). It does \emph{not} mean RAM, cache, disk or any other computer memory. \\
+  Long-term memory & Memory that survives after a session ends, as opposed to what is only in the current prompt. \\
+  Agent         & An AI program (here, the Pi coding agent) that talks to the user and carries out tasks using a language model and tools. \\
+  Harness       & The program around the model that runs the agent: it builds prompts, calls tools and in our case talks to the memory service. \\
+  Session       & One continuous conversation between the user and the agent. A new session starts with an empty prompt. \\
+  Context / context window & The text the model can read at one time (its prompt). Its size is limited and measured in tokens. \\
+  Token         & A small piece of text (a word or part of a word) that the model reads. Budgets and limits are counted in tokens. \\
+  Namespace     & A label such as \texttt{user:maya} that keeps one user's or project's memory separate from another's. \\
+  Evidence      & The original messages exactly as they were sent, stored before anything is extracted from them. \\
+  Episode       & One batch of messages saved together by a single retain request. \\
+  Event         & A single message (with role and timestamp) inside an episode. \\
+  Chunk         & A piece of an episode's text that is stored and embedded for search. \\
+  Spool         & A local folder of files on the client where batches wait if the memory service can't be reached. \\
+  Job / worker  & A job is a stored task (e.g.\ ``extract facts from this episode''); a worker is a background process that picks up and runs jobs. \\
+  Lease         & A time-limited lock a worker takes on a namespace so that two workers don't process it at the same time. \\
+  Claim         & A fact proposed by the model before the system has checked and stored it. \\
+  Fact / assertion & A stored statement about an entity, e.g.\ ``Maya lives in Bengaluru'', with its source quote and validity. \\
+  Entity        & A person, project, place or thing that facts are about. \\
+  Observation   & A higher-level statement built from at least two supporting facts. \\
+  Consolidation & The step that combines related facts into an observation. \\
+  Invalidation  & Marking an observation stale when one of the facts it depends on changes. \\
+  Supersede     & To replace a fact's value with a newer one while keeping the old fact as history. \\
+  Validity interval & The time range during which a fact was true, e.g.\ Chennai from 1 to 10 October. \\
+  Embedding / vector & A list of numbers representing the meaning of a text, used to find similar texts. \\
+  Retrieval / recall & Finding the stored memories relevant to a question and returning them to the agent. \\
+  Projection    & The copy of facts and entities kept in Neo4j as a graph. It can be rebuilt from PostgreSQL. \\
+  Reflection    & An optional step where the model writes an answer from retrieved memories, with citations. \\
+  Grounded answer & An answer in which every statement is backed by a cited, retrieved memory. \\
+  Fine-tuning   & Further training of an existing model on our own data so it does a specific task better. \\
+  Adapter       & The small set of extra weights trained by LoRA/QLoRA; the base model itself stays frozen. \\
+  Quantisation  & Storing model weights with fewer bits (e.g.\ 4-bit or 8-bit) so the model uses less memory and runs faster. Here ``memory'' does mean computer memory. \\
+  Teacher model & A larger model (GPT-5.6-sol) used to write the expected outputs for our training data. \\
+\end{longtable}
