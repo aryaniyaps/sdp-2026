@@ -42,6 +42,17 @@ LIMIT 100
         ));
         assertion["kind"] = kind;
     }
+    // A long conversation gives its speakers hundreds of assertions; the newest that fit are kept.
+    if let Some(limits) = state.model.context_limits() {
+        let (kept, dropped) = fit_newest(&assertions, &limits, consolidate_prompt);
+        if dropped > 0 {
+            tracing::warn!(
+                namespace=%job.namespace, job_id=%job.id, dropped, kept=kept.len(),
+                "oldest assertions left out of consolidation to fit the local model context"
+            );
+        }
+        assertions = kept;
+    }
     if assertions.len() < 2 {
         return Ok(json!({"inference_ids":[],"reason":"fewer than two active assertions"}));
     }

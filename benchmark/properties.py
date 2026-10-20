@@ -135,7 +135,7 @@ def scenarios(seed):
 
 def retain(base, ns, scenario):
     for index, s in enumerate(scenario["sessions"]):
-        bench.api(base, "/api/v2/retain", {
+        bench.engine(base, "/api/v2/retain", {
             "namespace": ns, "session_id": f"session_{index + 1}", "external_id": f"{scenario['id']}:session_{index + 1}",
             "events": [{"role": "user", "content": t, "occurred_at": s["date"], "metadata": {"turn": j}}
                        for j, t in enumerate(s["turns"])],
@@ -149,13 +149,13 @@ def mentions(text, value):
 
 
 def recall(base, ns, query, asked, **extra):
-    return bench.api(base, "/api/v2/recall", {"namespace": ns, "query": query, "reference_date": asked,
+    return bench.engine(base, "/api/v2/recall", {"namespace": ns, "query": query, "reference_date": asked,
                                               "max_tokens": bench.CONFIG["context_budget"],
                                               "top_k": bench.CONFIG["top_k"], **extra}, timeout=900)
 
 
 def check(base, ns, scenario):
-    graph = bench.api(base, f"/api/v2/graph?namespace={urllib.parse.quote(ns)}")
+    graph = bench.engine(base, f"/api/v2/graph?namespace={urllib.parse.quote(ns)}")
     assertions = [a for a in graph["assertions"] if a["kind"] != "inference"]
     active = [a for a in assertions if a["status"] in ("active", "contested")]
     family, checks, responses = scenario["family"], {}, {}
@@ -179,9 +179,9 @@ def check(base, ns, scenario):
         checks["relative_date_resolved"] = any(
             (a.get("event_at") or "")[:10] == scenario["expect_date"] for a in hits)
     elif family == "abstention":
-        unknown = responses["reflect_unknown"] = bench.api(base, "/api/v2/reflect", {
+        unknown = responses["reflect_unknown"] = bench.engine(base, "/api/v2/reflect", {
             "namespace": ns, "query": scenario["question"], "reference_date": scenario["asked"]}, timeout=900)
-        known = responses["reflect_control"] = bench.api(base, "/api/v2/reflect", {
+        known = responses["reflect_control"] = bench.engine(base, "/api/v2/reflect", {
             "namespace": ns, "query": scenario["control"], "reference_date": scenario["asked"]}, timeout=900)
         checks["abstains_without_evidence"] = bool(unknown.get("insufficient_evidence"))
         checks["answers_with_evidence"] = not known.get("insufficient_evidence") and mentions(known.get("answer"), scenario["expect"])

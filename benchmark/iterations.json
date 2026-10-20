@@ -41,6 +41,33 @@
       ],
       "dev_before": "session recall 0 on every item",
       "dev_after": "conv-26:q0 session recall 1.0, 26/26 quotes verbatim"
+    },
+    {
+      "version": "v3-consolidation-budget",
+      "date": "2026-10-20",
+      "dev_run": "locomo-dev-v2",
+      "finding": "Once a LoCoMo speaker had about a dozen sessions of assertions, every consolidation job for that speaker failed before sending a request: up to 100 active assertions made a prompt of about 12,100 tokens, over the 12,288-token context once the 3,072-token answer is reserved. conv-30 lost 6 of its first 10 consolidations and conv-26 12; such a bank gets no inferences for its main speakers.",
+      "change": "Consolidation keeps the newest assertions whose prompt fits the context with a repair reserve and no more than the 6,000-token prompts the student was trained on (fit_newest, the same bound extraction uses), and logs how many it left out. Unit test consolidation_keeps_the_newest_assertions_that_fit.",
+      "files": [
+        "src/worker/prompts.rs",
+        "src/worker/consolidation.rs",
+        "src/worker/mod.rs"
+      ],
+      "dev_before": "18 of 28 consolidations failed across the two dev banks",
+      "dev_after": "pending"
+    },
+    {
+      "version": "v3-harness-engine-restarts",
+      "date": "2026-10-20",
+      "dev_run": "locomo-dev-v2",
+      "finding": "Harness fault: restarting the engine while a bank was being built crashed the ingest stage (connection refused) instead of waiting for the engine to return.",
+      "change": "Every engine call in ingest, recall and the property suite retries for about 15 minutes before giving up.",
+      "files": [
+        "benchmark/run.py",
+        "benchmark/properties.py"
+      ],
+      "dev_before": "ingest stage exited on an engine restart",
+      "dev_after": "resumed ingest waits through restarts"
     }
   ]
 }

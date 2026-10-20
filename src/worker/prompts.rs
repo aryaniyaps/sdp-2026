@@ -98,6 +98,36 @@ fn mention_strength(assertion: &Value, batch_words: &[String]) -> u8 {
     score("subject", 3) + score("value", 2)
 }
 
+/// Keep the longest prefix of `items`, which must be newest first, whose prompt fits a local model's
+/// context with room for the answer and a repair round, and is no longer than the prompts the student
+/// was trained on. Returns the kept items and how many were dropped. Deterministic, so a retry builds
+/// the identical prompt.
+pub fn fit_newest(
+    items: &[Value],
+    limits: &OllamaLimits,
+    render: impl Fn(&[Value]) -> String,
+) -> (Vec<Value>, usize) {
+    let budget = limits.prompt_budget();
+    let target = budget
+        .saturating_sub(REPAIR_RESERVE_TOKENS.min(budget / 4))
+        .min(MAX_PROMPT_TOKENS);
+    let fits = |count: usize| extraction_prompt_tokens(&render(&items[..count])) <= target;
+    if fits(items.len()) {
+        return (items.to_vec(), 0);
+    }
+    // A longer prefix never shortens the prompt, so the largest fitting one is found by bisection.
+    let (mut low, mut high) = (0, items.len());
+    while low < high {
+        let middle = (low + high).div_ceil(2);
+        if fits(middle) {
+            low = middle;
+        } else {
+            high = middle - 1;
+        }
+    }
+    (items[..low].to_vec(), items.len() - low)
+}
+
 /// Shrink the existing-assertions snapshot until the extract prompt fits a local model's context,
 /// leaving room for the answer and a repair round. Returns the kept assertions in their original
 /// order and how many were dropped. Assertions whose subject or value appears as whole words in the
@@ -157,6 +187,21 @@ pub fn fit_existing_assertions(
 /// tries again.
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn consolidation_keeps_the_newest_assertions_that_fit() {
+        let limits = OllamaLimits::new(12288, 3072).unwrap();
+        // A LoCoMo speaker after a dozen sessions: 100 active assertions of about 120 tokens each.
+        let items: Vec<Value> = (0..100)
+            .map(|i| serde_json::json!({"id": i, "statement": format!("assertion {i} {}", "word ".repeat(80))}))
+            .collect();
+        let render = |kept: &[Value]| crate::worker::consolidate_prompt(kept);
+        let (kept, dropped) = fit_newest(&items, &limits, render);
+        assert!(dropped > 0 && kept.len() >= 2, "kept {}", kept.len());
+        assert_eq!(kept[..], items[..kept.len()], "the newest are kept, in order");
+        assert!(extraction_prompt_tokens(&render(&kept)) <= MAX_PROMPT_TOKENS);
+        assert_eq!(fit_newest(&items[..3], &limits, render), (items[..3].to_vec(), 0));
+    }
+
     use super::*;
     use serde_json::json;
 

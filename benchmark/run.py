@@ -68,6 +68,11 @@ def api(base, path, body=None, timeout=300):
         return json.load(response)
 
 
+def engine(base, path, body=None, timeout=300):
+    """An engine call that rides out a restart: about 15 minutes of retries before it gives up."""
+    return retry(lambda: api(base, path, body, timeout), "engine", attempts=10)
+
+
 def parallel(function, items, workers):
     """Runs function over items; the first failure stops the stage once running calls finish."""
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
@@ -331,14 +336,14 @@ def wait_ready(base, ns, poll=15, job_retries=2):
     permanent failure, so one bad session is recorded instead of stopping the whole run."""
     retried = collections.Counter()
     while True:
-        status = api(base, f"/api/v2/status?namespace={urllib.parse.quote(ns)}")
-        jobs = api(base, f"/api/v2/jobs?namespace={urllib.parse.quote(ns)}")
+        status = engine(base, f"/api/v2/status?namespace={urllib.parse.quote(ns)}")
+        jobs = engine(base, f"/api/v2/jobs?namespace={urllib.parse.quote(ns)}")
         failed = [j for j in jobs if j["status"] == "failed"]
         for job in failed:
             if retried[job["id"]] < job_retries:
                 retried[job["id"]] += 1
                 log(stage="retry_job", namespace=ns, job=job["id"], kind=job["kind"], error=str(job.get("error"))[:200])
-                api(base, f"/api/v2/jobs/{job['id']}/retry?namespace={urllib.parse.quote(ns)}", {})
+                engine(base, f"/api/v2/jobs/{job['id']}/retry?namespace={urllib.parse.quote(ns)}", {})
         active = [j for j in jobs if j["status"] in ("pending", "running")]
         if not active and all(retried[j["id"]] >= job_retries for j in failed):
             if any(status.get("embedding_gaps", {}).values()) and not failed:
@@ -357,7 +362,7 @@ def ingest(run, banks, base):
         if path.exists():
             return
         ns, start = namespace(run, bank["bank"]), time.monotonic()
-        jobs = [api(base, "/api/v2/retain", retain_payload(run, bank["bank"], s))["job_id"] for s in bank["sessions"]]
+        jobs = [engine(base, "/api/v2/retain", retain_payload(run, bank["bank"], s))["job_id"] for s in bank["sessions"]]
         status = wait_ready(base, ns)
         if status["permanently_failed_jobs"]:
             log(stage="bank_incomplete", bank=bank["bank"], failed=status["permanently_failed_jobs"])
@@ -400,7 +405,7 @@ def recall(run, items, base, conditions):
             "top_k": CONFIG["top_k"],
             **CONDITIONS[condition]["recall"],
         }
-        response = retry(lambda: api(base, "/api/v2/recall", request, timeout=900), "engine")
+        response = engine(base, "/api/v2/recall", request, timeout=900)
         response["request"] = request
         if response["degraded_reasons"]:
             # Kept and counted in the report (degraded_recalls) rather than stopping the run.

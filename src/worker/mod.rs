@@ -22,7 +22,7 @@ mod review;
 mod secrets;
 mod window;
 pub use consolidation::{CONSOLIDATE_TEMPLATE, consolidate_prompt};
-pub use prompts::{EXTRACT_TEMPLATE, extract_prompt, fill_template, fit_existing_assertions};
+pub use prompts::{EXTRACT_TEMPLATE, extract_prompt, fill_template, fit_existing_assertions, fit_newest};
 pub use secrets::leaks_secret;
 pub use window::{WINDOW_EVENT_TOKENS, compact_event, shorten_content, windows};
 
