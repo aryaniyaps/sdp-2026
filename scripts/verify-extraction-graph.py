@@ -71,7 +71,7 @@ def main():
         receipt['health'] = request('/healthz')
         initial = retain('initial', "Project Orion's database is PostgreSQL.")
         old = assertions_with(initial, 'PostgreSQL')
-        check('initial_fact_active', old and old[0]['status'] == 'active')
+        check('initial_assertion_active', old and old[0]['status'] == 'active')
         old = old[0]
         check('database_entity_extracted', any(e['name'] == 'PostgreSQL' and e['entity_type'] == 'technology'
                                                 for e in initial['entities']))
