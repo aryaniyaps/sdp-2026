@@ -67,6 +67,34 @@ pub(super) async fn review(
     unreachable!("review loop always returns")
 }
 
+/// Wording that states a change of value outright. The review model sometimes vetoes a correction
+/// whose quote says "I moved from Hobart to Accra"; these phrases keep such a correction. They never
+/// make an ordinary claim a correction, so a match can only keep what the extractor proposed.
+const CHANGE_WORDS: [&str; 14] = [
+    "moved from",
+    "moved out of",
+    "relocated from",
+    "switched from",
+    "switched to",
+    "changed from",
+    "changed my",
+    "no longer",
+    "not anymore",
+    "left my job",
+    "started a new job",
+    "sold my",
+    "replaced my",
+    "correction:",
+];
+
+fn states_change(quotes: &[String]) -> bool {
+    quotes.iter().any(|quote| {
+        let quote = quote.to_lowercase();
+        CHANGE_WORDS.iter().any(|words| quote.contains(words))
+            || (quote.contains(" left ") && quote.contains(" and started"))
+    })
+}
+
 fn apply_review(
     extraction: &Extraction,
     output: Value,
@@ -97,8 +125,9 @@ fn apply_review(
         } else if !review.change_quote.is_empty() {
             return Err(invalid("a non-correction must have empty change evidence"));
         }
-        // Review may veto a proposed correction, never promote an ordinary claim to one.
-        if claim.correction && !review.explicit_change {
+        // Review may veto a proposed correction, never promote an ordinary claim to one. A veto is
+        // overruled when the claim's own quote states the change in words ("moved from", "no longer").
+        if claim.correction && !review.explicit_change && !states_change(&claim.quotes) {
             claim.correction = false;
             claim.explanation = "Conflicting report; source does not confirm replacement.".into();
             for relation in &mut claim.related {
@@ -155,6 +184,25 @@ mod tests {
     fn output(explicit: bool, quote: &str, name: &str) -> Value {
         json!({"reviews":[{"claim_index":0,"explicit_change":explicit,"change_quote":quote,
             "entities":[{"name":name,"entity_type":"technology"}]}]})
+    }
+
+    #[test]
+    fn a_veto_does_not_undo_a_change_the_quote_states() {
+        let text = "Big news: I moved from Hobart to Accra last weekend, so I live in Accra now.";
+        let (claims, events) = fixture(text, true);
+        let reviewed = apply_review(&claims, output(false, "", "Accra"), &events).unwrap();
+        assert!(
+            reviewed.claims[0].correction,
+            "a stated move stays a correction"
+        );
+        // A stated change never makes an ordinary claim a correction.
+        let (claims, events) = fixture(text, false);
+        let reviewed = apply_review(&claims, output(false, "", "Accra"), &events).unwrap();
+        assert!(!reviewed.claims[0].correction);
+        assert!(!states_change(&["I live in Accra these days.".into()]));
+        assert!(states_change(&[
+            "I left Northwind and started a new job at Juniper Bank".into()
+        ]));
     }
 
     #[test]

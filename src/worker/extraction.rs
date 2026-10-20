@@ -125,11 +125,11 @@ LIMIT 80
     Ok(outcome)
 }
 
-/// The student copies the time a message was sent into `event_at` even when the quote says
-/// "yesterday" or "in three days". When the claim's own quotes name exactly one relative day and the
-/// model's date is the day the message was sent, the date moves to the day the quote names: in
-/// `event_at`, in `valid_from` when it was the same instant, and where the statement spells it out.
-/// `source_indices` must still index `events`.
+/// The student often copies the time a message was sent into `event_at` when the quote says
+/// "yesterday", and sometimes miscounts "in three days". When the claim's own quotes name exactly one
+/// relative day, that day is the event date: in `event_at`, in `valid_from` when it was the same
+/// instant, and where the statement spells out the model's date. `source_indices` must still index
+/// `events`.
 pub(crate) fn resolve_relative_day(claim: &mut ClaimInput, events: &[SourceEvent]) {
     let Some(said) = claim
         .source_indices
@@ -139,16 +139,14 @@ pub(crate) fn resolve_relative_day(claim: &mut ClaimInput, events: &[SourceEvent
     else {
         return;
     };
-    let Some(event_at) = claim
-        .event_at
-        .filter(|at| at.date_naive() == said.date_naive())
-    else {
+    let Some(event_at) = claim.event_at else {
         return;
     };
     let Some(day) = crate::temporal::mentioned_day(&claim.quotes.join(" "), said) else {
         return;
     };
-    let shift = day - said.date_naive();
+    let given = event_at.date_naive();
+    let shift = day - given;
     if shift.is_zero() {
         return;
     }
@@ -158,7 +156,7 @@ pub(crate) fn resolve_relative_day(claim: &mut ClaimInput, events: &[SourceEvent
     }
     for format in ["%Y-%m-%d", "%-d %B %Y", "%B %-d, %Y"] {
         let (old, new) = (
-            said.date_naive().format(format).to_string(),
+            given.format(format).to_string(),
             day.format(format).to_string(),
         );
         claim.statement = claim.statement.replace(&old, &new);
@@ -336,6 +334,18 @@ mod repair_tests {
             copied.statement,
             "Caroline attended an LGBTQ support group on 2023-05-07."
         );
+        // A miscounted date is corrected too: "in three days" from 8 May is 11 May, not 12 May.
+        let mut miscounted = claim(
+            "I will present at the review in three days",
+            Some(said + chrono::Duration::days(4)),
+        );
+        miscounted.statement = "Caroline will present on 2023-05-12.".into();
+        resolve_relative_day(&mut miscounted, &events);
+        assert_eq!(
+            miscounted.event_at.unwrap().date_naive().to_string(),
+            "2023-05-11"
+        );
+        assert_eq!(miscounted.statement, "Caroline will present on 2023-05-11.");
         // A date the model already resolved, a quote without a relative day, or no date stays as it is.
         let resolved = said - chrono::Duration::days(1);
         for (quote, event_at) in [

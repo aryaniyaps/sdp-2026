@@ -83,6 +83,19 @@
       ],
       "dev_before": "conv-26 reported ready with 12 failed consolidations",
       "dev_after": "the 12 were found, retried on the v3 engine and succeeded; both dev banks have all 19 extractions and 19 consolidations"
+    },
+    {
+      "version": "v4-stated-changes-and-miscounted-days",
+      "date": "2026-10-20",
+      "dev_run": "properties-dev-v3",
+      "finding": "Property suite on the v3 engine: in 4 of 12 knowledge updates ('Big news: I moved from Hobart to Accra last weekend, so I live in Accra now') the extractor proposed a correction and the review model vetoed it ('source does not confirm replacement'), leaving both cities contested. In 'I will present at the design review in three days' said on 11 April the model wrote 15 April, which the v2 rule left alone because it only corrected copied message dates.",
+      "change": "A correction is not vetoed when its own quote states the change in words (moved from, switched to, no longer, sold my, left ... and started, correction:); the guard never turns an ordinary claim into a correction. The relative-day rule now also replaces a miscounted model date. The review prompt (a frozen model contract) is unchanged. Unit tests a_veto_does_not_undo_a_change_the_quote_states and the miscounted case in a_relative_day_in_the_quote_moves_a_copied_message_date.",
+      "files": [
+        "src/worker/review.rs",
+        "src/worker/extraction.rs"
+      ],
+      "dev_before": "knowledge_update old value superseded 8/12; relative_date resolved 8/12 (3 of the 4 misses were events never extracted)",
+      "dev_after": "pending"
     }
   ]
 }
