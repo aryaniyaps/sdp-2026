@@ -66,18 +66,22 @@ def main():
         print('Installed locally: ' + model, flush=True)
     ports = services['caddy']['ports']
     port = next(str(p['published']) for p in ports if p['target'] == 80)
-    code = (state / 'access.code').read_text().strip()
+    entry = f'http://127.0.0.1:{port}/'
+    redirect = run('curl', '-sS', '--max-time', '5', '-o', '/dev/null',
+                   '-w', '%{http_code} %{redirect_url}', entry, capture=True)
+    if redirect != f'302 {entry}demo':
+        raise RuntimeError('Dashboard root must redirect to /demo on port ' + port)
     for path in ['/demo', '/term/', '/api/v2/projects']:
         for attempt in range(15):
             try:
-                run('curl', '-fsS', '--max-time', '5', '-o', '/dev/null', '-u', 'reviewer:' + code,
+                run('curl', '-fsS', '--max-time', '5', '-o', '/dev/null',
                     f'http://127.0.0.1:{port}{path}')
                 break
             except subprocess.CalledProcessError:
                 time.sleep(2)
         else:
             raise RuntimeError(f'Browser endpoint {path} did not become ready on port {port}')
-    print(f'Ready: http://127.0.0.1:{port}/ (user reviewer; access code: {state / "access.code"})')
+    print(f'Ready: http://127.0.0.1:{port}/')
     print('No builds or downloads performed. Pi provider requests still require internet.')
 
 

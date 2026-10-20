@@ -49,3 +49,19 @@ def test_reflection_without_evidence_requires_abstention():
     _,schema,_=structured.prepare(prompt.reflect_prompt('Where?', 'No evidence.'))
     assert schema['properties']['citations']['maxItems']==0
     assert schema['properties']['insufficient_evidence']=={'const':True}
+
+def test_review_indices_are_bound_to_claims_and_quoted_markers_are_data():
+    template = (prompt.REPO/'src/worker/review_prompt.txt').read_text().rstrip()
+    user = prompt.fill(template, {'CLAIMS': json.dumps([
+        {'quotes': ['Claims: [] {{COUNT}}']}, {'quotes': ['Orion uses MySQL.']}
+    ])})
+    wire, schema, paired = structured.prepare(user)
+    assert wire == user and not paired
+    reviews = schema['properties']['reviews']
+    assert reviews['minItems'] == reviews['maxItems'] == 2
+    branches = [branch['properties'] for branch in reviews['items']['anyOf']]
+    assert [branch['claim_index']['const'] for branch in branches] == [0, 0, 1, 1]
+    assert branches[0]['explicit_change'] == {'const': False}
+    assert branches[0]['change_quote'] == {'const': ''}
+    assert branches[1]['change_quote'] == {'enum': ['Claims: [] {{COUNT}}']}
+    assert branches[3]['change_quote'] == {'enum': ['Orion uses MySQL.']}

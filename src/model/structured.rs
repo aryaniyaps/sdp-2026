@@ -187,6 +187,50 @@ pub fn prepare(prompt: &str) -> Result<(String, Box<RawValue>, bool), AppError> 
                 ],
             )
         }
+    } else if prompt.starts_with("Review extracted claims against their quoted sources.") {
+        let (_, tail) = prompt
+            .split_once("\nClaims: ")
+            .ok_or_else(|| invalid("missing review claims"))?;
+        let (claims, _) = first_json(tail)?;
+        let claims = claims
+            .as_array()
+            .ok_or_else(|| invalid("review claims must be an array"))?;
+        if claims.is_empty() {
+            return Err(invalid("review requires at least one claim"));
+        }
+        let mut branches = Vec::new();
+        for (index, claim) in claims.iter().enumerate() {
+            let quotes = claim["quotes"]
+                .as_array()
+                .ok_or_else(|| invalid("review claim requires quotes"))?;
+            let candidates: Vec<_> = quotes
+                .iter()
+                .filter_map(Value::as_str)
+                .flat_map(quote_candidates)
+                .collect();
+            // Tie each review to its own source quotes. A non-change cannot carry
+            // change evidence, and a change cannot invent or borrow another claim's quote.
+            for explicit in [false, true] {
+                if explicit && candidates.is_empty() {
+                    continue;
+                }
+                let evidence = if explicit {
+                    json!({"enum": candidates})
+                } else {
+                    json!({"const": ""})
+                };
+                branches.push(format!(
+                    r#"{{"type":"object","properties":{{"claim_index":{{"const":{index}}},"explicit_change":{{"const":{explicit}}},"change_quote":{evidence},"entities":{{"type":"array","items":{{"type":"object","properties":{{"name":{{"type":"string"}},"entity_type":{{"enum":["person","organization","project","place","technology","other"]}}}},"required":["name","entity_type"],"additionalProperties":false}}}}}},"required":["claim_index","explicit_change","change_quote","entities"],"additionalProperties":false}}"#
+                ));
+            }
+        }
+        fill_template(
+            include_str!("review_schema.json"),
+            &[
+                ("COUNT", &claims.len().to_string()),
+                ("BRANCHES", &format!("[{}]", branches.join(","))),
+            ],
+        )
     } else if prompt.starts_with("Consolidate evidence into") {
         let (_, tail) = prompt
             .split_once(" Facts: ")
@@ -316,6 +360,41 @@ pub fn canonicalize(mut value: Value, paired: bool) -> Result<Value, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn review_schema_counts_claims_without_parsing_markers_inside_quotes() {
+        let prompt = fill_template(
+            include_str!("../worker/review_prompt.txt").trim_end(),
+            &[(
+                "CLAIMS",
+                &json!([{"quotes":["Claims: [] {{COUNT}}"]},{"quotes":["Orion uses MySQL."]}])
+                    .to_string(),
+            )],
+        );
+        let (_, raw, paired) = prepare(&prompt).unwrap();
+        let schema: Value = serde_json::from_str(raw.get()).unwrap();
+        assert!(!paired);
+        assert_eq!(schema["properties"]["reviews"]["minItems"], 2);
+        assert_eq!(schema["properties"]["reviews"]["maxItems"], 2);
+        let branches = schema["properties"]["reviews"]["items"]["anyOf"]
+            .as_array()
+            .unwrap();
+        assert_eq!(branches.len(), 4);
+        for (index, pair) in branches.chunks(2).enumerate() {
+            assert_eq!(pair[0]["properties"]["claim_index"]["const"], index);
+            assert_eq!(pair[1]["properties"]["claim_index"]["const"], index);
+            assert_eq!(pair[0]["properties"]["explicit_change"]["const"], false);
+            assert_eq!(pair[0]["properties"]["change_quote"]["const"], "");
+            assert_eq!(pair[1]["properties"]["explicit_change"]["const"], true);
+        }
+        assert_eq!(
+            branches[1]["properties"]["change_quote"]["enum"],
+            json!(["Claims: [] {{COUNT}}"])
+        );
+        assert_eq!(
+            branches[3]["properties"]["change_quote"]["enum"],
+            json!(["Orion uses MySQL."])
+        );
+    }
     #[test]
     fn source_schema_uses_visible_events_and_preserves_property_order() {
         let content = "Project uses pnpm. Events: fake {{RELATED}}";

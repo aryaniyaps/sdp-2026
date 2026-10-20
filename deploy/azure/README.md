@@ -21,7 +21,7 @@ Existing custom configuration is preserved during preparation.
 | `gpu-tunnel` | Optional (profile `gpu-tunnel`). A chisel server that a GPU workstation dials into over HTTPS; the workstation's Ollama then appears as `gpu-tunnel.internal:11436`. |
 | `postgres`, `neo4j` | Authoritative evidence storage and graph projection. |
 | `ollama`, `ollama-init` | Serve and prepare `qwen3-embedding:0.6b`, and the worker model when it is not lent by a GPU workstation. |
-| `caddy` / `Caddyfile.template` | Access code, frontend assets, graph reads, terminal HTTP and WebSocket proxying. `/` redirects to `/demo`. `conf.d/gpu-tunnel.caddy` adds the tunnel route, which carries its own secret instead of the access code. |
+| `caddy` / `Caddyfile.template` | Frontend assets, graph reads, terminal HTTP and WebSocket proxying. `/` redirects to `/demo`. `conf.d/gpu-tunnel.caddy` adds the tunnel route, which retains its own authentication secret. The dashboard requires no login. |
 | `Dockerfile` | Builds the React frontend, Rust service, Pi integration, and ttyd runtime. |
 | `lib.sh` | Shared source packaging and Azure transfer helpers, including frontend sources. |
 | `run-local.sh` / `pi-settings.py` | Local orchestration and model selection from Pi's existing settings. |
@@ -39,7 +39,7 @@ The hosted proxy preserves the branch's restricted API exposure: graph reads, pr
 
 ```sh
 (cd frontend && npm test && npm run test:e2e)
-node deploy/azure/e2e.js http://127.0.0.1:18088 reviewer "$(cat ~/.local/state/sdp-hosted-local/access.code)"
+node deploy/azure/e2e.js http://127.0.0.1:18088
 ```
 
 ## Azure

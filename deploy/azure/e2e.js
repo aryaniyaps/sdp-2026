@@ -1,12 +1,12 @@
 // End to end check of the hosted page with a real headless Chrome: tell Pi a fact in one session,
 // open a session in the other directory, ask about it, and watch the graph change.
-// Usage: node e2e.js <base url> <user> <password>
+// Usage: node e2e.js <base url>
 const { spawn } = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-  const [, , base, user, pass] = process.argv;
+  const [, , base] = process.argv;
   const port = 9571, profile = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-'));
   const proc = spawn('google-chrome-stable', ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--window-size=1600,900',
     '--no-first-run', '--mute-audio', 'about:blank'], { stdio: 'ignore' });
@@ -21,7 +21,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let termText = async () => '';
   try {
     await send('Page.enable'); await send('Network.enable');
-    await send('Network.setExtraHTTPHeaders', { headers: { Authorization: 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64') } });
     const nav = await send('Page.navigate', { url: base + '/' }); console.log('navigate', JSON.stringify(nav.result).slice(0, 120)); await sleep(4000); console.log('page', await ev(`document.readyState + ' ' + location.href + ' frames=' + document.querySelectorAll('iframe').length`));
     termText = () => ev(`(() => { const t = document.getElementById('term').contentWindow.term; if (!t) return ''; const b = t.buffer.active; let s = ''; for (let i = 0; i < b.length; i++) s += b.getLine(i).translateToString(true) + '\\n'; return s; })()`);
     const graphStats = () => ev(`(() => {

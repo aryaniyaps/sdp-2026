@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the hosted setup on this machine: Pi in a browser terminal next to the live memory graph,
-# behind the same proxy and access code, at http://127.0.0.1:18088/ (user reviewer). It is the
+# behind the same proxy, at http://127.0.0.1:18088/ without a login. It is the
 # stack of docker-compose.yml with a local proxy address, and it keeps its own databases, so it
 # does not touch the memory of scripts/run-memory.sh.
 #   run-local.sh [up]   start the prepared stack offline (the default)
@@ -71,8 +71,7 @@ if [ -f "$STATE/docker-compose.yml" ]; then
   done
   # Refresh managed routes/launcher together with the application image. Keep
   # passwords, custom ports, host Ollama and network settings in the saved override.
-  hash=$(docker run --rm --pull never caddy:2 caddy hash-password --plaintext "$(cat "$STATE/access.code")")
-  sed -e 's#__SITE_ADDRESS__#:80#' -e "s#__ACCESS_HASH__#$hash#" -e 's/admin /reviewer /' "$HERE/Caddyfile.template" > "$STATE/Caddyfile"
+  sed -e 's#__SITE_ADDRESS__#:80#' "$HERE/Caddyfile.template" > "$STATE/Caddyfile"
   cp "$HERE/pi-session.sh" "$STATE/pi-session.sh"
   chmod 644 "$STATE/Caddyfile"
   chmod 755 "$STATE/pi-session.sh"
@@ -91,11 +90,9 @@ if [ ! -f "$STATE/.env" ]; then
   } > "$STATE/.env"
 fi
 grep -E '^(POSTGRES|NEO4J)_PASSWORD=' "$STATE/.env" > "$STATE/.env.new" && mv "$STATE/.env.new" "$STATE/.env"
-[ -f "$STATE/access.code" ] || openssl rand -hex 12 > "$STATE/access.code"
-hash=$(docker run --rm caddy:2 caddy hash-password --plaintext "$(cat "$STATE/access.code")")
 
 cp "$HERE/docker-compose.yml" "$HERE/pi-session.sh" "$STATE/"
-sed -e 's#__SITE_ADDRESS__#:80#' -e "s#__ACCESS_HASH__#$hash#" -e 's/admin /reviewer /' "$HERE/Caddyfile.template" > "$STATE/Caddyfile"
+sed -e 's#__SITE_ADDRESS__#:80#' "$HERE/Caddyfile.template" > "$STATE/Caddyfile"
 mkdir -p "$STATE/conf.d"
 # A previous run handed this folder to uid 10001, so take it back before refreshing the login.
 docker run --rm --user root --entrypoint chown -v "$STATE/pi-agent:/d" sdp-memory-app:local -R "$(id -u):$(id -g)" /d

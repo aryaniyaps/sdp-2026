@@ -68,6 +68,30 @@ def prepare(user):
         related = {'type':'array','items':obj({'assertion_id':{'enum':ids},'relation':{'enum':['extends','contradicts','causes']},'explanation':S})} if ids else {'type':'array','items':{'type':'object'},'maxItems':0}
         schema = json.loads(prompt.fill((ROOT/'extract_schema.json').read_text(),{'SOURCES':json.dumps(branches),'RELATED':json.dumps(related)})) if branches else obj({'claims':{'type':'array','items':{'type':'object'},'maxItems':0}})
         return user+'\n'+WIRE_INSTRUCTION, schema, True
+    if user.startswith('Review extracted claims against their quoted sources.'):
+        claims, _ = first_json(user.split('\nClaims: ', 1)[1])
+        if not isinstance(claims, list) or not claims:
+            raise ValueError('review requires at least one claim')
+        branches = []
+        for index, claim in enumerate(claims):
+            quotes = claim.get('quotes')
+            if not isinstance(quotes, list):
+                raise ValueError('review claim requires quotes')
+            candidates = [candidate for quote in quotes if isinstance(quote, str)
+                          for candidate in quote_candidates(quote)]
+            for explicit in [False, True]:
+                if explicit and not candidates:
+                    continue
+                branches.append(obj({
+                    'claim_index': {'const': index},
+                    'explicit_change': {'const': explicit},
+                    'change_quote': {'enum': candidates} if explicit else {'const': ''},
+                    'entities': {'type': 'array', 'items': obj({
+                        'name': S, 'entity_type': {'enum': ['person', 'organization', 'project', 'place', 'technology', 'other']}})}
+                }))
+        schema = json.loads(prompt.fill((ROOT/'review_schema.json').read_text(), {
+            'COUNT': str(len(claims)), 'BRANCHES': json.dumps(branches)}))
+        return user, schema, False
     if user.startswith('Consolidate evidence into'):
         facts, _ = first_json(user.split(' Facts: ',1)[1])
         def ids(key):

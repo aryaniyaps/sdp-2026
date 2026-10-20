@@ -21,8 +21,6 @@ umask 077
 if [ "${GPU_TUNNEL:-1}" = 1 ] && ! grep -q '^GPU_TUNNEL_SECRET=' "$STATE/secrets.env"; then
   echo "GPU_TUNNEL_SECRET=$(openssl rand -hex 24)" >> "$STATE/secrets.env"
 fi
-# shellcheck disable=SC2034  # read by render_config in lib.sh
-hash=$(cat "$STATE/access.hash")
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 

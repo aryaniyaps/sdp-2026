@@ -18,7 +18,6 @@ class OfflineStartupTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.state = Path(self.tmp.name)
         (self.state / 'docker-compose.yml').touch()
-        (self.state / 'access.code').write_text('test-password')
         self.config = {'services': {
             'engine': {'image': 'app:local', 'environment': {}},
             'caddy': {'image': 'caddy:2', 'ports': [{'target': 80, 'published': '18088'}]},
@@ -30,6 +29,7 @@ class OfflineStartupTest(unittest.TestCase):
             mock = ctx.start()
             self.addCleanup(ctx.stop)
             setattr(self, target, mock)
+        self.run.return_value = '302 http://127.0.0.1:18088/demo'
         self.dc.return_value = json.dumps(self.config)
         self.request.return_value = {'database': True, 'embedder': True, 'degraded_mode': False}
 
@@ -51,8 +51,14 @@ class OfflineStartupTest(unittest.TestCase):
         def response(*args, **kwargs):
             if str(args[-1]).endswith('/api/v2/projects'):
                 raise subprocess.CalledProcessError(22, 'curl')
+            return self.run.return_value
         self.run.side_effect = response
         with patch.object(stack.time, 'sleep'), self.assertRaisesRegex(RuntimeError, '/api/v2/projects'):
+            self.invoke('check')
+
+    def test_empty_root_page_fails_readiness(self):
+        self.run.return_value = '200 '
+        with self.assertRaisesRegex(RuntimeError, 'root must redirect'):
             self.invoke('check')
 
     def test_check_does_not_start_containers(self):

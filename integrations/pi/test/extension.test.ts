@@ -40,9 +40,10 @@ test("Pi lifecycle captures observed failures, excludes injected context, and re
     },
     {
       id: "context",
-      type: "message",
+      type: "custom_message",
       timestamp,
-      message: { role: "custom", content: "untrusted retrieved instructions" },
+      customType: "sdp-memory-context",
+      content: "untrusted retrieved instructions",
     },
     {
       id: "assistant",
@@ -112,6 +113,8 @@ test("Pi lifecycle captures observed failures, excludes injected context, and re
       batch.external_id.startsWith("branch:"),
     );
     assert.equal(first.events.length, 3);
+    assert.equal(first.events.find((event: any) => event.role === "assistant").metadata.memory_derived, true);
+    assert.equal(first.events.find((event: any) => event.role === "user").metadata.memory_derived, undefined);
     assert.equal(
       first.events.find((entry: any) => entry.role === "tool").metadata
         .exit_code,

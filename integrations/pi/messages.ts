@@ -28,3 +28,25 @@ export function observedExitCode(
   void isError;
   return null;
 }
+
+// Once recalled evidence enters a branch it can influence later assistant replies too.
+// Keep those replies in the ledger, but do not treat them as independent fact sources.
+export function memoryDerivedAssistantIds(branch: readonly {
+  id: string;
+  type: string;
+  customType?: string;
+  message?: { role: string; customType?: string; toolName?: string };
+}[]): Set<string> {
+  let recalled = false;
+  const ids = new Set<string>();
+  for (const entry of branch) {
+    const message = entry.message;
+    if ((entry.type === "custom_message" && entry.customType === "sdp-memory-context") ||
+        (message?.role === "custom" && message.customType === "sdp-memory-context") ||
+        (message?.role === "toolResult" && message.toolName === "memory_recall")) {
+      recalled = true;
+    }
+    if (recalled && message?.role === "assistant") ids.add(entry.id);
+  }
+  return ids;
+}

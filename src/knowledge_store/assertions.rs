@@ -81,6 +81,27 @@ LIMIT 1
             let mut action = "created";
             let id = if let Some(id) = same {
                 action = "reinforced";
+                // A verified correction can select a value that was already one side of
+                // a dispute. Reusing its identity must not bypass conflict resolution.
+                if c.cardinality == Cardinality::Single && c.correction && c.confidence >= 0.8 {
+                    let previous: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM assertions WHERE namespace=$1 AND slot_key=$2 AND id<>$3 AND cardinality='single' AND status IN ('active','contested') ORDER BY valid_from,id FOR UPDATE")
+                        .bind(&job.namespace).bind(&slot).bind(id).fetch_all(&mut *tx).await?;
+                    for old in &previous {
+                        sqlx::query("UPDATE assertions SET status='superseded',valid_to=GREATEST(valid_from,$2) WHERE id=$1")
+                            .bind(old).bind(at).execute(&mut *tx).await?;
+                        invalidate(&mut tx, &job.namespace, *old).await?;
+                        project(&mut tx, &job.namespace, *old).await?;
+                        sqlx::query("INSERT INTO assertion_edges(namespace,from_id,to_id,relation,explanation) VALUES($1,$2,$3,'supersedes',$4) ON CONFLICT DO NOTHING")
+                            .bind(&job.namespace).bind(id).bind(old).bind(&c.explanation).execute(&mut *tx).await?;
+                    }
+                    sqlx::query("UPDATE assertions SET status='active' WHERE id=$1")
+                        .bind(id)
+                        .execute(&mut *tx)
+                        .await?;
+                    if !previous.is_empty() {
+                        action = "superseded";
+                    }
+                }
                 id
             } else {
                 let previous: Vec<Uuid> = if c.cardinality == Cardinality::Single {

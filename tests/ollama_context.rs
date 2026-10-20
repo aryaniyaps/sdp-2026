@@ -687,6 +687,11 @@ struct QuotesLastEvent {
 #[async_trait]
 impl JsonModel for QuotesLastEvent {
     async fn generate(&self, prompt: &str) -> Result<Value, AppError> {
+        if prompt.starts_with("Review extracted claims") {
+            return Ok(
+                json!({"reviews":[{"claim_index":0,"explicit_change":false,"change_quote":"","entities":[]}]}),
+            );
+        }
         self.prompts.lock().unwrap().push(prompt.into());
         let events = &prompt[prompt.find("\nEvents: ").unwrap()..];
         let local: usize = {
@@ -737,6 +742,10 @@ async fn a_long_session_is_read_in_windows_and_claims_keep_episode_indices() {
             occurred_at: chrono::Utc::now(),
             metadata: json!({"tool":"bash","tool_call_id":format!("call-{n}"),"input":{"command":"make"}}),
         })
+        .flat_map(|event| [EvidenceEvent {
+            role: "assistant".into(), content: "DERIVED_ECHO_MUST_NOT_BECOME_A_FACT".into(),
+            occurred_at: event.occurred_at, metadata: json!({"memory_derived":true}),
+        }, event])
         .collect();
     let (job, _) = running_extract_job_for(&store, &[], ns.clone(), events).await;
     let model = Arc::new(QuotesLastEvent {
@@ -756,6 +765,7 @@ async fn a_long_session_is_read_in_windows_and_claims_keep_episode_indices() {
     let prompts = model.prompts.lock().unwrap().clone();
     assert_eq!(prompts.len(), windows, "one call per window, no repairs");
     for prompt in &prompts {
+        assert!(!prompt.contains("DERIVED_ECHO_MUST_NOT_BECOME_A_FACT"));
         assert!(
             !prompt.contains("call-"),
             "tool call ids are not shown to the model"

@@ -1,4 +1,4 @@
-# Everything except the GPU tunnel sits behind one access code. Only the landing page, the terminal
+# The demo dashboard is available without HTTP authentication. Only the landing page, the terminal
 # project/session controls, graph reads and confirmed namespace clears are reachable; the memory API itself (retain, recall, jobs) is not
 # exposed. conf.d/*.caddy adds routes that carry their own authentication (the GPU tunnel).
 __SITE_ADDRESS__ {
@@ -9,9 +9,6 @@ __SITE_ADDRESS__ {
 	}
 	import /etc/caddy/conf.d/*.caddy
 	handle {
-		basic_auth {
-			admin __ACCESS_HASH__
-		}
 		handle /term/* {
 			reverse_proxy term:7681
 		}
@@ -41,7 +38,7 @@ __SITE_ADDRESS__ {
 			reverse_proxy engine:8080
 		}
 		handle / {
-			redir /demo 302
+			redir * /demo 302
 		}
 		handle {
 			respond "not found" 404

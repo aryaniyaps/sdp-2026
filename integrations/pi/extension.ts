@@ -17,6 +17,7 @@ import {
   type EvidenceEvent,
   type RetainBatch,
 } from "./client.ts";
+import { memoryDerivedAssistantIds } from "./messages.ts";
 const exec = promisify(execFile);
 
 export default function memoryExtension(pi: ExtensionAPI) {
@@ -272,6 +273,7 @@ export default function memoryExtension(pi: ExtensionAPI) {
     );
     // Branch identity makes retries idempotent and avoids reading abandoned branches.
     const events: EvidenceEvent[] = [];
+    const memoryDerived = memoryDerivedAssistantIds(branch);
     for (const entry of unretained) {
       if (entry.type !== "message") continue;
       const message = entry.message;
@@ -308,7 +310,10 @@ export default function memoryExtension(pi: ExtensionAPI) {
         role: message.role,
         content,
         occurred_at: entry.timestamp,
-        metadata: { entry_id: entry.id, commit },
+        metadata: {
+          entry_id: entry.id, commit,
+          ...(memoryDerived.has(entry.id) ? { memory_derived: true } : {}),
+        },
       });
     }
     if (events.length) {

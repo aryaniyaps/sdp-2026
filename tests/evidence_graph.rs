@@ -149,6 +149,74 @@ async fn consolidate(
     serde_json::from_value(result["observation_ids"][0].clone()).unwrap()
 }
 #[tokio::test]
+async fn explicit_correction_resolves_an_existing_contested_value() {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("TEST_DATABASE_URL missing; integration skipped");
+        return;
+    };
+    let store = Store::new(
+        PgPoolOptions::new()
+            .max_connections(4)
+            .connect(&url)
+            .await
+            .unwrap(),
+    );
+    store.migrate().await.unwrap();
+    let ns = format!("contested-correction-{}", Uuid::new_v4());
+    let at = Utc::now();
+    let mut ids = Vec::new();
+    for (offset, value) in ["Python", "Rust", "Go"].into_iter().enumerate() {
+        let (_, result) = extract(
+            &store,
+            &ns,
+            &format!("Ada uses {value}"),
+            at + Duration::seconds(offset as i64),
+            vec![claim(value, Cardinality::Single, false)],
+        )
+        .await;
+        ids.push(
+            serde_json::from_value::<Uuid>(result["decisions"][0]["assertion_id"].clone()).unwrap(),
+        );
+    }
+    // Repetition and a low-confidence correction must not resolve the conflict.
+    for (offset, correction, confidence) in [(3, false, 0.95), (4, true, 0.79)] {
+        let mut candidate = claim("Rust", Cardinality::Single, correction);
+        candidate.confidence = confidence;
+        extract(
+            &store,
+            &ns,
+            "Ada uses Rust",
+            at + Duration::seconds(offset),
+            vec![candidate],
+        )
+        .await;
+        for id in &ids {
+            assert_eq!(store.assertion(&ns, *id).await.unwrap().status, "contested");
+        }
+    }
+    let correction_at = at + Duration::seconds(5);
+    let (_, result) = extract(
+        &store,
+        &ns,
+        "Ada uses Rust instead of Python or Go",
+        correction_at,
+        vec![claim("Rust", Cardinality::Single, true)],
+    )
+    .await;
+    assert_eq!(result["decisions"][0]["assertion_id"], ids[1].to_string());
+    assert_eq!(store.assertion(&ns, ids[1]).await.unwrap().status, "active");
+    for old in [ids[0], ids[2]] {
+        let assertion = store.assertion(&ns, old).await.unwrap();
+        assert_eq!(assertion.status, "superseded");
+        assert!(assertion.valid_to.is_some());
+        let linked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM assertion_edges WHERE namespace=$1 AND from_id=$2 AND to_id=$3 AND relation='supersedes')")
+            .bind(&ns).bind(ids[1]).bind(old).fetch_one(&store.pool).await.unwrap();
+        assert!(linked);
+    }
+    assert_eq!(store.assertion(&ns, ids[1]).await.unwrap().sources.len(), 4);
+}
+
+#[tokio::test]
 async fn evidence_lifecycle_and_projection() {
     let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
         eprintln!("TEST_DATABASE_URL missing; integration skipped");

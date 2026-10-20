@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Creates the hosted setup from nothing: Pi in a browser terminal next to the live memory graph, on
-# one Azure VM, behind HTTPS and one access code. Run it once; afterwards deploy.sh updates the app.
+# one Azure VM, behind HTTPS without a dashboard login. Run it once; afterwards deploy.sh updates the app.
 # It refuses to run when the VM already exists.
 #
-# Needs: az (logged in), docker (only to hash the access code), openssl, ssh-keygen, tar, base64,
+# Needs: az (logged in), openssl, ssh-keygen, tar, base64,
 # and a Pi that is logged in on this machine (its auth.json is copied to the VM, for the terminal only:
 # the memory worker is the fine-tuned model and never uses it).
 #   DNS_LABEL     required, a name unique in the region: the page is <label>.<location>.cloudapp.azure.com
@@ -17,7 +17,7 @@
 #                 0 uses the VM's own Ollama (CPU, slow) and you install the model there yourself
 #   SEED_DUMP     a dump made by make-seed.sh; the memory starts from it (default: start empty)
 #   SSH_FROM      a CIDR to open port 22 for (default: SSH stays closed, nothing here needs it)
-#   SDP_CLOUD_STATE  where the access code, passwords and the admin key are kept (default ~/.sdp-cloud)
+#   SDP_CLOUD_STATE  where the passwords and the admin key are kept (default ~/.sdp-cloud)
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -35,7 +35,7 @@ FQDN=$DNS.$LOC.cloudapp.azure.com
 # shellcheck source=lib.sh
 . "$HERE/lib.sh"
 
-for tool in az docker openssl ssh-keygen tar base64 python3; do
+for tool in az openssl ssh-keygen tar base64 python3; do
   command -v "$tool" > /dev/null || { echo "missing tool: $tool" >&2; exit 1; }
 done
 az account show > /dev/null || { echo "run az login first" >&2; exit 1; }
@@ -57,15 +57,12 @@ if [ ! -f "$STATE/secrets.env" ]; then
   {
     echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
     echo "NEO4J_PASSWORD=$(openssl rand -hex 16)"
-    echo "ACCESS_CODE=$(openssl rand -hex 12)"
     echo "GPU_TUNNEL_SECRET=$(openssl rand -hex 24)"
   } > "$STATE/secrets.env"
 fi
 grep -q '^GPU_TUNNEL_SECRET=' "$STATE/secrets.env" || echo "GPU_TUNNEL_SECRET=$(openssl rand -hex 24)" >> "$STATE/secrets.env"
 get() { grep -m1 "^$1=" "$STATE/secrets.env" | cut -d= -f2-; }
 [ -f "$STATE/vm_key" ] || ssh-keygen -t ed25519 -N '' -C "$VM" -f "$STATE/vm_key" -q
-# shellcheck disable=SC2034  # read by render_config in lib.sh
-hash=$(docker run --rm caddy:2 caddy hash-password --plaintext "$(get ACCESS_CODE)")
 
 echo "Creating $RG, the network rules and $VM ($SIZE)"
 az group create -n "$RG" -l "$LOC" -o none
@@ -154,8 +151,6 @@ on_vm "$WORK/finish.sh"
 cat <<DONE
 
 Done. Page:   https://$FQDN/   (the certificate can take a minute)
-User:         admin
-Access code:  $STATE/secrets.env (ACCESS_CODE)
 Later:        deploy/azure/deploy.sh updates the app; az vm deallocate -g $RG -n $VM stops the compute cost;
               az group delete -n $RG removes everything.
 DONE

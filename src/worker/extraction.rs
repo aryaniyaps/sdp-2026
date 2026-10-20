@@ -9,7 +9,15 @@ pub(super) async fn extract(state: &AppState, job: &Job) -> Result<Value, AppErr
         .store
         .episode_evidence(&job.namespace, episode)
         .await?;
-    let events: Vec<_> = evidence.iter().map(|(_, e)| e).collect();
+    // Preserve the complete ledger and its indices; recalled assistant answers are
+    // derivative evidence, not a new independent source for fact extraction.
+    let indexed_events: Vec<_> = evidence
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, event))| extraction_source(event))
+        .map(|(index, (_, event))| (index, event))
+        .collect();
+    let events: Vec<_> = indexed_events.iter().map(|(_, event)| *event).collect();
     let existing: Vec<Value> = if let Some(snapshot) = job.payload.get("existing_snapshot") {
         serde_json::from_value(snapshot.clone()).map_err(|e| AppError::Validation(e.to_string()))?
     } else {
@@ -63,6 +71,7 @@ LIMIT 80
             events[range.clone()].iter().map(|e| (*e).clone()).collect();
         let extraction =
             extract_window(state, &window_existing, &event_values, &window_events).await?;
+        let extraction = super::review::review(state, extraction, &window_events).await?;
         // Window-local source indices become indices into the whole episode.
         for mut claim in extraction.claims {
             if leaks_secret(&claim.statement) {
@@ -73,7 +82,7 @@ LIMIT 80
                 continue;
             }
             for index in &mut claim.source_indices {
-                *index += range.start;
+                *index = indexed_events[*index + range.start].0;
             }
             claims.push(claim);
         }
@@ -93,6 +102,10 @@ LIMIT 80
         outcome["existing_facts_dropped"] = json!(dropped_facts);
     }
     Ok(outcome)
+}
+
+fn extraction_source(event: &EvidenceEvent) -> bool {
+    !(event.role == "assistant" && event.metadata["memory_derived"] == true)
 }
 
 /// Ask the model about one window and return claims whose quotes are verified against the window's
@@ -218,6 +231,29 @@ fn repair_prompt(
 #[cfg(test)]
 mod repair_tests {
     use super::*;
+
+    #[test]
+    fn recalled_answers_are_not_independent_sources_but_new_evidence_is() {
+        let event = |role: &str, metadata: Value| EvidenceEvent {
+            role: role.into(),
+            content: "Mira owns Orion".into(),
+            occurred_at: chrono::Utc::now(),
+            metadata,
+        };
+        assert!(!extraction_source(&event(
+            "assistant",
+            json!({"memory_derived":true})
+        )));
+        assert!(extraction_source(&event("assistant", json!({}))));
+        assert!(extraction_source(&event(
+            "user",
+            json!({"memory_derived":true})
+        )));
+        assert!(extraction_source(&event(
+            "tool",
+            json!({"memory_derived":true})
+        )));
+    }
 
     #[test]
     fn oversized_invalid_answer_keeps_all_evidence_and_fits_on_wire() {

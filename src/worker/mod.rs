@@ -18,6 +18,7 @@ mod consolidation;
 mod extraction;
 mod projection;
 mod prompts;
+mod review;
 mod secrets;
 mod window;
 pub use consolidation::{CONSOLIDATE_TEMPLATE, consolidate_prompt};

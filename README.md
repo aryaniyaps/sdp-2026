@@ -34,11 +34,7 @@ sudo systemctl start docker ollama
 ./deploy/azure/run-local.sh check
 ```
 
-Open **http://127.0.0.1:18088/**, username `reviewer`. Read the password locally:
-
-```sh
-cat ~/.local/state/sdp-hosted-local/access.code
-```
+Open **http://127.0.0.1:18088/**. No username or password is required.
 
 The browser API is http://127.0.0.1:18080/; health is `/healthz`, API docs are
 `/swagger-ui/`, and the graph is `/graph?namespace=YOUR_NAMESPACE`.
@@ -58,7 +54,7 @@ keeping memory and models:
 ./deploy/azure/run-local.sh
 ```
 
-Configuration and the access code live in `~/.local/state/sdp-hosted-local/`.
+Configuration lives in `~/.local/state/sdp-hosted-local/`.
 The existing override uses host Ollama on port 11434, the local subnet
 `10.253.202.0/24`, worker `mem-extractor:general-v1` and embedding alias
 `qwen3-embedding-cpu` (CPU embeddings avoid GPU contention). Preparation preserves
@@ -346,10 +342,20 @@ assuming them. `as_of` queries validity time, not a replay of the database as it
 was recorded at that instant.
 
 An explicit correction to a single-valued slot requires extracted confidence of
-at least **0.8** to supersede automatically. Extraction still has to recognize
-the same subject/predicate and correction. If it does not, inspect the stored
-assertions and job decisions for the mismatch. Dependent observations can become
-stale when their support changes.
+at least **0.8** to supersede automatically. Before saving a nonempty extraction,
+the same local SLM separately reviews update intent and named entity mentions
+against the cited quotes. A proposed correction needs a confirmed, verbatim change
+quote; a plain conflicting report remains contested. Added entity names must occur
+in the quoted evidence. This adds an inference call and does not guarantee complete
+semantic extraction. The extractor still has to recognize the same subject and
+predicate. Dependent observations can become stale when their support changes.
+
+Check entities, conflicting reports, explicit corrections, evidence and Neo4j
+history in a separate diagnostic namespace (no project data is cleared):
+
+```sh
+python3 scripts/verify-extraction-graph.py --out /tmp/entity-conflict-verification.json
+```
 
 ### 5. Handle conflicting reports
 

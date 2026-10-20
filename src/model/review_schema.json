@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "reviews": {
+      "type": "array",
+      "minItems": {{COUNT}},
+      "maxItems": {{COUNT}},
+      "items": {"anyOf": {{BRANCHES}}}
+    }
+  },
+  "required": ["reviews"],
+  "additionalProperties": false
+}
