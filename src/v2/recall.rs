@@ -439,6 +439,25 @@ pub fn context_block(hit: &RecallHit, labels: Labels) -> String {
         hit.id, hit.statement, kind, status, hit.valid_from, hit.valid_to, hit.event_at, quotes
     )
 }
+/// The order hits are packed into the context. Normally the fused ranking. With source text mixed in,
+/// source chunks and assertions alternate, each in its own ranked order, starting with source text:
+/// an assertion matches several channels (lexical, semantic, temporal, graph) and so outscores raw text
+/// in one fused list, which pushed the evidence it was extracted from out of the context.
+pub fn packing_order(ranking: &[RecallHit], interleave: bool) -> Vec<&RecallHit> {
+    if !interleave {
+        return ranking.iter().collect();
+    }
+    let (raw, structured): (Vec<&RecallHit>, Vec<&RecallHit>) =
+        ranking.iter().partition(|hit| hit.kind == "source_chunk");
+    let mut order = Vec::with_capacity(ranking.len());
+    let (mut raw, mut structured) = (raw.into_iter(), structured.into_iter());
+    loop {
+        match (raw.next(), structured.next()) {
+            (None, None) => return order,
+            (a, b) => order.extend(a.into_iter().chain(b)),
+        }
+    }
+}
 pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallResponse, AppError> {
     if r.namespace.trim().is_empty()
         || r.query.trim().is_empty()
@@ -787,7 +806,7 @@ LIMIT 10
     let mut context = String::new();
     let mut results = Vec::new();
     let mut tokens = 0;
-    for hit in &ranking {
+    for hit in packing_order(&ranking, r.include_raw && !r.raw_only) {
         if results.len() >= r.top_k {
             break;
         }
@@ -902,6 +921,46 @@ fn looks_temporal(query: &str) -> bool {
 }
 #[cfg(test)]
 mod tests {
+    use super::{RecallHit, packing_order};
+    use uuid::Uuid;
+    #[test]
+    fn source_text_and_assertions_alternate_when_mixed() {
+        let hit = |kind: &str, score: f64| RecallHit {
+            id: Uuid::new_v4(),
+            kind: kind.into(),
+            statement: String::new(),
+            status: String::new(),
+            score,
+            ranks: Default::default(),
+            paths: vec![],
+            sources: vec![],
+            valid_from: None,
+            valid_to: None,
+            event_at: None,
+        };
+        // Assertions outscore source text in the fused ranking.
+        let ranking = vec![
+            hit("attribute", 0.9),
+            hit("episode", 0.8),
+            hit("inference", 0.7),
+            hit("source_chunk", 0.2),
+            hit("source_chunk", 0.1),
+        ];
+        let kinds =
+            |order: Vec<&RecallHit>| order.iter().map(|h| h.kind.clone()).collect::<Vec<_>>();
+        assert_eq!(
+            kinds(packing_order(&ranking, true)),
+            [
+                "source_chunk",
+                "attribute",
+                "source_chunk",
+                "episode",
+                "inference"
+            ]
+        );
+        assert_eq!(kinds(packing_order(&ranking, false))[0], "attribute");
+    }
+
     use super::any_word_query;
     #[test]
     fn natural_questions_become_any_word_queries() {

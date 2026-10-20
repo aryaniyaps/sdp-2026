@@ -56,15 +56,17 @@
     }
   },
   "context_budget": 8192,
-  "top_k": 20,
+  "top_k": 60,
   "conditions": {
     "enhanced": {
       "recall": {
         "raw_only": false,
         "graph": true,
         "inferences": true,
-        "temporal": true
-      }
+        "temporal": true,
+        "include_raw": true
+      },
+      "note": "the engine: assertions with source quotes, inferences, graph and temporal planning, interleaved with source text"
     },
     "raw_hybrid": {
       "recall": {
@@ -83,12 +85,23 @@
     "no_memory": {
       "recall": null
     },
+    "assertions_only": {
+      "recall": {
+        "raw_only": false,
+        "graph": true,
+        "inferences": true,
+        "temporal": true
+      },
+      "ablation": true,
+      "note": "the engine without source text"
+    },
     "no_graph": {
       "recall": {
         "raw_only": false,
         "graph": false,
         "inferences": true,
-        "temporal": true
+        "temporal": true,
+        "include_raw": true
       },
       "ablation": true
     },
@@ -97,7 +110,8 @@
         "raw_only": false,
         "graph": true,
         "inferences": false,
-        "temporal": true
+        "temporal": true,
+        "include_raw": true
       },
       "ablation": true
     }

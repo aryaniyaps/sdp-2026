@@ -96,6 +96,19 @@
       ],
       "dev_before": "knowledge_update old value superseded 8/12; relative_date resolved 8/12 (3 of the 4 misses were events never extracted)",
       "dev_after": "pending"
+    },
+    {
+      "version": "v5-hybrid-recall",
+      "date": "2026-10-20",
+      "dev_run": "locomo-dev-v2",
+      "finding": "On the two dev conversations, assertions alone (the v1 'enhanced' design) answered 0.459 (Jev) against 0.798 for plain retrieval over source chunks; 77 of its 126 misses were questions whose evidence turn no stored assertion cites, i.e. the extractor's coverage. Mixing source text in (include_raw) reached 0.768, because assertions match several channels and outrank the source text in one fused list. Every retrieval condition also packed only about 2k of its 8,192-token budget because top_k was 20.",
+      "change": "Recall with source text packs source chunks and assertions alternately, each in its own ranked order (packing_order). The engine condition is now this hybrid; assertions alone stays as the ablation 'assertions_only'. top_k is 60 for every retrieval condition, so the token budget, not the hit count, bounds the context. Unit test source_text_and_assertions_alternate_when_mixed.",
+      "files": [
+        "src/v2/recall.rs",
+        "benchmark/config.json"
+      ],
+      "dev_before": "assertions only 0.459; mixed by fused rank 0.768 (top_k 20), 0.807 (top_k 60); plain retrieval 0.824 (top_k 60)",
+      "dev_after": "hybrid 0.828 at top_k 60 (multi-hop 0.77 vs 0.67, open-domain 0.85 vs 0.77 for plain retrieval; 7,046 context tokens, 43% of full context)"
     }
   ]
 }
