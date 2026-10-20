@@ -3,11 +3,11 @@
 # is already on disk, so a failed or interrupted stage is simply run again. The engine is restarted when
 # its health check fails. Progress: benchmark/runs/<run>.status and benchmark/runs/<run>.log.
 #
-#   benchmark/overnight.sh [run-id]        (default locomo-test)
+#   benchmark/overnight.sh [run-id]        (default locomo-final)
 set -uo pipefail
 cd "$(dirname "$0")/.."
-RUN=${1:-locomo-test}
-PROPS=${PROPS:-properties-test}
+RUN=${1:-locomo-final}
+PROPS=${PROPS:-properties-final}
 LOG=benchmark/runs/$RUN.log
 STATUS=benchmark/runs/$RUN.status
 BASE=http://$(python3 -c "import json;print(json.load(open('benchmark/config.json'))['engine']['bind'])")

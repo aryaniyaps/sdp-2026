@@ -284,8 +284,8 @@ def build(test_run, properties_run):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run", default="locomo-test")
-    parser.add_argument("--properties", default="properties-test")
+    parser.add_argument("--run", default="locomo-final")
+    parser.add_argument("--properties", default="properties-final")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
     notebook = nbf.v4.new_notebook()

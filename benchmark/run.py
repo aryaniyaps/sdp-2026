@@ -33,6 +33,9 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent.parent
 BENCH = ROOT / "benchmark"
 CONFIG = json.loads((BENCH / "config.json").read_text())
+# A dev run may compare another worker model; a test run uses the committed configuration.
+if os.environ.get("BENCH_WORKER_MODEL"):
+    CONFIG["engine"]["worker_model"] = os.environ["BENCH_WORKER_MODEL"]
 CONDITIONS = CONFIG["conditions"]
 DATASET = CONFIG["dataset"]
 OLLAMA = "http://127.0.0.1:11434"
@@ -266,6 +269,8 @@ def prepare(run, split, items, base):
             raise RuntimeError("split or item set changed; use a new run ID")
         if sha((run / "source.tar.gz").read_bytes()) != manifest["source_archive_sha256"]:
             raise RuntimeError("frozen source archive checksum mismatch")
+        if split == "test" and os.environ.get("BENCH_WORKER_MODEL"):
+            raise RuntimeError("BENCH_WORKER_MODEL is for dev runs; a test run uses benchmark/config.json")
         if manifest["code_fingerprint"] != fingerprint:
             if split == "test":
                 raise RuntimeError("code or configuration changed after this test run was frozen; use a new run ID")

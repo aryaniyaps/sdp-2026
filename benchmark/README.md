@@ -71,7 +71,7 @@ ollama pull qwen3-embedding:0.6b               # the embedder
 python3 benchmark/run.py fetch                 # LoCoMo at a pinned commit, checked against its SHA-256
 benchmark/engine.sh &                          # engine on 127.0.0.1:8090 with its own Postgres and Neo4j
 python3 -m unittest discover -s benchmark      # protocol tests
-benchmark/overnight.sh locomo-test             # every stage, unattended; progress in runs/locomo-test.status
+benchmark/overnight.sh locomo-final             # every stage, unattended; progress in runs/locomo-final.status
 ```
 
 `overnight.sh` keeps the machine awake, restarts the engine if its health check fails, and retries each stage.
@@ -80,14 +80,14 @@ re-run after an interruption. Rate limits pause every worker of that provider (h
 backing off up to 15 minutes) and are retried for up to six hours. On the laptop used here (RTX 4070, 8 GB) the run
 takes about seven hours, most of it building memory.
 
-Single stages: `python3 benchmark/run.py {ingest,recall,answer,judge,report,verify} --split test --run locomo-test`,
+Single stages: `python3 benchmark/run.py {ingest,recall,answer,judge,report,verify} --split test --run locomo-final`,
 with `--conditions`, `--judges` and `--repeat N` to narrow them.
 
 ## Checking the results
 
 ```sh
-python3 benchmark/run.py verify --split test --run locomo-test            # offline consistency check
-python3 benchmark/run.py verify --split test --run locomo-test --live 20  # re-asks the models on 20 items
+python3 benchmark/run.py verify --split test --run locomo-final            # offline consistency check
+python3 benchmark/run.py verify --split test --run locomo-final --live 20  # re-asks the models on 20 items
 cd benchmark && uv run python build_notebook.py --execute                 # rebuilds the report notebook
 ```
 
