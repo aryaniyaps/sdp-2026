@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { memoryDerivedAssistantIds } from "../messages.ts";
 
-test("memory provenance survives later turns and resume, without marking original user/tool evidence", () => {
+test("memory provenance survives later turns and resume, without marking original user/tool messages", () => {
   const message = (id: string, role: string, toolName?: string) => ({id, type: "message", message: {role, toolName}});
   const branch = [message("original", "assistant"), message("user", "user"),
     {id: "recall", type: "custom_message", customType: "sdp-memory-context"},

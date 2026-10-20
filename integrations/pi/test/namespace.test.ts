@@ -60,7 +60,7 @@ test("projects have isolated namespaces and spools; sessions in the same project
       recalls.push(body);
       return new Response(
         JSON.stringify({
-          context: "earlier fact",
+          context: "earlier assertion",
           trace_id: "t",
           results: [],
           degraded_reasons: [],
@@ -79,7 +79,7 @@ test("projects have isolated namespaces and spools; sessions in the same project
       { prompt: "what did I say?" },
       first.ctx,
     );
-    // The first directory queues evidence while the service is down.
+    // The first directory queues source events while the service is down.
     await first.handlers.get("tool_result")!(
       {
         toolName: "bash",
@@ -108,12 +108,12 @@ test("projects have isolated namespaces and spools; sessions in the same project
     );
     // Automatic recall must not wait for the server's LLM date planner.
     assert(recalls.every((r) => r.temporal === false));
-    // Interactive recall keeps raw evidence in play so an extraction mistake cannot hide it.
+    // Interactive recall keeps raw source chunks in play so an extraction mistake cannot hide it.
     assert(recalls.every((r) => r.include_raw === true));
     // Automatic recall drops vector matches beyond the calibrated distance, so an unrelated prompt injects nothing.
     assert.equal(AUTOMATIC_RECALL_MAX_DISTANCE, 0.45);
     assert(recalls.every((r) => r.max_distance === 0.45));
-    // Directory B must not deliver A's queued evidence.
+    // Directory B must not deliver A's queued source events.
     assert.equal(retained.length, 0);
     const resumedA = session(a, "session-a2");
     await resumedA.handlers.get("session_start")!({}, resumedA.ctx);

@@ -1,0 +1,91 @@
+% Chapter 2
+
+\chapter{\uppercase{Literature Survey}}
+\label{ch:survey}
+This chapter looks at existing work on long-term memory for agents. Every number
+quoted here is the one reported by the authors on their own setup; we did not rerun any
+of these systems.
+
+\section{\uppercase{Long Context and External Memory}}
+The simplest memory is to keep the entire conversation in the prompt. Liu et al.\
+\cite{liu2024lost} found that models use information in the middle of a long context less reliably
+than information near the start or end, so a bigger context window does not remove
+the need to choose what the model reads. It is also slow (17\,s p95 latency for the full
+history in the Mem0 paper).
+
+All the systems below handle this the same basic way. They keep memory outside
+the prompt and only put a selected part of it in front of the model. Where they differ is
+what they store, who decides how a stored item changes (the model or the code), and
+whether the old value of a changed item is kept.
+
+\section{\uppercase{Memory Systems}}
+\textbf{MemGPT.} Packer et al.\ \cite{packer2023memgpt} split the prompt into a main context and
+external recall and archival storage, and let the model move data between them using
+function calls. On deep memory retrieval they report 92.5\% for GPT-4 with MemGPT
+against 32.1\% for GPT-4 reading a summary.  A missed function call means a missed update.
+
+\textbf{Zep and Graphiti.} Rasmussen et al.\ \cite{rasmussen2025zep} store a temporal knowledge graph of
+episodes, entities and ``facts'' (their term). Each one has a valid time and an invalid time,
+and a contradicting one closes the old one instead of deleting it. They report 71.2\% on
+LongMemEval with gpt-4o against 60.2\% for the full 115k-token history, from a single
+run.  This is closest to ours, except that in Zep the graph is the main store while we
+keep the real data in PostgreSQL.
+
+\textbf{Mem0.} In Mem0 \cite{chhikara2025mem0} an LLM extracts candidate ``facts'', compares each one with
+the nearest stored memories and picks one of add, update, delete or no-op. On LoCoMo
+they report a judge score of 66.9 against 72.9 for the full history, with p95 latency of
+1.4\,s against 17\,s. Only one benchmark and an unnamed judge model were used, and the
+open-source release has since dropped update, delete and graph memory. We use the
+same extract-then-compare idea, but in our system the update decision is made by fixed
+code rules and not by the LLM for each extracted item.
+
+\textbf{Supermemory.} Supermemory \cite{daga2026supermemory} stores atomic memories linked to source
+chunks, with ``updates'', ``extends'' and ``derives'' links and two timestamps on each. Its
+results are only from the vendor's own report and the engine is closed source.
+
+\textbf{Hindsight.} Hindsight \cite{latimer2025hindsight} is built around three operations, retain, recall and
+reflect. Recall combines four retrieval strategies using rank fusion and packs the result
+into a token budget. This directly influenced our recall step. It is not peer reviewed though.
+
+\textbf{Benchmarks.} LongMemEval \cite{wu2025longmemeval} tests chat assistants on long-term interactive memory, and
+Zep, Hindsight and Supermemory all report on it. LoCoMo \cite{maharana2024locomo} evaluates very
+long-term conversational memory and is the only benchmark used in the Mem0 paper.
+ The published results aren't really comparable since each uses its own models and judge.
+
+\section{\uppercase{Methods Used in This Project}}
+We use a few well known methods as building blocks. PostgreSQL full-text search
+\cite{postgres2026fts} with GIN indexes is our keyword search. pgvector \cite{kane2026pgvector} adds vector columns and
+nearest-neighbour search to the same database, which we use with cosine distance on
+1,024-dimensional vectors. Reciprocal Rank Fusion \cite{cormack2009rrf} merges several ranked lists
+by adding up $1/(k+\mathit{rank})$ for each item; we use $k=60$. The vectors come from a Qwen3
+Embedding model \cite{zhang2025qwen3emb} served through Ollama, and the memory model is fine-tuned
+with QLoRA \cite{dettmers2023qlora}, which trains small adapter weights on top of a frozen, quantised
+base model.
+
+\section{\uppercase{Comparison and Gap}}
+\begin{table}[H]
+\caption{Comparison of existing memory systems}
+\label{tab:related}
+\centering
+\begin{reporttable}
+\begin{tabularx}{\textwidth}{|L{2.6cm}|Y|Y|}
+\hline
+\textbf{System} & \textbf{Who decides an update} & \textbf{Main limitation} \\
+\hline
+MemGPT & The model, through function calls & Edits depend on correct calls; no cost figures \\
+\hline
+Zep / Graphiti & Graph rule (validity intervals) & Single run; graph database is the main store \\
+\hline
+Mem0 & The LLM, per item & One benchmark; released code differs from paper \\
+\hline
+Supermemory & Not fully documented & Closed source, vendor report only \\
+\hline
+Hindsight & Retain step & Not peer reviewed; budget not stated \\
+\hline
+\end{tabularx}
+\end{reporttable}
+\end{table}
+
+Table~\ref{tab:related} puts the five systems side by side.  In all of them the model decides updates or the rule is tied to a graph database.  So we took the extract-then-compare
+idea, the validity intervals and the fused recall, but made the update rule plain
+service code, kept PostgreSQL as the source of truth, tied every assertion to an exact quote, and trained a small local extraction model.

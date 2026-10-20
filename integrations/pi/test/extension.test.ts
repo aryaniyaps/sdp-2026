@@ -123,7 +123,7 @@ test("Pi lifecycle captures observed failures, excludes injected context, and re
     assert(!JSON.stringify(first).includes("untrusted retrieved instructions"));
     await handlers.get("session_start")!({}, ctx);
     await handlers.get("agent_settled")!({}, ctx);
-    // A resumed session does not resend evidence an earlier settle already delivered.
+    // A resumed session does not resend source events an earlier settle already delivered.
     assert.equal(
       submitted.filter((batch) => batch.external_id.startsWith("branch:"))
         .length,

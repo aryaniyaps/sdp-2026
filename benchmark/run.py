@@ -352,7 +352,7 @@ def retrieve(run, data, base, selected_conditions):
                 "top_k": CONFIG["top_k"],
                 "raw_only": condition == "raw_hybrid",
                 "graph": condition not in ("raw_hybrid", "no_graph"),
-                "observations": condition != "no_consolidation",
+                "inferences": condition != "no_consolidation",
                 "temporal": condition not in ("raw_hybrid",),
             }
             response = api(base, "/api/v2/recall", request, timeout=900)

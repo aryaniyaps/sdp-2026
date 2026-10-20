@@ -289,7 +289,7 @@ export function DemoPage() {
           </Modal.Header>
           <Modal.Body>
             <p>
-              Permanently delete all memories, facts and entities in{" "}
+              Permanently delete all memories, assertions and entities in{" "}
               <strong>{clearTarget}</strong>. This cannot be undone.
             </p>
             <Form.Label htmlFor="clear-confirmation">

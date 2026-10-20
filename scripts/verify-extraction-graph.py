@@ -63,32 +63,32 @@ def main():
             time.sleep(2)
         raise TimeoutError('Jobs did not finish; see receipt')
 
-    def facts(graph, value):
+    def assertions_with(graph, value):
         return [a for a in graph['assertions']
-                if a['kind'] != 'observation' and a['value'].lower() == value.lower()]
+                if a['kind'] != 'inference' and a['value'].lower() == value.lower()]
 
     try:
         receipt['health'] = request('/healthz')
         initial = retain('initial', "Project Orion's database is PostgreSQL.")
-        old = facts(initial, 'PostgreSQL')
+        old = assertions_with(initial, 'PostgreSQL')
         check('initial_fact_active', old and old[0]['status'] == 'active')
         old = old[0]
         check('database_entity_extracted', any(e['name'] == 'PostgreSQL' and e['entity_type'] == 'technology'
                                                 for e in initial['entities']))
         conflict = retain('conflict', "Project Orion's database is MySQL.")
-        new = facts(conflict, 'MySQL')
+        new = assertions_with(conflict, 'MySQL')
         check('both_conflicting_values_contested', new and new[0]['status'] == 'contested'
-              and facts(conflict, 'PostgreSQL')[0]['status'] == 'contested')
+              and assertions_with(conflict, 'PostgreSQL')[0]['status'] == 'contested')
         new = new[0]
         check('subject_identity_preserved', old['subject_id'] == new['subject_id'])
         check('contradiction_edge', any(e['from_id'] == new['id'] and e['to_id'] == old['id']
                                        and e['relation'] == 'contradicts' for e in conflict['edges']))
         correction = retain('correction', "Correction: Project Orion's database is SQLite, not PostgreSQL or MySQL.")
-        current = facts(correction, 'SQLite')
+        current = assertions_with(correction, 'SQLite')
         check('explicit_correction_active', current and current[0]['status'] == 'active')
         current = current[0]
-        check('both_old_values_superseded', all(facts(correction, v)[0]['status'] == 'superseded'
-              and facts(correction, v)[0]['valid_to'] is not None for v in ['PostgreSQL', 'MySQL']))
+        check('both_old_values_superseded', all(assertions_with(correction, v)[0]['status'] == 'superseded'
+              and assertions_with(correction, v)[0]['valid_to'] is not None for v in ['PostgreSQL', 'MySQL']))
         check('supersession_edges', all(any(e['from_id'] == current['id'] and e['to_id'] == a['id']
               and e['relation'] == 'supersedes' for e in correction['edges']) for a in [old, new]))
         entities = retain('entities', 'Mira owns Project Orion at Cedar Labs.')

@@ -1,4 +1,4 @@
-//! Evidence-backed graph domain. Assertions are not arbitrary mutable text blobs.
+//! Source-grounded graph domain. Assertions are not arbitrary mutable text blobs.
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -11,10 +11,10 @@ pub struct RetainRequest {
     pub external_id: String,
     #[serde(default)]
     pub metadata: Value,
-    pub events: Vec<EvidenceEvent>,
+    pub events: Vec<SourceEvent>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct EvidenceEvent {
+pub struct SourceEvent {
     pub role: String,
     pub content: String,
     pub occurred_at: DateTime<Utc>,
@@ -95,7 +95,7 @@ fn optional_timestamp<'de, D: serde::Deserializer<'de>>(
         .transpose()
 }
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ObservationInput {
+pub struct InferenceInput {
     pub subject_id: Uuid,
     pub statement: String,
     pub predicate: String,
@@ -106,7 +106,9 @@ pub struct ObservationInput {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Consolidation {
-    pub observations: Vec<ObservationInput>,
+    /// The trained consolidation model names its output `observations`.
+    #[serde(rename = "observations")]
+    pub inferences: Vec<InferenceInput>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AssertionView {
@@ -125,11 +127,11 @@ pub struct AssertionView {
     pub event_at: Option<DateTime<Utc>>,
     pub recorded_at: DateTime<Utc>,
     pub confidence: f32,
-    pub sources: Vec<EvidenceSource>,
+    pub sources: Vec<SourceQuote>,
     pub relations: Vec<RelatedInput>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct EvidenceSource {
+pub struct SourceQuote {
     pub chunk_id: Uuid,
     pub quote: String,
     pub role: String,
@@ -150,7 +152,25 @@ pub struct Job {
     pub error: Option<String>,
 }
 
-pub fn validate_claim(c: &ClaimInput, events: &[EvidenceEvent]) -> Result<(), crate::AppError> {
+/// Assertion kinds as stored. The extraction and consolidation models were trained on the
+/// earlier names `fact` and `observation`, so the two conversions below are the only place
+/// those names meet the stored ones (see docs/terminology.md).
+pub fn kind_from_model(kind: &str) -> &str {
+    match kind {
+        "fact" => "attribute",
+        "observation" => "inference",
+        other => other,
+    }
+}
+pub fn kind_to_model(kind: &str) -> &str {
+    match kind {
+        "attribute" => "fact",
+        "inference" => "observation",
+        other => other,
+    }
+}
+
+pub fn validate_claim(c: &ClaimInput, events: &[SourceEvent]) -> Result<(), crate::AppError> {
     use crate::AppError::Validation;
     for (field, value) in [
         ("subject.name", &c.subject.name),
@@ -276,8 +296,8 @@ fn clip(text: &str, max: usize) -> String {
 #[cfg(test)]
 mod claim_validation_tests {
     use super::*;
-    fn event(content: &str) -> EvidenceEvent {
-        EvidenceEvent {
+    fn event(content: &str) -> SourceEvent {
+        SourceEvent {
             role: "user".into(),
             content: content.into(),
             occurred_at: Utc::now(),
@@ -394,5 +414,17 @@ mod timestamp_tests {
         assert_eq!(day.date, offset.date);
         assert!(serde_json::from_str::<DateFixture>(r#"{"date":"yesterday"}"#).is_err());
         assert!(serde_json::from_str::<DateFixture>(r#"{"date":"2026-02-30"}"#).is_err());
+    }
+
+    #[test]
+    fn model_kind_names_translate_both_ways() {
+        for (model, stored) in [
+            ("fact", "attribute"),
+            ("observation", "inference"),
+            ("goal", "goal"),
+        ] {
+            assert_eq!(kind_from_model(model), stored);
+            assert_eq!(kind_to_model(stored), model);
+        }
     }
 }

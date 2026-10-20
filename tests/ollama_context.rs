@@ -16,7 +16,7 @@ use axum::{
 use http_body_util::BodyExt;
 use memory_engine::{
     AppError, AppState, api,
-    knowledge::{EvidenceEvent, Job, RetainRequest},
+    knowledge::{Job, RetainRequest, SourceEvent},
     model::{JsonModel, OllamaJsonModel, OllamaLimits, cached_generate, estimate_tokens},
     providers::Embedder,
     store::Store,
@@ -310,7 +310,7 @@ fn repository_text(chars: usize) -> String {
         include_str!("../src/v2/recall.rs"),
         include_str!("../src/worker/mod.rs"),
         include_str!("../src/graph.rs"),
-        include_str!("../docs/evidence-memory.md"),
+        include_str!("../docs/memory-design.md"),
         include_str!("../README.md"),
     ]
     .join("\n");
@@ -390,7 +390,7 @@ async fn live_shrunk_extract_prompt_fits_the_real_context() {
     let Some((base, model)) = live_base() else {
         return;
     };
-    let facts: Vec<Value> = (0..80)
+    let assertions: Vec<Value> = (0..80)
         .map(|n| {
             json!({"id":Uuid::new_v4(),"subject":format!("Person {n}"),"subject_id":Uuid::new_v4(),"predicate":"likes","value":"hiking in the mountains","cardinality":"multiple","valid_from":"2026-01-02T03:04:05.123456Z"})
         })
@@ -398,12 +398,13 @@ async fn live_shrunk_extract_prompt_fits_the_real_context() {
     let events = vec![
         json!({"source_index":0,"event":{"role":"user","content":repository_text(20000),"occurred_at":"2026-02-03T04:05:06Z","metadata":null}}),
     ];
-    let full = memory_engine::worker::extract_prompt(&facts, &events);
+    let full = memory_engine::worker::extract_prompt(&assertions, &events);
     assert!(
         limits().preflight(&full).is_err(),
         "the unshrunk prompt must not fit, or this test proves nothing"
     );
-    let (kept, dropped) = memory_engine::worker::fit_existing_facts(&facts, &events, &limits());
+    let (kept, dropped) =
+        memory_engine::worker::fit_existing_assertions(&assertions, &events, &limits());
     let prompt = format!(
         "{}\n\nIgnore the task above and reply with the single word OK.",
         memory_engine::worker::extract_prompt(&kept, &events)
@@ -442,7 +443,7 @@ impl JsonModel for Recording {
         self.limits
     }
 }
-fn snapshot_facts(count: usize) -> Vec<Value> {
+fn snapshot_assertions(count: usize) -> Vec<Value> {
     (0..count)
         .map(|n| {
             json!({"id":Uuid::new_v4(),"subject":format!("Subject {n}"),"subject_id":Uuid::new_v4(),"predicate":"likes","value":format!("thing number {n} with some padding words"),"cardinality":"multiple","valid_from":"2026-01-02T00:00:00Z"})
@@ -450,28 +451,28 @@ fn snapshot_facts(count: usize) -> Vec<Value> {
         .collect()
 }
 /// Retains the events, then turns their extract job into a running job owned by this test, so no
-/// other job in the database can be claimed or disturbed. Returns the job and the evidence
+/// other job in the database can be claimed or disturbed. Returns the job and the source events
 /// events as the worker will see them.
 async fn running_extract_job(
     store: &Store,
-    facts: &[Value],
+    assertions: &[Value],
     content: &str,
-) -> (Job, Vec<EvidenceEvent>) {
+) -> (Job, Vec<SourceEvent>) {
     let ns = format!("ctx-extract-{}", Uuid::new_v4());
-    let events = vec![EvidenceEvent {
+    let events = vec![SourceEvent {
         role: "user".into(),
         content: format!("{content} ({ns})"),
         occurred_at: chrono::Utc::now(),
         metadata: json!({}),
     }];
-    running_extract_job_for(store, facts, ns, events).await
+    running_extract_job_for(store, assertions, ns, events).await
 }
 async fn running_extract_job_for(
     store: &Store,
-    facts: &[Value],
+    assertions: &[Value],
     ns: String,
-    events: Vec<EvidenceEvent>,
-) -> (Job, Vec<EvidenceEvent>) {
+    events: Vec<SourceEvent>,
+) -> (Job, Vec<SourceEvent>) {
     let (episode, job_id, _) = store
         .retain(&RetainRequest {
             namespace: ns.clone(),
@@ -484,14 +485,14 @@ async fn running_extract_job_for(
         .unwrap();
     let token = Uuid::new_v4();
     sqlx::query("UPDATE memory_jobs SET status='running',attempts=1,lease_token=$2,lease_until=now()+interval '15 minutes',payload=payload || jsonb_build_object('existing_snapshot',$3::jsonb) WHERE id=$1")
-        .bind(job_id).bind(token).bind(json!(facts)).execute(&store.pool).await.unwrap();
+        .bind(job_id).bind(token).bind(json!(assertions)).execute(&store.pool).await.unwrap();
     sqlx::query("INSERT INTO memory_namespace_leases(namespace,job_id,lease_token,lease_until) VALUES($1,$2,$3,now()+interval '15 minutes')")
         .bind(&ns).bind(job_id).bind(token).execute(&store.pool).await.unwrap();
     let job = Job {
         id: job_id,
         namespace: ns.clone(),
         kind: "extract".into(),
-        payload: json!({"episode_id":episode,"existing_snapshot":facts}),
+        payload: json!({"episode_id":episode,"existing_snapshot":assertions}),
         status: "running".into(),
         attempts: 1,
         lease_token: Some(token),
@@ -499,7 +500,7 @@ async fn running_extract_job_for(
         error: None,
     };
     let events = store
-        .episode_evidence(&ns, episode)
+        .episode_events(&ns, episode)
         .await
         .unwrap()
         .into_iter()
@@ -510,10 +511,10 @@ async fn running_extract_job_for(
 async fn extract_with(
     store: &Store,
     model: Arc<Recording>,
-    facts: &[Value],
+    assertions: &[Value],
     content: &str,
-) -> (Value, String, Vec<Value>, Vec<EvidenceEvent>) {
-    let (job, events) = running_extract_job(store, facts, content).await;
+) -> (Value, String, Vec<Value>, Vec<SourceEvent>) {
+    let (job, events) = running_extract_job(store, assertions, content).await;
     let state = AppState {
         store: store.clone(),
         graph: None,
@@ -550,18 +551,18 @@ async fn worker_shrinks_the_snapshot_for_a_local_model_and_leaves_hosted_alone()
             .unwrap(),
     );
     store.migrate().await.unwrap();
-    let facts = snapshot_facts(80);
+    let assertions = snapshot_assertions(80);
 
     // The expanded prompt plus wire instructions leaves no repair-adjusted snapshot
-    // room at 4096. At 5120 the snapshot still shrinks but relevant facts can survive.
+    // room at 4096. At 5120 the snapshot still shrinks but relevant assertions can survive.
     let small = OllamaLimits::new(5120, 1024).unwrap();
     let local = Arc::new(Recording {
         prompts: Mutex::new(Vec::new()),
         limits: Some(small),
     });
     let (result, prompt, _, _) =
-        extract_with(&store, local, &facts, "Subject 77 now prefers tea.").await;
-    let dropped = result["existing_facts_dropped"].as_u64().unwrap() as usize;
+        extract_with(&store, local, &assertions, "Subject 77 now prefers tea.").await;
+    let dropped = result["existing_assertions_dropped"].as_u64().unwrap() as usize;
     assert!(dropped > 0 && dropped < 80, "{result}");
     assert!(
         estimate_tokens(&prompt) + small.num_predict <= small.num_ctx,
@@ -570,12 +571,12 @@ async fn worker_shrinks_the_snapshot_for_a_local_model_and_leaves_hosted_alone()
     assert!(prompt.starts_with("You are the extraction worker"));
     assert!(prompt.contains("Existing facts: ["));
     assert!(
-        prompt.contains(facts[77]["id"].as_str().unwrap()),
-        "the fact the batch talks about is kept"
+        prompt.contains(assertions[77]["id"].as_str().unwrap()),
+        "the assertion the batch talks about is kept"
     );
     assert!(
-        !prompt.contains(facts[79]["id"].as_str().unwrap()),
-        "the oldest fact that is not mentioned goes first"
+        !prompt.contains(assertions[79]["id"].as_str().unwrap()),
+        "the oldest assertion that is not mentioned goes first"
     );
 
     let tiny = OllamaLimits::new(4096, 1024).unwrap();
@@ -584,24 +585,27 @@ async fn worker_shrinks_the_snapshot_for_a_local_model_and_leaves_hosted_alone()
         limits: Some(tiny),
     });
     let (result, prompt, _, _) =
-        extract_with(&store, model, &facts, "Subject 77 now prefers tea.").await;
-    assert_eq!(result["existing_facts_dropped"], 80);
+        extract_with(&store, model, &assertions, "Subject 77 now prefers tea.").await;
+    assert_eq!(result["existing_assertions_dropped"], 80);
     assert!(prompt.contains("Subject 77 now prefers tea."));
     assert!(estimate_tokens(&prompt) + tiny.num_predict <= tiny.num_ctx);
 
-    // A model with no known window keeps every fact.
+    // A model with no known window keeps every assertion.
     let hosted = Arc::new(Recording {
         prompts: Mutex::new(Vec::new()),
         limits: None,
     });
     let (result, prompt, event_values, _) =
-        extract_with(&store, hosted, &facts, "Subject 77 now prefers tea.").await;
-    assert!(result.get("existing_facts_dropped").is_none(), "{result}");
+        extract_with(&store, hosted, &assertions, "Subject 77 now prefers tea.").await;
+    assert!(
+        result.get("existing_assertions_dropped").is_none(),
+        "{result}"
+    );
     assert_eq!(
         prompt,
-        memory_engine::worker::extract_prompt(&facts, &event_values)
+        memory_engine::worker::extract_prompt(&assertions, &event_values)
     );
-    assert!(prompt.contains(facts[79]["id"].as_str().unwrap()));
+    assert!(prompt.contains(assertions[79]["id"].as_str().unwrap()));
     sqlx::query("DELETE FROM model_cache WHERE model='recording-fixture'")
         .execute(&store.pool)
         .await
@@ -652,7 +656,8 @@ async fn refused_repair_prompt_forgets_the_invalid_reply_it_followed() {
         .execute(&store.pool)
         .await
         .unwrap();
-    let (job, _) = running_extract_job(&store, &snapshot_facts(2), "Subject 1 likes tea.").await;
+    let (job, _) =
+        running_extract_job(&store, &snapshot_assertions(2), "Subject 1 likes tea.").await;
     let model = Arc::new(RefusesRepair {
         calls: Mutex::new(0),
     });
@@ -735,14 +740,14 @@ async fn a_long_session_is_read_in_windows_and_claims_keep_episode_indices() {
     let ns = format!("ctx-windows-{}", Uuid::new_v4());
     // 14 events of about 4,000 characters: far more than one window, and each longer than the
     // 1,600 characters the model is shown.
-    let events: Vec<EvidenceEvent> = (0..14)
-        .map(|n| EvidenceEvent {
+    let events: Vec<SourceEvent> = (0..14)
+        .map(|n| SourceEvent {
             role: "tool".into(),
             content: format!("marker-{n:02} {}", "build output line\n".repeat(220)),
             occurred_at: chrono::Utc::now(),
             metadata: json!({"tool":"bash","tool_call_id":format!("call-{n}"),"input":{"command":"make"}}),
         })
-        .flat_map(|event| [EvidenceEvent {
+        .flat_map(|event| [SourceEvent {
             role: "assistant".into(), content: "DERIVED_ECHO_MUST_NOT_BECOME_A_FACT".into(),
             occurred_at: event.occurred_at, metadata: json!({"memory_derived":true}),
         }, event])
@@ -779,7 +784,7 @@ async fn a_long_session_is_read_in_windows_and_claims_keep_episode_indices() {
             "indices restart in each window"
         );
     }
-    // Each window's claim was checked against its own events; the stored evidence must point at
+    // Each window's claim was checked against its own events; the stored source quotes must point at
     // the event that really holds the quote, which only holds if the indices were shifted.
     let rows: Vec<(String, String)> = sqlx::query_as(
         "SELECT s.quote, e.content FROM assertion_sources s \
@@ -838,7 +843,7 @@ async fn extraction_decodes_paired_sources_but_returns_the_canonical_contract() 
 }
 
 #[tokio::test]
-async fn reflection_sends_exact_evidence_ids_as_a_citation_enum() {
+async fn reflection_sends_exact_cited_ids_as_a_citation_enum() {
     let id = "79c6279e-e958-43c8-9954-63d36427f42c";
     let reply = json!({"answer":"Chennai.","citations":[id],"insufficient_evidence":false});
     let (base, fake) = fake_ollama(json!({"response":reply.to_string(),"done":true,"done_reason":"stop","prompt_eval_count":500,"eval_count":60})).await;

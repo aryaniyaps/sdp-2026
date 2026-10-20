@@ -1,4 +1,4 @@
-export type EvidenceEvent = {
+export type SourceEvent = {
   role: string;
   content: string;
   occurred_at: string;
@@ -8,7 +8,7 @@ export type RetainBatch = {
   namespace: string;
   session_id: string;
   external_id: string;
-  events: EvidenceEvent[];
+  events: SourceEvent[];
   metadata: Record<string, unknown>;
 };
 export type RecallResult = {

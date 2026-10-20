@@ -2,18 +2,18 @@
 
 Memory Engine stores conversation history for a coding assistant and retrieves relevant parts in later sessions. It is our SDP project, built with Rust, PostgreSQL, Neo4j, and a React frontend.
 
-The main idea is to keep the original conversation as evidence instead of storing only a generated summary. Facts link back to the text they came from. When a user corrects something, the previous fact stays in the history with its validity dates.
+The main idea is to keep the original conversation as the source instead of storing only a generated summary. Assertions extracted from it link back to the text they came from. When a user corrects something, the previous assertion stays in the history with its validity dates. [docs/terminology.md](docs/terminology.md) defines the names used here.
 
 ## What it does
 
 - Saves user, assistant, and tool messages in separate namespaces.
-- Extracts facts in the background and keeps their source quotes.
-- Tracks corrections, conflicting facts, and dated events.
+- Extracts assertions in the background and keeps their source quotes.
+- Tracks corrections, conflicting assertions, and dated events.
 - Combines text search, vector search, and graph connections during recall.
 - Returns cited context within a token budget.
 - Connects to Pi to recall earlier sessions and save new interactions.
 
-The dashboard lets you save an interaction, ask a question, inspect a fact's evidence, and view processing traces. The graph page shows memories, facts, and entities, with search, zoom, and node details. Both pages use React; forms, cards, tables, and dialogs use React Bootstrap. The graph layout and canvas renderer live separately from the page components.
+The dashboard lets you save an interaction, ask a question, inspect an assertion's sources, and view processing traces. The graph page shows memories, assertions, and entities, with search, zoom, and node details. Both pages use React; forms, cards, tables, and dialogs use React Bootstrap. The graph layout and canvas renderer live separately from the page components.
 
 ## Running locally (including offline)
 
@@ -179,7 +179,7 @@ Health must report `database: true`, `embedder: true`, `degraded_mode: false` an
 the intended worker model. Installed model checks are not a semantic accuracy test.
 For actual extraction, retain the API example below, then inspect
 `/api/v2/jobs?namespace=example` until extraction, consolidation and projection finish;
-recall should return supported facts. A successful retain alone only means queued.
+recall should return supported assertions. A successful retain alone only means queued.
 
 If port 8080 is occupied, use the existing native service or stop it before launching
 the foreground script. If the browser stack cannot reach host Ollama, check that the
@@ -193,7 +193,7 @@ prepared application image/binary.
 This example follows a fictional person's information through retention,
 extraction, consolidation, corrections and recall. It also covers conflicting
 reports and retrieval from a new Pi session. The API responses and graph expose
-the evidence behind each stage.
+the sources behind each stage.
 
 ### Setup
 
@@ -203,7 +203,7 @@ the evidence behind each stage.
    this repository. Use the browser stack's API at **18080** throughout; the native
    service at 8080 has separate data.
 3. Use a fresh namespace for each run to keep existing project memory intact.
-   Model wording, extraction counts, observations and latency can vary. The checks
+   Model wording, extraction counts, inferences and latency can vary. The checks
    below describe expected behavior; inspect the actual results at each stage.
 4. Keep the responses for comparison between runs. If inference fails, inspect
    the current job error and distinguish it from any earlier successful result.
@@ -246,7 +246,7 @@ memory_request /healthz
 ```
 
 Open the printed graph URL. Use **Fit**, **Search nodes**, and the **Memories**,
-**Facts**, and **Entities** toggles to inspect one layer at a time. Click nodes
+**Assertions**, and **Entities** toggles to inspect one layer at a time. Click nodes
 for details; hover over purple arrows to read their relation. Keep the namespace
 identical in the terminal, graph and Pi.
 
@@ -254,19 +254,19 @@ identical in the terminal, graph and Pi.
 
 | Term | Meaning |
 | --- | --- |
-| Evidence / memory | The original retained message, role, timestamp and source text. Click a memory node to see the facts it supports. |
+| Source event / memory | The original retained message, role, timestamp and source text. Click a memory node to see the assertions it supports. |
 | Claim | The extractor's proposed subject, predicate, value, kind, confidence and source quotes. The job's `result.decisions` records accepted actions and assertion IDs; inspect those assertions for the stored fields. The public job response does not expose the full raw model proposal. |
-| Assertion / fact | A stored, validated claim with an ID, status and validity dates. Click a fact and inspect its assertion API response. “Validated” means structural/source checks, not proof that the speaker is truthful. |
-| Entity | A person, place, technology or other subject mentioned by facts. Entity links connect related knowledge. |
-| Observation | A derived assertion produced by consolidation, supported by other assertions. Follow its support relations back to source-backed facts. It is an inference, not a direct quote. |
+| Assertion | A stored, validated claim with an ID, status and validity dates. Click an assertion and inspect its assertion API response. “Validated” means structural/source checks, not proof that the speaker is truthful. |
+| Entity | A person, place, technology or other subject mentioned by assertions. Entity links connect related knowledge. |
+| Inference | A derived assertion (kind `inference`) produced by consolidation, supported by two or more other assertions. Follow its support relations back to source-grounded assertions. It is derived, not a direct quote. |
 | Correction | A new accepted value supersedes a previous belief while retaining its history. |
-| Contradiction | Incompatible values remain contested when there is no sufficiently confident explicit correction. Both claims retain their evidence. |
-| Recall / reflection | Recall returns ranked evidence and packed context; reflection generates an answer with citations to retrieved IDs. Pi uses recall to inform its own response. |
+| Contradiction | Incompatible values remain contested when there is no sufficiently confident explicit correction. Both claims retain their source quotes. |
+| Recall / reflection | Recall returns ranked assertions and source chunks and packed context; reflection generates an answer with citations to retrieved IDs. Pi uses recall to inform its own response. |
 
-### 1. Retain evidence
+### 1. Retain source events
 
 Use the API for the first part so the source is exactly what you type, without
-an assistant response adding extra facts. This is the same retention API used by Pi.
+an assistant response adding extra statements. This is the same retention API used by Pi.
 
 ```sh
 memory_request /api/v2/retain '{"session_id":"maya-story","external_id":"initial","events":[{"role":"user","content":"My name is Maya Sen. I live in Pune. I prefer vegetarian meals. I avoid meat when choosing restaurants. My sister is Leela Sen.","occurred_at":"2026-10-08T09:00:00Z"}]}'
@@ -274,7 +274,7 @@ memory_request /api/v2/jobs
 memory_request /api/v2/status
 ```
 
-The response includes `episode_id`, `job_id` and `created`: evidence is durable, but extraction
+The response includes `episode_id`, `job_id` and `created`: the source events are durable, but extraction
 may still be running. Repeat the jobs/status requests until work finishes.
 Inspect `extract`, `consolidate` and `project` jobs and their `status`, `attempts`,
 `result` and `error`. Jobs may finish too quickly to catch every intermediate state.
@@ -284,10 +284,10 @@ source-backed assertions. An empty namespace can also report ready, so readiness
 alone is insufficient. Inspect `embedding_gaps` too. Wait for this stage before
 submitting the next episode; sequential episodes make the history easy to follow.
 
-### 2. Inspect facts and source evidence
+### 2. Inspect assertions and their sources
 
 Search for **Maya** or **Pune**. Click the memory and read its original text, then
-click the residence fact to inspect its source quote. The same data is available
+click the residence assertion to inspect its source quote. The same data is available
 through the API:
 
 ```sh
@@ -308,21 +308,21 @@ to 100 assertions. Projection and memory endpoints also have limits, so use this
 small namespace to avoid truncation. One graph view may not contain a large
 account's entire history.
 
-### 3. Inspect derived observations
+### 3. Inspect derived inferences
 
-Look for an observation about Maya's food preferences. In the graph legend,
-observations have a distinct style within the **Facts** layer. Select one and
-follow its support relations to the vegetarian preference and avoiding-meat facts.
-In `/api/v2/graph`, locate `kind: "observation"` and its `supports`/`derives` edges;
+Look for an inference about Maya's food preferences. In the graph legend,
+inferences are drawn as diamonds within the **Assertions** layer. Select one and
+follow its support relations to the vegetarian preference and avoiding-meat assertions.
+In `/api/v2/graph`, locate `kind: "inference"` and its `supports`/`derives` edges;
 inspect the supporting assertion IDs with the assertion endpoint.
 
-**Checkpoint:** the observation is active and has at least two distinct supporting
-facts, each traceable to evidence. Check that the inference follows from its
+**Checkpoint:** the inference is active and has at least two distinct supporting
+assertions, each traceable to a source quote. Check that the inference follows from its
 supports: a vegetarian preference, for example, does not establish an allergy.
-If consolidation produces no observation, inspect its job result. A successful
+If consolidation produces no inference, inspect its job result. A successful
 job need not produce new knowledge.
 
-### 4. Correct a fact and query its history
+### 4. Correct an assertion and query its history
 
 ```sh
 memory_request /api/v2/retain '{"session_id":"maya-story","external_id":"move","events":[{"role":"user","content":"I am Maya Sen. Correction: I moved from Pune to Chennai today. My current home city is Chennai, not Pune. My vegetarian meal preference has not changed.","occurred_at":"2026-10-08T10:00:00Z"}]}'
@@ -346,11 +346,11 @@ at least **0.8** to supersede automatically. Before saving a nonempty extraction
 the same local SLM separately reviews update intent and named entity mentions
 against the cited quotes. A proposed correction needs a confirmed, verbatim change
 quote; a plain conflicting report remains contested. Added entity names must occur
-in the quoted evidence. This adds an inference call and does not guarantee complete
+in the cited quotes. This adds an inference call and does not guarantee complete
 semantic extraction. The extractor still has to recognize the same subject and
-predicate. Dependent observations can become stale when their support changes.
+predicate. Dependent inferences can become stale when their support changes.
 
-Check entities, conflicting reports, explicit corrections, evidence and Neo4j
+Check entities, conflicting reports, explicit corrections, source quotes and Neo4j
 history in a separate diagnostic namespace (no project data is cleared):
 
 ```sh
@@ -379,12 +379,12 @@ Two conflicting reports do not establish which one is correct.
 This depends on the model extracting a shared slot without marking a correction.
 If it chooses different predicates or treats the second report as a correction,
 inspect the stored assertions and job decisions to identify the mismatch.
-`contested` facts remain eligible for recall; check whether retrieval returns both.
+`contested` assertions remain eligible for recall; check whether retrieval returns both.
 
-### 6. Retrieve evidence and generate cited answers
+### 6. Retrieve memory and generate cited answers
 
 ```sh
-memory_request /api/v2/recall '{"query":"What meals does Maya Sen prefer?","max_tokens":2048,"graph":true,"observations":true}'
+memory_request /api/v2/recall '{"query":"What meals does Maya Sen prefer?","max_tokens":2048,"graph":true,"inferences":true}'
 memory_request /api/v2/reflect '{"query":"What meals does Maya Sen prefer?","max_tokens":2048}'
 memory_request /api/v2/graph/projection
 memory_request '/api/v2/traces?limit=10'
@@ -396,13 +396,13 @@ A path may be empty if a result came directly from text/vector retrieval.
 In the reflection response, inspect `answer`, `citations` and `insufficient_evidence`; resolve
 citation IDs against `recall.results` and inspect their source quotes.
 
-PostgreSQL holds the authoritative evidence/assertions while Neo4j
+PostgreSQL holds the authoritative source events and assertions while Neo4j
 holds the graph projection. The projection endpoint demonstrates actual Neo4j
 nodes/relationships; a PostgreSQL graph response alone does not prove that
 projection succeeded. Traces make retrieval and worker behavior inspectable.
 
 For an optional comparison, repeat recall with `graph: false` and
-`observations: false`, then with `raw_only: true`. These isolate capabilities;
+`inferences: false`, then with `raw_only: true`. These isolate capabilities;
 they are not a lexical-only baseline or an accuracy benchmark, and a simple
 question may return the same answer in every configuration.
 
@@ -423,7 +423,7 @@ Click **New session** in the console. Confirm the namespace again and ask:
 
 Inspect the `memory_recall` result if Pi invokes the tool, or inspect the namespace's
 recall traces for automatic pre-turn recall. The new session has not been given
-the biography; a supported answer should identify Leela Sen from retained evidence.
+the biography; a supported answer should identify Leela Sen from retained memory.
 Check `/memory-status` after the turn for retention/spool state. Pi answering
 successfully without visible retrieved evidence is not enough to prove memory use.
 The API and graph work locally; Pi's configured remote model requires
@@ -441,16 +441,16 @@ env -u PYTHONPATH slm-distill/.venv/bin/python slm-distill/verify_live_memory.py
 This uses its own `acceptance-general:...` namespace, not `WALKTHROUGH_NS`, and needs the
 training environment's Python dependencies and access to the configured Ollama
 (default `http://127.0.0.1:11434`; use `--ollama-url` if different). It checks
-extraction, source evidence, observations, correction, projection, recall and
+extraction, source quotes, inferences, correction, projection, recall and
 reflection. It does **not** verify the ambiguous-conflict or new-Pi-session steps;
 check those separately. Read `passed`, individual checks, timestamps and model
 identity, then open the receipt's namespace in the graph.
 
 | What goes wrong | What to inspect next |
 | --- | --- |
-| Retain succeeded but no facts appear | `/api/v2/jobs`: evidence is saved before inference. Inspect failed jobs' `error` and `result`; inspect the memory node's extraction state. |
-| Fact exists in API but not graph | Confirm namespace; inspect projection jobs and `/api/v2/graph/projection`. |
-| Wrong/unsupported fact | Compare the assertion's quotes with the original text and the extraction job decisions. Source matching does not guarantee semantic accuracy. |
+| Retain succeeded but no assertions appear | `/api/v2/jobs`: source events are saved before extraction. Inspect failed jobs' `error` and `result`; inspect the memory node's extraction state. |
+| Assertion exists in API but not graph | Confirm namespace; inspect projection jobs and `/api/v2/graph/projection`. |
+| Wrong/unsupported assertion | Compare the assertion's quotes with the original text and the extraction job decisions. Source matching does not guarantee semantic accuracy. |
 | Recall is empty or degraded | Check namespace, worker/embedding health, `embedding_gaps`, `degraded_reasons`, temporal filters and trace. |
 | Pi does not retrieve the saved information | Confirm `MEMORY_URL` points to 18080, the exact namespace, `/memory-status`, and recall traces. |
 | A job failed | Fix the reported cause first, then retry that job as shown below; retain the failure receipt. |
@@ -463,7 +463,7 @@ memory_request /api/v2/jobs
 ```
 
 The complete flow is: original memory → exact quote → assertion → supported
-observation → correction/history → contested conflict → cited recall →
+inference → correction/history → contested conflict → cited recall →
 new-session use. Record which checks passed, failed or were not run alongside
 the saved responses. Keep receipts outside Git and do not include credentials.
 
@@ -495,13 +495,13 @@ src/
   api.rs                 health, traces, metrics, and API docs
   web.rs                 serves the built React app
   v2/
-    mod.rs               evidence API routes and job status
+    mod.rs               v2 API routes and job status
     graph.rs             graph inspection and maintenance
     recall.rs            retrieval, ranking, and context packing
     reflect.rs           answers grounded in retrieved evidence
   knowledge_store/
-    evidence.rs          stores conversation batches
-    assertions.rs        facts, corrections, and observations
+    sources.rs           stores source events (conversation batches)
+    assertions.rs        assertions, corrections, and inferences
     jobs.rs              queue leases, retries, and completion
     maintenance.rs       namespace cleanup
   worker/                job processing and extraction prompts
@@ -521,7 +521,7 @@ slm-distill/             separate local-model training experiment
 scripts/                 startup, verification, and demo commands
 ```
 
-PostgreSQL is the source of truth. Neo4j holds a projection for graph traversal. Workers pick up durable jobs, and a failed graph write can be retried without losing the original evidence. A namespace keeps one user's memory separate from another's.
+PostgreSQL is the source of truth. Neo4j holds a projection for graph traversal. Workers pick up durable jobs, and a failed graph write can be retried without losing the original source events. A namespace keeps one user's memory separate from another's.
 
 The V1 memory API, deterministic demo controls, and original resolver have been removed. Traces now use `/api/v2/traces`. Existing migrations are kept unchanged so older databases can upgrade; namespace cleanup also removes rows left by the old resolver. The benchmark no longer runs its retired `legacy` condition.
 
@@ -539,7 +539,7 @@ Or install it for all sessions:
 pi install /absolute/path/to/sdp-2026/integrations/pi
 ```
 
-The extension recalls relevant memory before a turn and saves new messages and tool output afterwards. It writes evidence to a local spool before submitting it, so a temporary server failure does not lose the batch. Injected recall context is excluded from retention.
+The extension recalls relevant memory before a turn and saves new messages and tool output afterwards. It writes source events to a local spool before submitting them, so a temporary server failure does not lose the batch. Injected recall context is excluded from retention.
 
 By default, local Pi sessions use `project:<repository basename>:<root path digest>` (or the working directory outside Git). Sessions within one repository share memory; unrelated project roots are isolated. Set `MEMORY_NAMESPACE` to explicitly share memory across projects, or switch the active namespace during a Pi session with `/memory-namespace [namespace]` (without an argument, Pi prompts for one). Switching namespaces marks a retention boundary so earlier conversation is not copied into the new namespace. Clearing also advances that boundary so cleared conversation is not replayed on the next turn. `MEMORY_URL` changes the service address and `MEMORY_SPOOL` changes the local queue location. The extension also provides `memory_recall`, `memory_remember`, `/memory-status`, and `/memory-clear [namespace]`. Clear prompts you to type the namespace exactly, clears server data, then discards queued local batches for that namespace.
 
@@ -547,7 +547,7 @@ Installing it sends session content, including tool output, to the configured se
 
 ## API example
 
-Save some evidence:
+Save some source events:
 
 ```sh
 curl http://127.0.0.1:8080/api/v2/retain \
@@ -565,9 +565,9 @@ curl http://127.0.0.1:8080/api/v2/recall \
   -d '{"namespace":"example","query":"Which language does Ada prefer?","max_tokens":2048}'
 ```
 
-Retention returns once evidence is saved. Extraction happens asynchronously, so a successful retain response does not mean every fact has been extracted yet. Status and traces show pending and failed work.
+Retention returns once the source events are saved. Extraction happens asynchronously, so a successful retain response does not mean every assertion has been extracted yet. Status and traces show pending and failed work.
 
-Recall accepts optional time bounds, graph and observation switches, and `max_distance` for vector relevance filtering. Automatic Pi recall uses a distance cutoff of 0.45, calibrated on a small sample with the default embedding model. It is imperfect for short prompts and needs recalibration for other models. See [the recall notes](docs/evidence-memory.md#recall-relevance-cutoff) for details.
+Recall accepts optional time bounds, graph and inference switches, and `max_distance` for vector relevance filtering. Automatic Pi recall uses a distance cutoff of 0.45, calibrated on a small sample with the default embedding model. It is imperfect for short prompts and needs recalibration for other models. See [the recall notes](docs/memory-design.md#recall-relevance-cutoff) for details.
 
 To clear a namespace:
 
@@ -575,7 +575,7 @@ To clear a namespace:
 ./scripts/clear-graph.sh example
 ```
 
-This deletes its evidence and facts and queues a graph cleanup. The command asks you to confirm the namespace.
+This deletes its source events and assertions and queues a graph cleanup. The command asks you to confirm the namespace.
 
 ## The worker model
 
@@ -629,13 +629,13 @@ python3 scripts/pi-rpc-e2e.py
 
 ## Evaluation status
 
-The evaluation runner compares raw hybrid retrieval, the evidence memory engine, and full conversation history. It also supports graph and consolidation ablations, repeated answers, judging, and human review.
+The evaluation runner compares raw hybrid retrieval, the source-grounded memory engine, and full conversation history. It also supports graph and consolidation ablations, repeated answers, judging, and human review.
 
 The full LongMemEval-S experiment is still pending. Pilot artifacts are not evidence of an accuracy improvement. Follow [the benchmark runbook](benchmark/README.md) for the dataset, commands, saved artifacts, and reporting requirements. Use a new run name after code or configuration changes; the runner rejects incompatible manifests.
 
 Other notes:
 
-- [Backend design and retrieval](docs/evidence-memory.md)
+- [Backend design and retrieval](docs/memory-design.md)
 - [Subsystem review](docs/subsystem-review.md)
 - [Local model distillation experiment](slm-distill/README.md)
 - [Azure deployment](deploy/azure/README.md)
@@ -684,7 +684,7 @@ The original fine-tuned model has not been recovered. This replacement must be a
 
 ### Verify the deployed memory engine
 
-The live check creates its own namespace and preserves its receipts. It exercises everyday preferences and an explicit sister relationship, a home-city correction, supported derived observations, Neo4j projection, recall and cited reflection. It requires actual source quotes, checks that the old city is not still active, and rejects the unsupported addition of a country absent from the fixture. It fails when a required check fails; merely accepting a retain request is insufficient.
+The live check creates its own namespace and preserves its receipts. It exercises everyday preferences and an explicit sister relationship, a home-city correction, supported derived inferences, Neo4j projection, recall and cited reflection. It requires actual source quotes, checks that the old city is not still active, and rejects the unsupported addition of a country absent from the fixture. It fails when a required check fails; merely accepting a retain request is insufficient.
 
 ```sh
 env -u PYTHONPATH slm-distill/.venv/bin/python slm-distill/verify_live_memory.py --url http://127.0.0.1:18080
@@ -692,9 +692,9 @@ env -u PYTHONPATH slm-distill/.venv/bin/python slm-distill/verify_live_memory.py
 
 The default receipt is `slm-distill/data/research-v3/final-acceptance.json`. Check its `deployment_identity_before.health.worker_model`, `passed`, per-check outcomes and timestamps before interpreting it as evidence for a particular release. PostgreSQL remains authoritative; Neo4j is the derived graph projection. Extraction and consolidation are asynchronous, so inspect `/api/v2/jobs?namespace=YOUR_NAMESPACE` until they finish.
 
-The final native acceptance passed all 16 checks. Its first reflection attempt exposed an invalid citation UUID; the deployed decoder now constrains citations to supplied evidence IDs. The second inference run passed after correcting a harness attribution false negative (resolved subject Maya Sen); `final-acceptance.json` explicitly records that same-output re-audit rather than claiming fresh inference. Synthetic screenshots are `slm-distill/data/research-v3/final-graph.png` and `final-graph-observations.png`.
+The final native acceptance passed all 16 checks. Its first reflection attempt exposed an invalid citation UUID; the deployed decoder now constrains citations to supplied evidence IDs. The second model run passed after correcting a harness attribution false negative (resolved subject Maya Sen); `final-acceptance.json` explicitly records that same-output re-audit rather than claiming fresh inference. Synthetic screenshots are `slm-distill/data/research-v3/final-graph.png` and `final-graph-observations.png`.
 
-The original browser `user:dev` queue also completed: 43 extraction, 43 consolidation and 160 projection jobs succeeded, with no pending or failed jobs. Eight active derived observations each have at least two distinct supporting facts. The Neo4j projection contains 112 nodes and 197 relationships, including 21 support/derivation edges. All 142 source-quote links match their stored source chunks verbatim. These are a point-in-time recovery receipt (`original-queue-final.json`), not a general semantic-accuracy benchmark.
+The original browser `user:dev` queue also completed: 43 extraction, 43 consolidation and 160 projection jobs succeeded, with no pending or failed jobs. Eight active inferences each have at least two distinct supporting assertions. The Neo4j projection contains 112 nodes and 197 relationships, including 21 support/derivation edges. All 142 source-quote links match their stored source chunks verbatim. These are a point-in-time recovery receipt (`original-queue-final.json`), not a general semantic-accuracy benchmark.
 
 
 ## References

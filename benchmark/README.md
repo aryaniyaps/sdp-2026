@@ -119,10 +119,10 @@ historical artifacts; start a new run for the current three-condition protocol.
 | Condition | Retrieval / context | Answer count |
 |---|---|---:|
 | `raw_hybrid` | Lexical/vector search over retained source chunks | 500 + 100 + 100 |
-| `enhanced` | Temporal assertions, supported observations and bounded graph expansion | 500 + 100 + 100 |
+| `enhanced` | Temporal assertions, supported inferences and bounded graph expansion | 500 + 100 + 100 |
 | `full_history` | Complete timestamped histories, without memory retrieval | 500 + 100 + 100 |
 | `no_graph` | Enhanced retrieval with graph expansion disabled | 100 |
-| `no_consolidation` | Enhanced retrieval with observations excluded | 100 |
+| `no_consolidation` | Enhanced retrieval with inferences excluded | 100 |
 
 Each retrieval condition runs on all 500 questions, including both ablations.
 Repetitions 1 and 2 use only the fixed 100-question sample; repeat 0 already contains
@@ -173,9 +173,9 @@ incomplete artifacts, not an improvement result. Earlier runs containing
 `retired.json` must not be used for final reporting.
 
 **On another machine, use a new run ID and rebuild all banks.** Dataset, run artifacts,
-model cache and retained evidence are not in Git. Copying only the run folder is
+model cache and retained source events are not in Git. Copying only the run folder is
 insufficient: `ingestion.json` can say a bank is complete while the new database has
-none of its evidence. Resuming the original run requires the matching PostgreSQL
+none of its source events. Resuming the original run requires the matching PostgreSQL
 database, artifacts and exact freeze; reconstruct the Neo4j projection if necessary.
 
 ## 6. Complete the human audit and final report
@@ -238,7 +238,7 @@ Its harness/model settings are currently fixed in `demo/run.py`, so check their
 availability before running on another machine. It uses a disposable repository and
 three fresh sessions. The existing local demonstration passed seven unit tests and
 twelve independent API checks, with the microsecond correction injected into session
-three. Final-session evidence processing stopped at the subscription quota. See
+three. Processing of the final session's source events stopped at the subscription quota. See
 [`docs/pi-demo-results.md`](../docs/pi-demo-results.md).
 
 The demo proves native integration and remembered decisions across sessions; it has

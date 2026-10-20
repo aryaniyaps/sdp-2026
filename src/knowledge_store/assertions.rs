@@ -10,8 +10,8 @@ impl Store {
     ) -> Result<Value, AppError> {
         let episode: Uuid = serde_json::from_value(job.payload["episode_id"].clone())
             .map_err(|e| AppError::Validation(e.to_string()))?;
-        let evidence = self.episode_evidence(&job.namespace, episode).await?;
-        let events: Vec<_> = evidence.iter().map(|(_, e)| e.clone()).collect();
+        let sources = self.episode_events(&job.namespace, episode).await?;
+        let events: Vec<_> = sources.iter().map(|(_, e)| e.clone()).collect();
         if vectors.len() != extraction.claims.len() {
             return Err(AppError::Validation("embedding count mismatch".into()));
         }
@@ -136,7 +136,7 @@ LIMIT 1
 INSERT INTO assertions(namespace, subject_id, predicate, value, normalized_value, STATEMENT, slot_key, CARDINALITY, kind, status, valid_from, event_at, confidence, model, episode_id, embedding)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id
 "#)
-                    .bind(&job.namespace).bind(subject).bind(&c.predicate).bind(&c.value).bind(&value).bind(&c.statement).bind(&slot).bind(c.cardinality.as_str()).bind(&c.kind).bind(status).bind(at).bind(event_at).bind(c.confidence).bind(model).bind(episode).bind(embedding.map(Vector::from)).fetch_one(&mut *tx).await?;
+                    .bind(&job.namespace).bind(subject).bind(&c.predicate).bind(&c.value).bind(&value).bind(&c.statement).bind(&slot).bind(c.cardinality.as_str()).bind(crate::knowledge::kind_from_model(&c.kind)).bind(status).bind(at).bind(event_at).bind(c.confidence).bind(model).bind(episode).bind(embedding.map(Vector::from)).fetch_one(&mut *tx).await?;
                 for old in previous {
                     sqlx::query("INSERT INTO assertion_edges VALUES($1,$2,$3,$4,$5,now())")
                         .bind(&job.namespace)
@@ -158,7 +158,7 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id
                     "INSERT INTO assertion_sources VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
                 )
                 .bind(id)
-                .bind(evidence[*i].0)
+                .bind(sources[*i].0)
                 .bind(q)
                 .execute(&mut *tx)
                 .await?;
@@ -185,7 +185,7 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id
                         .bind(&job.namespace)
                         .bind(eid)
                         .bind(normalize_component(alias))
-                        .bind(evidence[*i].0)
+                        .bind(sources[*i].0)
                         .execute(&mut *tx)
                         .await?;
                     }
@@ -196,7 +196,7 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id
                     return Err(AppError::Validation("invalid extracted relation".into()));
                 }
                 // A model may link a restatement to the assertion that this claim
-                // reinforced. Its evidence is already attached above; it is not
+                // reinforced. Its sources are already attached above; it is not
                 // a relationship between two different assertions.
                 if relation.assertion_id == id {
                     continue;
@@ -281,7 +281,7 @@ ORDER BY e.occurred_at,
         .fetch_all(&self.pool)
         .await?
         .into_iter()
-        .map(|s| EvidenceSource {
+        .map(|s| SourceQuote {
             chunk_id: s.get("chunk_id"),
             quote: s.get("quote"),
             role: s.get("role"),
@@ -318,7 +318,7 @@ ORDER BY e.occurred_at,
         vectors: Vec<Option<Vec<f32>>>,
         model: &str,
     ) -> Result<Value, AppError> {
-        if vectors.len() != c.observations.len() {
+        if vectors.len() != c.inferences.len() {
             return Err(AppError::Validation("embedding count mismatch".into()));
         }
         let mut tx = self.pool.begin().await?;
@@ -345,7 +345,7 @@ SELECT EXISTS
             return Err(AppError::Conflict("consolidation lease lost".into()));
         }
         let mut ids = Vec::new();
-        for (o, v) in c.observations.iter().zip(vectors) {
+        for (o, v) in c.inferences.iter().zip(vectors) {
             let supports: std::collections::HashSet<_> = o.supports.iter().copied().collect();
             if supports.len() < 2
                 || !o.confidence.is_finite()
@@ -354,7 +354,7 @@ SELECT EXISTS
                     .iter()
                     .any(|s| s.trim().is_empty())
             {
-                return Err(AppError::Validation("observation requires two distinct supports, valid confidence and nonempty fields".into()));
+                return Err(AppError::Validation("an inference requires two distinct supports, valid confidence and nonempty fields".into()));
             }
             let rows=sqlx::query("SELECT id,valid_from,subject_id FROM assertions WHERE namespace=$1 AND id=ANY($2) AND status='active' FOR UPDATE").bind(&job.namespace).bind(&o.supports).fetch_all(&mut *tx).await?;
             if rows.len() != supports.len()
@@ -363,7 +363,7 @@ SELECT EXISTS
                     .any(|r| r.get::<Uuid, _>("subject_id") == o.subject_id)
             {
                 return Err(AppError::Conflict(
-                    "observation evidence changed or subject not grounded".into(),
+                    "inference supports changed or subject not grounded".into(),
                 ));
             }
             let at = rows
@@ -378,7 +378,7 @@ SELECT a.id
 FROM assertions a
 WHERE a.namespace = $1
   AND a.slot_key = $2
-  AND a.kind = 'observation'
+  AND a.kind = 'inference'
   AND a.status = 'active'
   AND a.statement = $3
   AND a.normalized_value = $4
@@ -418,9 +418,9 @@ LIMIT 1
                 ids.push(id);
                 continue;
             }
-            let previous:Vec<Uuid>=sqlx::query_scalar("SELECT id FROM assertions WHERE namespace=$1 AND slot_key=$2 AND kind='observation' AND status IN ('active','stale') FOR UPDATE").bind(&job.namespace).bind(&slot).fetch_all(&mut *tx).await?;
+            let previous:Vec<Uuid>=sqlx::query_scalar("SELECT id FROM assertions WHERE namespace=$1 AND slot_key=$2 AND kind='inference' AND status IN ('active','stale') FOR UPDATE").bind(&job.namespace).bind(&slot).fetch_all(&mut *tx).await?;
             for old in previous {
-                // Inferred summaries retain historical evidence, but are unavailable once outdated.
+                // Inferences keep their historical sources, but are unavailable once outdated.
                 sqlx::query("UPDATE assertions SET status='stale' WHERE id=$1")
                     .bind(old)
                     .execute(&mut *tx)
@@ -430,7 +430,7 @@ LIMIT 1
             }
             let id:Uuid=sqlx::query_scalar(r#"
 INSERT INTO assertions(namespace, subject_id, predicate, value, normalized_value, STATEMENT, slot_key, CARDINALITY, kind, status, valid_from, confidence, model, embedding)
-VALUES($1,$2,$3,$4,$5,$6,$7,'multiple','observation','active',$8,$9,$10,$11) RETURNING id
+VALUES($1,$2,$3,$4,$5,$6,$7,'multiple','inference','active',$8,$9,$10,$11) RETURNING id
 "#)
                 .bind(&job.namespace).bind(o.subject_id).bind(&o.predicate).bind(&o.value).bind(normalize_component(&o.value)).bind(&o.statement).bind(&slot).bind(at).bind(o.confidence).bind(model).bind(v.map(Vector::from)).fetch_one(&mut *tx).await?;
             for support in supports {
@@ -438,11 +438,11 @@ VALUES($1,$2,$3,$4,$5,$6,$7,'multiple','observation','active',$8,$9,$10,$11) RET
                 sqlx::query("INSERT INTO assertion_sources SELECT $1,chunk_id,quote FROM assertion_sources WHERE assertion_id=$2 ON CONFLICT DO NOTHING").bind(id).bind(support).execute(&mut *tx).await?;
                 sqlx::query("INSERT INTO assertion_entities SELECT namespace,$1,entity_id FROM assertion_entities WHERE assertion_id=$2 ON CONFLICT DO NOTHING").bind(id).bind(support).execute(&mut *tx).await?;
             }
-            // New observations only point to existing nodes: dependencies are acyclic by construction.
+            // New inferences only point to existing nodes: dependencies are acyclic by construction.
             project(&mut tx, &job.namespace, id).await?;
             ids.push(id);
         }
-        let result = json!({"observation_ids":ids});
+        let result = json!({"inference_ids":ids});
         sqlx::query("UPDATE memory_jobs SET status='succeeded',result=$3,error=NULL,completed_at=now(),lease_token=NULL,lease_until=NULL WHERE id=$1 AND lease_token=$2").bind(job.id).bind(job.lease_token).bind(&result).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM memory_namespace_leases WHERE namespace=$1 AND lease_token=$2")
             .bind(&job.namespace)
@@ -452,7 +452,7 @@ VALUES($1,$2,$3,$4,$5,$6,$7,'multiple','observation','active',$8,$9,$10,$11) RET
         tx.commit().await?;
         Ok(result)
     }
-    /// Retracts an assertion and invalidates observations that depend on it.
+    /// Retracts an assertion and invalidates inferences that depend on it.
     pub async fn retract(&self, namespace: &str, id: Uuid) -> Result<Vec<Uuid>, AppError> {
         let mut tx = self.pool.begin().await?;
         lock_namespace(&mut tx, namespace).await?;

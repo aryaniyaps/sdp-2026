@@ -1,12 +1,12 @@
 import { h, fmtTime, shortId, cut } from "./helpers.js";
 
 // Build a detail model separately from its DOM representation.
-export function createDetails({ nodes, getEvidence, colors: COL, select }) {
+export function createDetails({ nodes, getSources, colors: COL, select }) {
   function summary(n) {
     const label =
       n.cls === "memory"
         ? cut(n.d.text, 90)
-        : n.cls === "fact"
+        : n.cls === "assertion"
           ? cut(n.d.statement || n.d.name, 90)
           : cut(n.d.name, 90);
     return {
@@ -14,26 +14,26 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
       cls: n.cls,
       label,
       dim: n.dimStatus,
-      observation: n.observation,
-      status: n.cls === "fact" ? n.d.status || null : null,
+      inference: n.inference,
+      status: n.cls === "assertion" ? n.d.status || null : null,
     };
   }
 
   function buildModel(n) {
     const d = n.d;
     if (n.cls === "memory") {
-      /* one entry per fact: the server sends one row per quote */
-      const byFact = new Map();
+      /* one entry per assertion: the server sends one row per quote */
+      const byAssertion = new Map();
       for (const s of d.supports || []) {
-        let g = byFact.get(s.assertion_id);
+        let g = byAssertion.get(s.assertion_id);
         if (!g) {
           const f = nodes.get("f:" + s.assertion_id);
           g = {
-            fact: f && !f.dying ? summary(f) : null,
+            assertion: f && !f.dying ? summary(f) : null,
             assertionId: s.assertion_id,
             quotes: [],
           };
-          byFact.set(s.assertion_id, g);
+          byAssertion.set(s.assertion_id, g);
         }
         g.quotes.push(s.quote);
       }
@@ -48,12 +48,12 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
         id: d.id,
         text: d.text,
         truncated: !!d.text_truncated,
-        supports: Array.from(byFact.values()),
+        supports: Array.from(byAssertion.values()),
       };
     }
-    if (n.cls === "fact") {
+    if (n.cls === "assertion") {
       const ev = Array.from(
-        getEvidence().get(d.id) || [],
+        getSources().get(d.id) || [],
         ([memoryKey, quotes]) => {
           const m = nodes.get(memoryKey);
           return {
@@ -84,8 +84,8 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
           });
       }
       return {
-        cls: "fact",
-        title: n.observation ? "Observation" : "Fact",
+        cls: "assertion",
+        title: n.inference ? "Inference" : "Assertion",
         statement: d.statement,
         status: d.status,
         kind: d.assertion_kind,
@@ -94,29 +94,30 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
         revision: d.revision,
         expired: n.validToMs !== null && n.validToMs <= Date.now(),
         id: d.id,
-        evidence: ev,
+        sources: ev,
         entities: ents,
         relations: rels,
-        observation: n.observation,
+        inference: n.inference,
         dim: n.dimStatus,
         name: d.name,
       };
     }
-    const facts = [];
-    for (const l of n.adj) if (l.type === "mention") facts.push(summary(l.s));
+    const assertions = [];
+    for (const l of n.adj)
+      if (l.type === "mention") assertions.push(summary(l.s));
     return {
       cls: "entity",
       title: "Entity",
       name: d.name,
       type: d.entity_type,
       id: d.id,
-      facts,
+      assertions,
     };
   }
 
   function dot(s) {
     return h("i", {
-      class: (s.observation ? "diamond " : "") + (s.dim ? "dimmed" : ""),
+      class: (s.inference ? "diamond " : "") + (s.dim ? "dimmed" : ""),
       style: "--c:" + COL[s.cls],
     });
   }
@@ -185,19 +186,20 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
     }
   }
 
-  /* why a memory has no facts, as a note for the details panel */
-  function noFactsNote(m) {
+  /* why a memory has no assertions, as a note for the details panel */
+  function noAssertionsNote(m) {
     const x = m.extraction;
     const status = x ? x.status : null;
     if (status === "failed")
       return h("div", {
         class: "note bad",
-        text: "No facts: extraction failed" + (x.error ? ". " + x.error : "."),
+        text:
+          "No assertions: extraction failed" + (x.error ? ". " + x.error : "."),
       });
     if (status === "blocked")
       return h("div", {
         class: "note",
-        text: "No facts yet: extraction is blocked behind a failed extraction in this namespace.",
+        text: "No assertions yet: extraction is blocked behind a failed extraction in this namespace.",
       });
     if (status === "running")
       return h("div", { class: "empty", text: "Extraction is running." });
@@ -213,7 +215,10 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
       });
     if (m.state === "pending")
       return h("div", { class: "empty", text: "Not extracted yet." });
-    return h("div", { class: "empty", text: "No fact cites this memory." });
+    return h("div", {
+      class: "empty",
+      text: "No assertion cites this memory.",
+    });
   }
 
   function renderModel(m) {
@@ -222,7 +227,7 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
       h(
         "div",
         {
-          class: "kindpill" + (m.observation ? " diamond" : ""),
+          class: "kindpill" + (m.inference ? " diamond" : ""),
           style: "--c:" + COL[m.cls],
         },
         h("i"),
@@ -275,18 +280,18 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
           }),
         );
       frag.append(
-        h("h4", { text: "Facts it supports (" + m.supports.length + ")" }),
+        h("h4", { text: "Assertions it supports (" + m.supports.length + ")" }),
       );
       if (!m.supports.length) {
-        frag.append(noFactsNote(m));
+        frag.append(noAssertionsNote(m));
       } else {
         const list = h("div", { class: "list" });
         for (const s of m.supports) {
           const quotes = s.quotes.map((q) =>
             h("div", { class: "quote", text: q }),
           );
-          if (s.fact) {
-            const row = nodeRow(s.fact);
+          if (s.assertion) {
+            const row = nodeRow(s.assertion);
             row.append(...quotes);
             list.append(row);
           } else {
@@ -296,7 +301,7 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
                 { class: "row" },
                 h("span", {
                   text:
-                    "Fact " +
+                    "Assertion " +
                     shortId(s.assertionId) +
                     " is not in the Neo4j projection",
                 }),
@@ -307,7 +312,7 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
         }
         frag.append(list);
       }
-    } else if (m.cls === "fact") {
+    } else if (m.cls === "assertion") {
       frag.append(
         h("div", { class: "statement", text: m.statement || m.name || "" }),
       );
@@ -338,17 +343,17 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
           ["Id", shortId(m.id), true],
         ]),
       );
-      frag.append(h("h4", { text: "Evidence (" + m.evidence.length + ")" }));
-      if (!m.evidence.length)
+      frag.append(h("h4", { text: "Sources (" + m.sources.length + ")" }));
+      if (!m.sources.length)
         frag.append(
           h("div", {
             class: "empty",
-            text: "No loaded memory cites this fact.",
+            text: "No loaded memory is a source for this assertion.",
           }),
         );
       else {
         const list = h("div", { class: "list" });
-        for (const e of m.evidence) {
+        for (const e of m.sources) {
           const quotes = e.quotes.map((q) =>
             h("div", { class: "quote", text: q }),
           );
@@ -407,8 +412,8 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
             text: r.relation || "relates to",
           });
           const line = r.outgoing
-            ? h("span", {}, "This fact ", rel, " " + r.other.label)
-            : h("span", {}, r.other.label + " ", rel, " this fact");
+            ? h("span", {}, "This assertion ", rel, " " + r.other.label)
+            : h("span", {}, r.other.label + " ", rel, " this assertion");
           const row = h(
             "button",
             {
@@ -444,17 +449,20 @@ export function createDetails({ nodes, getEvidence, colors: COL, select }) {
         h("h4", {
           text:
             "Mentioned by " +
-            m.facts.length +
-            (m.facts.length === 1 ? " fact" : " facts"),
+            m.assertions.length +
+            (m.assertions.length === 1 ? " assertion" : " assertions"),
         }),
       );
-      if (!m.facts.length)
+      if (!m.assertions.length)
         frag.append(
-          h("div", { class: "empty", text: "No fact mentions this entity." }),
+          h("div", {
+            class: "empty",
+            text: "No assertion mentions this entity.",
+          }),
         );
       else {
         const list = h("div", { class: "list" });
-        for (const s of m.facts) list.append(nodeRow(s, s.status));
+        for (const s of m.assertions) list.append(nodeRow(s, s.status));
         frag.append(list);
       }
     }

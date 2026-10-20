@@ -1,6 +1,6 @@
 //! Check update intent separately from extraction, and ground missing entity mentions.
 //! The local extractor can mistake any differing value for an explicit correction. A narrow
-//! second question must confirm replacement language before a correction may retire a fact.
+//! second question must confirm replacement language before a correction may retire an assertion.
 
 use super::*;
 use serde::Deserialize;
@@ -23,7 +23,7 @@ struct Review {
 pub(super) async fn review(
     state: &AppState,
     extraction: Extraction,
-    events: &[EvidenceEvent],
+    events: &[SourceEvent],
 ) -> Result<Extraction, AppError> {
     if extraction.claims.is_empty() {
         return Ok(extraction);
@@ -70,7 +70,7 @@ pub(super) async fn review(
 fn apply_review(
     extraction: &Extraction,
     output: Value,
-    events: &[EvidenceEvent],
+    events: &[SourceEvent],
 ) -> Result<Extraction, AppError> {
     let invalid = |message: &str| AppError::Provider(format!("claim review: {message}"));
     let reviews: Reviews =
@@ -135,8 +135,8 @@ fn apply_review(
 mod tests {
     use super::*;
 
-    fn fixture(text: &str, correction: bool) -> (Extraction, Vec<EvidenceEvent>) {
-        let events = vec![EvidenceEvent {
+    fn fixture(text: &str, correction: bool) -> (Extraction, Vec<SourceEvent>) {
+        let events = vec![SourceEvent {
             role: "user".into(),
             content: text.into(),
             occurred_at: chrono::Utc::now(),

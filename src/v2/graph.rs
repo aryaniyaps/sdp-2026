@@ -19,7 +19,7 @@ use std::{
 };
 use uuid::Uuid;
 
-#[utoipa::path(post,path="/api/v2/graph/rebuild",responses((status=200,body=Value)),tag="Evidence memory",request_body=Namespace)]
+#[utoipa::path(post,path="/api/v2/graph/rebuild",responses((status=200,body=Value)),tag="Memory",request_body=Namespace)]
 pub(super) async fn rebuild(
     State(s): State<Arc<AppState>>,
     Json(q): Json<Namespace>,
@@ -42,7 +42,7 @@ pub(super) struct ClearRequest {
     namespace: String,
     confirm: String,
 }
-#[utoipa::path(post,path="/api/v2/graph/clear",responses((status=200,body=Value),(status=400,description="confirm does not repeat the namespace"),(status=409,description="a job of the namespace is running")),tag="Evidence memory",request_body=ClearRequest)]
+#[utoipa::path(post,path="/api/v2/graph/clear",responses((status=200,body=Value),(status=400,description="confirm does not repeat the namespace"),(status=409,description="a job of the namespace is running")),tag="Memory",request_body=ClearRequest)]
 pub(super) async fn clear(
     State(s): State<Arc<AppState>>,
     Json(q): Json<ClearRequest>,
@@ -77,7 +77,7 @@ pub(super) struct GraphQuery {
     entity_id: Option<Uuid>,
     assertion_id: Option<Uuid>,
 }
-#[utoipa::path(get,path="/api/v2/graph",responses((status=200,body=Value)),tag="Evidence memory",params(("namespace"=String,Query),("entity_id"=Option<Uuid>,Query),("assertion_id"=Option<Uuid>,Query)))]
+#[utoipa::path(get,path="/api/v2/graph",responses((status=200,body=Value)),tag="Memory",params(("namespace"=String,Query),("entity_id"=Option<Uuid>,Query),("assertion_id"=Option<Uuid>,Query)))]
 pub(super) async fn graph(
     State(s): State<Arc<AppState>>,
     Query(q): Query<GraphQuery>,
@@ -184,7 +184,7 @@ pub(super) struct ProjectionResponse {
 /// The namespace as the Neo4j projection holds it. Unlike `/api/v2/graph`, which reads
 /// PostgreSQL, this shows what the graph database serves to recall, so a projection that
 /// lags behind PostgreSQL is visible. Neo4j failures are a 503, never an empty graph.
-#[utoipa::path(get,path="/api/v2/graph/projection",responses((status=200,body=ProjectionResponse),(status=400),(status=503)),tag="Evidence memory",params(("namespace"=String,Query),("limit"=Option<usize>,Query,description="Maximum nodes, 1 to 2000, default 400. A value outside the range is rejected with 400, it is never clamped")))]
+#[utoipa::path(get,path="/api/v2/graph/projection",responses((status=200,body=ProjectionResponse),(status=400),(status=503)),tag="Memory",params(("namespace"=String,Query),("limit"=Option<usize>,Query,description="Maximum nodes, 1 to 2000, default 400. A value outside the range is rejected with 400, it is never clamped")))]
 pub(super) async fn graph_projection(
     State(s): State<Arc<AppState>>,
     Query(query): Query<HashMap<String, String>>,
@@ -331,10 +331,10 @@ fn memory_extraction(row: &sqlx::postgres::PgRow) -> Result<MemoryExtraction, Ap
 /// through its episode. Every chunk cited by an assertion of the namespace is a candidate,
 /// plus the user and assistant chunks of its episodes. When `limit` cuts the result, a quarter
 /// of it is kept for the chunks no assertion cites yet (unprocessed first, then newest), so
-/// evidence that extraction has not reached still appears with an empty `supports` list, and
+/// source text that extraction has not reached still appears with an empty `supports` list, and
 /// `truncated` is true. Each memory says how its extraction went, and `counts` carries what
 /// a viewer needs to tell a lagging projection or a stuck extraction from a quiet namespace.
-#[utoipa::path(get,path="/api/v2/graph/memories",responses((status=200,body=MemoriesResponse),(status=400),(status=500)),tag="Evidence memory",params(("namespace"=String,Query),("limit"=Option<usize>,Query,description="Maximum memories, 1 to 1000, default 200. A value outside the range is rejected with 400, it is never clamped")))]
+#[utoipa::path(get,path="/api/v2/graph/memories",responses((status=200,body=MemoriesResponse),(status=400),(status=500)),tag="Memory",params(("namespace"=String,Query),("limit"=Option<usize>,Query,description="Maximum memories, 1 to 1000, default 200. A value outside the range is rejected with 400, it is never clamped")))]
 pub(super) async fn graph_memories(
     State(s): State<Arc<AppState>>,
     Query(query): Query<HashMap<String, String>>,

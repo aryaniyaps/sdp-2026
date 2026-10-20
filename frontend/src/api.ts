@@ -70,14 +70,14 @@ export const api = {
     query: string,
     maxTokens: number,
     graph: boolean,
-    observations: boolean,
+    inferences: boolean,
   ) =>
     request<RecallResponse>("/api/v2/recall", {
       namespace,
       query,
       max_tokens: maxTokens,
       graph,
-      observations,
+      inferences,
       reference_date: new Date().toISOString(),
     }),
 };

@@ -3,16 +3,16 @@
 
 Every Pi session is a separate `pi --mode rpc` process with its own working
 directory and its own session directory, so nothing is shared except the memory
-service. The script fails loudly: any missing injection, missing fact, extension
+service. The script fails loudly: any missing injection, missing recalled detail, extension
 error, or failed memory job is a non-zero exit with the evidence printed.
 
 Scenarios
-  1. Tell Pi a unique fact in directory A.
+  1. Tell Pi a unique detail in directory A.
   2. A fresh session in directory B asks about it right away, before extraction
-     has necessarily finished (raw evidence must already be recallable).
+     has necessarily finished (raw source chunks must already be recallable).
   3. Control: a fresh session with the extension disabled must NOT know it.
   4. After extraction completes, a fresh session in directory C asks again.
-  5. Correct the fact in directory D, then a fresh session in directory E asks
+  5. Correct the detail in directory D, then a fresh session in directory E asks
      for the current value.
 
 Requires: the memory service running (scripts/run-memory.sh), and a Pi install
@@ -315,7 +315,7 @@ def main():
         return s
 
     try:
-        print(f"\n1. Tell Pi a fact in {dirs['A']} (codename {codename})")
+        print(f"\n1. Tell Pi a detail in {dirs['A']} (codename {codename})")
         s1 = session("s1-tell", dirs["A"])
         s1.prompt(
             f"Remember this for future sessions: my side project is codenamed {codename}, it is a Rust command line tool, and I always deploy it on Fridays. Reply with just the word noted.",
@@ -406,7 +406,7 @@ def main():
         )
 
         print(
-            "\n5. Correct the fact in one directory, ask for the current value in another"
+            "\n5. Correct the detail in one directory, ask for the current value in another"
         )
         s5 = session("s5-correct", dirs["D"])
         s5.prompt(

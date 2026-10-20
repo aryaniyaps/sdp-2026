@@ -1,6 +1,11 @@
-//! Answers grounded in the evidence returned by recall.
+//! Answers grounded in the evidence returned by recall: the answer cites the retrieved
+//! assertions and source text that support it.
 
-use super::{RecallRequest, recall_engine};
+use super::{
+    RecallRequest,
+    recall::{Labels, context_block},
+    recall_engine,
+};
 use crate::{AppError, AppState, model::cached_generate, observability::TraceBuilder};
 use serde_json::{Value, json};
 use std::{collections::HashSet, time::Instant};
@@ -66,7 +71,13 @@ async fn perform_reflect(s: &AppState, r: RecallRequest) -> Result<Value, AppErr
             json!({"answer":"Insufficient evidence.","citations":[],"insufficient_evidence":true,"recall":recall}),
         );
     }
-    let prompt = reflect_prompt(&query, &recall.context);
+    // Recall packed these hits under the stored names; the model reads the names it was trained on.
+    let context: String = recall
+        .results
+        .iter()
+        .map(|hit| context_block(hit, Labels::Model))
+        .collect();
+    let prompt = reflect_prompt(&query, &context);
     let output = cached_generate(&s.store, s.model.as_ref(), "reflect-v2.1", &prompt).await?;
     let citations: Vec<Uuid> = serde_json::from_value(output["citations"].clone())
         .map_err(|e| AppError::Provider(e.to_string()))?;

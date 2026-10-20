@@ -1,4 +1,4 @@
-// End to end check of the hosted page with a real headless Chrome: tell Pi a fact in one session,
+// End to end check of the hosted page with a real headless Chrome: tell Pi a detail in one session,
 // open a session in the other directory, ask about it, and watch the graph change.
 // Usage: node e2e.js <base url>
 const { spawn } = require('child_process');
@@ -29,7 +29,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       if (!status.includes('Updated')) return null;
       const count = (id) => Number(doc.getElementById(id)?.textContent || 0);
       const relationships = status.match(/(\\d+) relationships/);
-      return { nodes: count('c-memory') + count('c-fact') + count('c-entity'), links: Number(relationships?.[1] || 0) };
+      return { nodes: count('c-memory') + count('c-assertion') + count('c-entity'), links: Number(relationships?.[1] || 0) };
     })()`);
     const waitFor = async (fn, ms, label) => { const end = Date.now() + ms; let last; while (Date.now() < end) { try { last = await fn(); if (last) return last; } catch {} await sleep(1000); } throw new Error('timeout: ' + label); };
     const type = async (text) => {
@@ -71,7 +71,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const g1 = await graphStats();
     check('graph grew while the sessions ran', g1.nodes > g0.nodes, `${g0.nodes} -> ${g1.nodes}`);
     await send('Page.captureScreenshot', { format: 'png' }).then((r) => fs.writeFileSync(path.join(os.tmpdir(), 'e2e-final.png'), Buffer.from(r.result.data, 'base64')));
-    console.log('screenshot', path.join(os.tmpdir(), 'e2e-final.png'), 'fact word', word);
+    console.log('screenshot', path.join(os.tmpdir(), 'e2e-final.png'), 'detail word', word);
   } catch (e) { check('run completed', false, e.message); try { const t = await termText(); console.log('terminal tail:', t.split('\n').filter(Boolean).slice(-12).join(' | ')); const r = await send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(os.tmpdir(), 'e2e-fail.png'), Buffer.from(r.result.data, 'base64')); } catch {} }
   ws.close(); proc.kill();
   for (const l of fs.readdirSync(os.tmpdir())) {}

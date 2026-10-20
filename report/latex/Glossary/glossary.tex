@@ -1,0 +1,62 @@
+\chapter*{GLOSSARY}
+\addcontentsline{toc}{section}{\bfseries GLOSSARY}
+
+Some everyday computing words are used with a narrower meaning in this report.
+The meanings below are the ones we use throughout.
+
+\setlongtables
+\begin{longtable}
+  {>{\PBS\raggedright\hspace{0pt}\bfseries}p{3.6cm}@{}%
+    >{\PBS\raggedright\hspace{0pt}}p{10.6cm}@{}}
+  Memory        & Knowledge about a user or project that the agent keeps across sessions (assertions, inferences and the source events they came from). It does \emph{not} mean RAM, cache, disk or any other computer memory. \\
+  Long-term memory & Memory that survives after a session ends, as opposed to what is only in the current prompt. \\
+  Agent         & An AI program (here, the Pi coding agent) that talks to the user and carries out tasks using a language model and tools. \\
+  Harness       & The program around the model that runs the agent: it builds prompts, calls tools and in our case talks to the memory service. \\
+  Session       & One continuous conversation between the user and the agent. A new session starts with an empty prompt. \\
+  Context / context window & The text the model can read at one time (its prompt). Its size is limited and measured in tokens. \\
+  Token         & A small piece of text (a word or part of a word) that the model reads. Budgets and limits are counted in tokens. \\
+  Namespace     & A label such as \texttt{user:maya} that keeps one user's or project's memory separate from another's. \\
+  Source event  & A single message or tool result (with role and timestamp) exactly as it was sent, stored before anything is extracted from it. ``Event'' is short for source event. \\
+  Episode       & One batch of source events saved together by a single retain request. \\
+  Source chunk  & A piece of a source event's text that is stored and embedded for search. \\
+  Source quote  & The exact passage of a source event that an assertion cites. It must appear word for word in the original text. \\
+  Spool         & A local folder of files on the client where batches wait if the memory service can't be reached. \\
+  Job / worker  & A job is a stored task (e.g.\ ``extract assertions from this episode''); a worker is a background process that picks up and runs jobs. \\
+  Lease         & A time-limited lock a worker takes on a namespace so that two workers don't process it at the same time. \\
+  Claim         & A candidate assertion proposed by the model before the system has checked and stored it. \\
+  Assertion     & A typed, temporal statement about an entity that the model extracted from source events, e.g.\ ``Maya lives in Bengaluru'', stored with its source quote and validity interval. It can be wrong, contested, superseded or retracted. \\
+  Attribute     & The assertion kind for a stable property of an entity, such as a home city or an employer (stored as kind \texttt{attribute}). \\
+  Inference     & An assertion (kind \texttt{inference}) derived from at least two supporting assertions, e.g.\ ``Maya works remotely as a software engineer at NovaTech''. \\
+  Entity        & A person, project, place or thing that assertions are about. \\
+  Consolidation & The step that combines related assertions into an inference. \\
+  Invalidation  & Marking an inference stale when one of the assertions it depends on changes. \\
+  Supersede     & To replace an assertion's value with a newer one while keeping the old assertion as history. \\
+  Validity interval & The time range during which an assertion was true, e.g.\ Chennai from 1 to 10 October. \\
+  Embedding / vector & A list of numbers representing the meaning of a text, used to find similar texts. \\
+  Retrieval / recall & Finding the stored memories relevant to a question and returning them to the agent. \\
+  Projection    & The copy of assertions and entities kept in Neo4j as a graph. It can be rebuilt from PostgreSQL. \\
+  Reflection    & An optional step where the model writes an answer from retrieved memories, with citations. \\
+  Grounded answer & An answer in which every statement is backed by a cited, retrieved memory. \\
+  Evidence      & Only in its ordinary sense: whatever is cited in support of a conclusion, such as the passages a reflected answer cites. A stored message is a source, not evidence. \\
+  Fine-tuning   & Further training of an existing model on our own data so it does a specific task better. \\
+  Adapter       & The small set of extra weights trained by LoRA/QLoRA; the base model itself stays frozen. \\
+  Quantisation  & Storing model weights with fewer bits (e.g.\ 4-bit or 8-bit) so the model uses less memory and runs faster. Here ``memory'' does mean computer memory. \\
+  Teacher model & A larger model (GPT-5.6-sol) used to write the expected outputs for our training data. \\
+\end{longtable}
+
+\noindent\textbf{Why ``source'' and ``assertion'', not ``evidence'' and ``fact''.}
+Evidence is a role, not a kind of record: a message becomes evidence only when
+something cites it in support of a conclusion. A fact is something established, whereas
+our extracted units are produced by a model and can be wrong, contested, superseded or
+retracted. We therefore follow the knowledge-representation usage of claims and their
+sources. Wikidata stores each statement (claim) with references to the sources that back
+it \cite{wikibase2026datamodel}, nanopublications keep an assertion separate from its
+provenance, the W3C PROV ontology links a derived entity to what it came from with
+\texttt{prov:wasDerivedFrom} and to a quoted passage with \texttt{prov:wasQuotedFrom}
+\cite{lebo2013provo}, and NELL holds extracted statements as ``candidate beliefs'' until
+enough support promotes them \cite{mitchell2018nell}. We also avoid ``observation'' for
+derived units, because Generative Agents \cite{park2023generative} uses it for raw
+perceptions and ``reflection'' for derived ones (``reflection'' already names question
+answering in our system). Zep/Graphiti \cite{rasmussen2025zep}, Mem0
+\cite{chhikara2025mem0} and Hindsight \cite{latimer2025hindsight} call their extracted
+units ``facts''; we deliberately depart from that usage.

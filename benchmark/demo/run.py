@@ -123,7 +123,7 @@ def main():
     if result.returncode:
         raise RuntimeError("demo tests failed")
     print(
-        "Three actual Pi sessions completed. Inspect JSONL, tool evidence and final tests; this is not an accuracy benchmark."
+        "Three actual Pi sessions completed. Inspect JSONL, tool results and final tests; this is not an accuracy benchmark."
     )
 
 

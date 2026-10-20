@@ -22,7 +22,7 @@ mod review;
 mod secrets;
 mod window;
 pub use consolidation::{CONSOLIDATE_TEMPLATE, consolidate_prompt};
-pub use prompts::{EXTRACT_TEMPLATE, extract_prompt, fill_template, fit_existing_facts};
+pub use prompts::{EXTRACT_TEMPLATE, extract_prompt, fill_template, fit_existing_assertions};
 pub use secrets::leaks_secret;
 pub use window::{WINDOW_EVENT_TOKENS, compact_event, shorten_content, windows};
 
@@ -31,7 +31,7 @@ const CONSOLIDATE_VERSION: &str = "consolidate-v2.3";
 
 pub async fn embed_missing_chunks(
     state: &AppState,
-    chunks: &[(Uuid, EvidenceEvent)],
+    chunks: &[(Uuid, SourceEvent)],
 ) -> Result<(), AppError> {
     for (chunk, event) in chunks {
         let missing: bool = sqlx::query_scalar("SELECT embedding IS NULL FROM chunks WHERE id=$1")

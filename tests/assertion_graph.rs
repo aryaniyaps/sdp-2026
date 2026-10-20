@@ -24,7 +24,7 @@ use std::{
 use tower::ServiceExt;
 use uuid::Uuid;
 /// The claim test takes any ready extract job in the shared database, so no test may create one
-/// while it runs. Retaining evidence holds this for reading and the claim test holds it for
+/// while it runs. Retaining source events holds this for reading and the claim test holds it for
 /// writing. A guard is held only around the call that creates the job, never across another
 /// acquisition, so a waiting writer cannot deadlock a reader.
 static READY_EXTRACT_JOBS: tokio::sync::RwLock<()> = tokio::sync::RwLock::const_new(());
@@ -96,7 +96,7 @@ async fn extract(
         session_id: "session".into(),
         external_id: Uuid::new_v4().to_string(),
         metadata: json!({}),
-        events: vec![EvidenceEvent {
+        events: vec![SourceEvent {
             role: "user".into(),
             content: text.into(),
             occurred_at: at,
@@ -131,7 +131,7 @@ async fn consolidate(
         .apply_consolidation(
             &job,
             &Consolidation {
-                observations: vec![ObservationInput {
+                inferences: vec![InferenceInput {
                     subject_id: subject,
                     statement: format!("Ada {topic}"),
                     predicate: topic.into(),
@@ -146,7 +146,7 @@ async fn consolidate(
         )
         .await
         .unwrap();
-    serde_json::from_value(result["observation_ids"][0].clone()).unwrap()
+    serde_json::from_value(result["inference_ids"][0].clone()).unwrap()
 }
 #[tokio::test]
 async fn explicit_correction_resolves_an_existing_contested_value() {
@@ -217,7 +217,7 @@ async fn explicit_correction_resolves_an_existing_contested_value() {
 }
 
 #[tokio::test]
-async fn evidence_lifecycle_and_projection() {
+async fn assertion_lifecycle_and_projection() {
     let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
         eprintln!("TEST_DATABASE_URL missing; integration skipped");
         return;
@@ -230,14 +230,14 @@ async fn evidence_lifecycle_and_projection() {
             .unwrap(),
     );
     store.migrate().await.unwrap();
-    let ns = format!("evidence-{}", Uuid::new_v4());
+    let ns = format!("assertions-{}", Uuid::new_v4());
     let at = Utc::now();
     let req = RetainRequest {
         namespace: ns.clone(),
         session_id: "idempotency".into(),
         external_id: "same".into(),
         metadata: json!({}),
-        events: vec![EvidenceEvent {
+        events: vec![SourceEvent {
             role: "tool".into(),
             content: "tests passed".into(),
             occurred_at: at,
@@ -285,7 +285,7 @@ async fn evidence_lifecycle_and_projection() {
     .await;
     let sql: Uuid = serde_json::from_value(r["decisions"][0]["assertion_id"].clone()).unwrap();
     let subject = store.assertion(&ns, python).await.unwrap().subject_id;
-    let observation = consolidate(
+    let inference = consolidate(
         &store,
         &ns,
         subject,
@@ -298,7 +298,7 @@ async fn evidence_lifecycle_and_projection() {
         &ns,
         subject,
         "can combine languages",
-        vec![observation, sql],
+        vec![inference, sql],
     )
     .await;
     let repeated = consolidate(
@@ -309,7 +309,7 @@ async fn evidence_lifecycle_and_projection() {
         vec![python, sql],
     )
     .await;
-    assert_eq!(repeated, observation);
+    assert_eq!(repeated, inference);
     assert_eq!(
         store.assertion(&ns, descendant).await.unwrap().status,
         "active"
@@ -328,7 +328,7 @@ async fn evidence_lifecycle_and_projection() {
         store.assertion(&ns, python).await.unwrap().status,
         "superseded"
     );
-    for id in [observation, descendant] {
+    for id in [inference, descendant] {
         assert_eq!(store.assertion(&ns, id).await.unwrap().status, "stale");
     }
     assert_eq!(store.assertion(&ns, sql).await.unwrap().status, "active");
@@ -361,7 +361,7 @@ async fn evidence_lifecycle_and_projection() {
         !current
             .ranking
             .iter()
-            .any(|h| h.id == python || h.id == observation || h.id == descendant)
+            .any(|h| h.id == python || h.id == inference || h.id == descendant)
     );
     query.as_of = Some(at + Duration::seconds(1));
     let historical = recall_engine(&s, query).await.unwrap();
@@ -684,7 +684,7 @@ impl Embedder for ConstantEmbedder {
     }
 }
 #[tokio::test]
-async fn unprocessed_evidence_is_recalled_before_extraction_and_failures_are_reported() {
+async fn unprocessed_source_text_is_recalled_before_extraction_and_failures_are_reported() {
     let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
         eprintln!("TEST_DATABASE_URL missing; integration skipped");
         return;
@@ -712,7 +712,7 @@ async fn unprocessed_evidence_is_recalled_before_extraction_and_failures_are_rep
             session_id: "session".into(),
             external_id: "pending-episode".into(),
             metadata: json!({}),
-            events: vec![EvidenceEvent {
+            events: vec![SourceEvent {
                 role: "user".into(),
                 content: "Remember that my side project is codenamed Marmalade and I deploy it on Fridays".into(),
                 occurred_at: Utc::now(),
@@ -737,8 +737,8 @@ async fn unprocessed_evidence_is_recalled_before_extraction_and_failures_are_rep
     assert!(natural.results[0].statement.contains("Marmalade"));
     assert!(natural.results[0].ranks.contains_key("raw_fallback"));
     // Once the chunk has a vector, a question with no shared words still finds it.
-    let evidence = store.episode_evidence(&ns, episode).await.unwrap();
-    memory_engine::worker::embed_missing_chunks(&state, &evidence)
+    let sources = store.episode_events(&ns, episode).await.unwrap();
+    memory_engine::worker::embed_missing_chunks(&state, &sources)
         .await
         .unwrap();
     let paraphrase = recall_engine(&state, ask("zzz unrelated phrasing"))
@@ -749,7 +749,7 @@ async fn unprocessed_evidence_is_recalled_before_extraction_and_failures_are_rep
             .ranks
             .contains_key("raw_fallback_semantic")
     );
-    // A failed extraction is reported, and the evidence is still served as raw text.
+    // A failed extraction is reported, and the source text is still served as raw text.
     sqlx::query("UPDATE memory_jobs SET status='failed',error='fixture' WHERE namespace=$1")
         .bind(&ns)
         .execute(&store.pool)
@@ -786,7 +786,7 @@ async fn include_raw_keeps_recent_source_text_in_an_interpreted_namespace() {
         model: Arc::new(NoModel),
         worker_concurrency: 1,
     };
-    // The extractor kept one fact and missed the deployment day stated in the same message.
+    // The extractor kept one assertion and missed the deployment day stated in the same message.
     extract(
         &store,
         &ns,
@@ -850,7 +850,7 @@ async fn requests_without_include_raw_keep_all_words_semantics_when_nothing_matc
             session_id: "session".into(),
             external_id: "settled".into(),
             metadata: json!({}),
-            events: vec![EvidenceEvent {
+            events: vec![SourceEvent {
                 role: "user".into(),
                 content: "Ada deploys the service on Tuesdays".into(),
                 occurred_at: Utc::now(),
@@ -954,7 +954,7 @@ const FACT_QUERY: &str = "zzquux relevance probe";
 const IDENTIFIER_QUERY: &str = "atlas-staging";
 const RAW_QUERY: &str = "mobile release branch name";
 const RAW_ONLY_QUERY: &str = "mobile release";
-/// A fact the extractor kept, with its vector at `distance` from the query vector.
+/// An assertion the extractor kept, with its vector at `distance` from the query vector.
 async fn embedded_fact(
     store: &Store,
     ns: &str,
@@ -962,10 +962,10 @@ async fn embedded_fact(
     statement: &str,
     distance: f32,
 ) -> Uuid {
-    let mut fact = claim(statement, Cardinality::Multiple, false);
-    fact.statement = statement.into();
-    fact.quotes = vec![statement.into()];
-    let (_, result) = extract(store, ns, statement, Utc::now(), vec![fact]).await;
+    let mut assertion = claim(statement, Cardinality::Multiple, false);
+    assertion.statement = statement.into();
+    assertion.quotes = vec![statement.into()];
+    let (_, result) = extract(store, ns, statement, Utc::now(), vec![assertion]).await;
     let id: Uuid = serde_json::from_value(result["decisions"][0]["assertion_id"].clone()).unwrap();
     sqlx::query("UPDATE assertions SET embedding=$2 WHERE id=$1")
         .bind(id)
@@ -984,7 +984,7 @@ async fn embedded_chunk(
     distance: Option<f32>,
 ) -> Uuid {
     let (episode, _) = retain_one(store, ns, text, "user", text, Utc::now()).await;
-    let chunk = store.episode_evidence(ns, episode).await.unwrap()[0].0;
+    let chunk = store.episode_events(ns, episode).await.unwrap()[0].0;
     if let Some(distance) = distance {
         sqlx::query("UPDATE chunks SET embedding=$2 WHERE id=$1")
             .bind(chunk)
@@ -996,7 +996,7 @@ async fn embedded_chunk(
     chunk
 }
 /// Two namespaces whose distances from the queries above are fixed by a table. `ns` holds five
-/// facts at 0.30, 0.40, 0.60, 0.90 and 0.95. `raw_ns` holds retained text and no fact: chunks at
+/// assertions at 0.30, 0.40, 0.60, 0.90 and 0.95. `raw_ns` holds retained text and no assertion: chunks at
 /// 0.30, 0.35, 0.70 and 0.80, and one chunk with no vector yet. The first and the last two chunks
 /// share words with `RAW_QUERY`, the others only match it by vector.
 struct DistanceFixture {
@@ -1041,7 +1041,7 @@ impl DistanceFixture {
             model: Arc::new(NoModel),
             worker_concurrency: 1,
         });
-        let ns = format!("distance-facts-{}", Uuid::new_v4());
+        let ns = format!("distance-assertions-{}", Uuid::new_v4());
         let near_fact = embedded_fact(
             &store,
             &ns,
@@ -1229,7 +1229,7 @@ async fn max_distance_keeps_exact_word_matches_on_facts_however_far_their_vector
     let Some(f) = DistanceFixture::new("max_distance exact identifier").await else {
         return;
     };
-    // "atlas-staging" is an identifier in one fact whose vector is the farthest of all.
+    // "atlas-staging" is an identifier in one assertion whose vector is the farthest of all.
     let all = f.recall(&f.ns, IDENTIFIER_QUERY, json!({})).await;
     assert_eq!(ranked(&all, "lexical"), [f.identifier_fact]);
     assert_eq!(ranked(&all, "semantic").last(), Some(&f.identifier_fact));
@@ -1411,7 +1411,7 @@ async fn max_distance_without_a_query_vector_leaves_out_what_it_cannot_measure_a
     .await
     .unwrap();
     assert_eq!(ranking_ids(&plain), HashSet::from([f.word_without_vector]));
-    // Exact word matches on facts need no vector, so the request still finds them.
+    // Exact word matches on assertions need no vector, so the request still finds them.
     let identifier = recall_engine(
         &offline,
         ask(&f.ns, IDENTIFIER_QUERY, json!({"max_distance":0.45})),
@@ -1433,7 +1433,7 @@ async fn max_distance_leaves_an_empty_context_when_nothing_is_close_enough() {
         return;
     };
     let app = api::router(f.state.clone());
-    // The automatic recall of the Pi extension, with a bound tighter than every fact.
+    // The automatic recall of the Pi extension, with a bound tighter than every assertion.
     let body = |max_distance: Value| {
         let mut body = json!({"namespace":f.ns,"query":FACT_QUERY,"graph":false,"temporal":false,"include_raw":true,"max_tokens":2048,"top_k":10});
         body["max_distance"] = max_distance;
@@ -1446,7 +1446,7 @@ async fn max_distance_leaves_an_empty_context_when_nothing_is_close_enough() {
     assert_eq!(empty["context"], "");
     assert_eq!(empty["estimated_tokens"], 0);
     assert_eq!(empty["degraded_reasons"], json!([]));
-    // The same request without the bound finds the nearest facts, so the gate made it empty.
+    // The same request without the bound finds the nearest assertions, so the gate made it empty.
     let (status, unbounded) = post_json(&app, "/api/v2/recall", &body(Value::Null)).await;
     assert_eq!(status, StatusCode::OK, "{unbounded}");
     assert!(!unbounded["results"].as_array().unwrap().is_empty());
@@ -1583,7 +1583,7 @@ async fn recall_without_max_distance_returns_the_candidates_it_always_did() {
         [f.word_and_near, f.near_only, f.far_only, f.word_and_far]
     );
     // Every cosine distance is at most 2, so that bound drops nothing: the replies are the
-    // same as without the field, ranks, scores, packed evidence and all.
+    // same as without the field, ranks, scores, packed sources and all.
     for (namespace, query, extra) in [
         (&f.ns, FACT_QUERY, json!({})),
         (&f.ns, IDENTIFIER_QUERY, json!({})),
@@ -1615,7 +1615,7 @@ async fn recall_without_max_distance_returns_the_candidates_it_always_did() {
     }
 }
 
-/// A namespace for the rank tests: two facts that match every word of `RAW_QUERY`, and chunks
+/// A namespace for the rank tests: two assertions that match every word of `RAW_QUERY`, and chunks
 /// that match more or fewer of its words, so the any-word pass of `include_raw` ranks the far
 /// chunks above the near ones.
 struct RankFixture {
@@ -1751,7 +1751,7 @@ async fn max_distance_removes_candidates_without_reordering_the_rest() {
             hit.statement
         );
     }
-    // So the survivors come in the order they had: a chunk is never promoted over a fact.
+    // So the survivors come in the order they had: a chunk is never promoted over an assertion.
     let before: Vec<Uuid> = unbounded
         .ranking
         .iter()
@@ -1786,8 +1786,8 @@ async fn max_distance_also_gates_source_text_that_requests_without_include_raw_s
         return;
     };
     let store = &f.state.store;
-    // Evidence whose extraction has not finished is searched as text, with or without
-    // include_raw, next to a fact that matched.
+    // Source text whose extraction has not finished is searched as text, with or without
+    // include_raw, next to an assertion that matched.
     let ns = format!("distance-unprocessed-{}", Uuid::new_v4());
     embedded_fact(store, &ns, f.axis, "Ada ships the mobile app", 0.30).await;
     let near = embedded_chunk(
@@ -1872,7 +1872,7 @@ async fn max_distance_drops_facts_that_only_the_graph_reached_when_they_are_far(
     let Some(f) = DistanceFixture::new("max_distance graph expansion").await else {
         return;
     };
-    // The five facts of the fixture are all about Ada, so the graph connects every one of them
+    // The five assertions of the fixture are all about Ada, so the graph connects every one of them
     // to the others, however far their vectors are from the question.
     for id in [
         f.near_fact,
@@ -1881,9 +1881,9 @@ async fn max_distance_drops_facts_that_only_the_graph_reached_when_they_are_far(
         f.farther_fact,
         f.identifier_fact,
     ] {
-        let fact = store.assertion(&f.ns, id).await.unwrap();
-        let ada = vec![json!({"id":fact.subject_id,"name":"Ada","entity_type":"person"})];
-        graph.project_assertion(&fact, 1, ada).await.unwrap();
+        let assertion = store.assertion(&f.ns, id).await.unwrap();
+        let ada = vec![json!({"id":assertion.subject_id,"name":"Ada","entity_type":"person"})];
+        graph.project_assertion(&assertion, 1, ada).await.unwrap();
     }
     let state = Arc::new(AppState {
         store: store.clone(),
@@ -1935,7 +1935,7 @@ async fn graph_distance_checks(state: Arc<AppState>, ns: String, ids: [Uuid; 5])
             .map(|id| id.as_str().unwrap().parse().unwrap())
             .collect()
     };
-    // Unbounded, the five facts are the vector seeds of the graph, so it adds nothing to them.
+    // Unbounded, the five assertions are the vector seeds of the graph, so it adds nothing to them.
     let unbounded = recall_engine(&state, ask(FACT_QUERY, json!({})))
         .await
         .unwrap();
@@ -1943,7 +1943,7 @@ async fn graph_distance_checks(state: Arc<AppState>, ns: String, ids: [Uuid; 5])
     let details = step(state.store.trace(unbounded.trace_id).await.unwrap());
     // The unbounded trace has no key for the bound, so traces of existing requests do not change.
     assert!(details.get("dropped_by_max_distance").is_none());
-    // Bounded, only the two near facts are seeds. The graph walks from them to the three facts
+    // Bounded, only the two near assertions are seeds. The graph walks from them to the three assertions
     // about the same person, whose vectors are far from the question, and the bound drops them.
     let bounded = recall_engine(&state, ask(FACT_QUERY, json!({"max_distance":0.45})))
         .await
@@ -1960,7 +1960,7 @@ async fn graph_distance_checks(state: Arc<AppState>, ns: String, ids: [Uuid; 5])
         "{details}"
     );
     assert!(ids_of(&details, "candidate_ids").is_empty(), "{details}");
-    // Without a query vector the graph facts that have a vector cannot be shown to be near.
+    // Without a query vector the graph assertions that have a vector cannot be shown to be near.
     // The exact word match seeds the walk and stays, and its neighbours are left out.
     let offline = AppState {
         store: state.store.clone(),
@@ -2023,7 +2023,7 @@ async fn recall_states_the_cutoff_it_used_and_keeps_the_exact_number_it_was_give
     let trace_id: Uuid = bounded["trace_id"].as_str().unwrap().parse().unwrap();
     let trace = f.state.store.trace(trace_id).await.unwrap();
     assert_eq!(trace.request["max_distance"], json!(0.45));
-    // The bound is the number sent: a fact at 0.4 is kept by 0.4 and dropped by anything below.
+    // The bound is the number sent: an assertion at 0.4 is kept by 0.4 and dropped by anything below.
     let at = f
         .recall(&f.ns, FACT_QUERY, json!({"max_distance":0.4000001}))
         .await;
@@ -2091,7 +2091,7 @@ fn view_state(store: Store, graph: Option<GraphStore>) -> Arc<AppState> {
 }
 
 #[tokio::test]
-async fn namespace_status_counts_embedding_gaps_and_pending_evidence() {
+async fn namespace_status_counts_embedding_gaps_and_pending_source_text() {
     let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
         eprintln!("TEST_DATABASE_URL missing; namespace status integration skipped");
         return;
@@ -2118,7 +2118,7 @@ async fn namespace_status_counts_embedding_gaps_and_pending_evidence() {
     retain_one(
         &store,
         &namespace,
-        "status-evidence",
+        "status-sources",
         "user",
         "Ada uses Rust.",
         Utc::now(),
@@ -2333,7 +2333,7 @@ async fn graph_view_checks(store: Store, graph: GraphStore, ns: String) {
     .await;
     let sql: Uuid = serde_json::from_value(r["decisions"][0]["assertion_id"].clone()).unwrap();
     let subject = store.assertion(&ns, python).await.unwrap().subject_id;
-    let observation = consolidate(
+    let inference = consolidate(
         &store,
         &ns,
         subject,
@@ -2356,7 +2356,7 @@ async fn graph_view_checks(store: Store, graph: GraphStore, ns: String) {
         session_id: "unextracted".into(),
         external_id: external.into(),
         metadata: json!({}),
-        events: vec![EvidenceEvent {
+        events: vec![SourceEvent {
             role: role.into(),
             content,
             occurred_at: at + Duration::seconds(offset),
@@ -2399,7 +2399,7 @@ async fn graph_view_checks(store: Store, graph: GraphStore, ns: String) {
             .all(|n| n["kind"] == "assertion" || n["kind"] == "entity"),
         "only assertions and entities are nodes: {nodes:?}"
     );
-    let pg_assertions: HashSet<Uuid> = [python, sql, observation, rust].into();
+    let pg_assertions: HashSet<Uuid> = [python, sql, inference, rust].into();
     assert_eq!(id_set(nodes, "assertion"), pg_assertions);
     let pg_entities: HashSet<Uuid> =
         sqlx::query_scalar("SELECT DISTINCT entity_id FROM assertion_entities WHERE namespace=$1")
@@ -2420,14 +2420,14 @@ async fn graph_view_checks(store: Store, graph: GraphStore, ns: String) {
     assert_eq!(node(rust)["statement"], "Ada uses Rust");
     assert_eq!(node(rust)["name"], "Ada uses Rust");
     assert_eq!(node(rust)["status"], "active");
-    assert_eq!(node(rust)["assertion_kind"], "fact");
+    assert_eq!(node(rust)["assertion_kind"], "attribute");
     assert!(node(rust)["valid_from"].as_str().is_some());
     assert!(node(rust)["valid_to"].is_null());
     assert!(node(rust)["revision"].as_i64().is_some());
     assert_eq!(node(python)["status"], "superseded");
     assert!(node(python)["valid_to"].as_str().is_some());
-    assert_eq!(node(observation)["assertion_kind"], "observation");
-    assert_eq!(node(observation)["status"], "stale");
+    assert_eq!(node(inference)["assertion_kind"], "inference");
+    assert_eq!(node(inference)["status"], "stale");
     assert_eq!(node(subject)["name"], "Ada");
     assert_eq!(node(subject)["entity_type"], "person");
     assert!(node(subject)["statement"].is_null());
@@ -2490,8 +2490,8 @@ async fn graph_view_checks(store: Store, graph: GraphStore, ns: String) {
     assert_eq!(small["truncated"], true);
     let small_nodes = small["nodes"].as_array().unwrap();
     assert_eq!(small_nodes.len(), 3);
-    // A cut graph keeps a share of its nodes for the entities the facts mention, so the
-    // MENTIONS relationships survive: two facts and the subject, not three facts alone.
+    // A cut graph keeps a share of its nodes for the entities the assertions mention, so the
+    // MENTIONS relationships survive: two assertions and the subject, not three assertions alone.
     assert_eq!(id_set(small_nodes, "assertion").len(), 2, "{small}");
     assert_eq!(id_set(small_nodes, "entity"), HashSet::from([subject]));
     assert!(
@@ -2569,7 +2569,7 @@ async fn graph_view_checks(store: Store, graph: GraphStore, ns: String) {
         assert!(memory["session_id"].as_str().is_some());
         assert!(memory["occurred_at"].as_str().is_some());
         assert_eq!(memory["text_truncated"], false);
-        // An observation also cites the chunks of the facts it combines.
+        // An inference also cites the chunks of the assertions it combines.
         assert!(
             memory["supports"]
                 .as_array()
@@ -2607,7 +2607,7 @@ async fn graph_view_checks(store: Store, graph: GraphStore, ns: String) {
     assert_eq!(long["text"].as_str().unwrap().chars().count(), 600);
     assert_eq!(long["supports"], json!([]));
     // A limit says that it cut the rest. A quarter of it (at least one) is kept for chunks that
-    // no fact cites, so the newest unextracted memory stays; cited chunks fill the rest, newest
+    // no assertion cites, so the newest unextracted memory stays; cited chunks fill the rest, newest
     // first.
     let (status, cut) = get_json(
         &app,
@@ -2652,7 +2652,7 @@ async fn retain_one(
             session_id: "unextracted".into(),
             external_id: external.into(),
             metadata: json!({}),
-            events: vec![EvidenceEvent {
+            events: vec![SourceEvent {
                 role: role.into(),
                 content: content.into(),
                 occurred_at: at,
@@ -2867,7 +2867,7 @@ async fn graph_view_keeps_the_newest_unextracted_memories_when_cited_ones_fill_t
     assert_eq!(body["truncated"], false);
 
     // Among chunks nothing cites, one that extraction has not processed beats a newer one
-    // that was processed and produced no fact.
+    // that was processed and produced no assertion.
     let ns = format!("graphview-limit-{}", Uuid::new_v4());
     let q = urlencode(&ns);
     for i in 0..4 {
@@ -2894,12 +2894,12 @@ async fn graph_view_keeps_the_newest_unextracted_memories_when_cited_ones_fill_t
         &ns,
         "new-processed",
         "user",
-        "Newer and processed without a fact",
+        "Newer and processed without an assertion",
         at + Duration::seconds(20),
     )
     .await;
     sqlx::query("UPDATE raw_events SET processing_state='processed' WHERE content=$1")
-        .bind("Newer and processed without a fact")
+        .bind("Newer and processed without an assertion")
         .execute(&store.pool)
         .await
         .unwrap();
@@ -3060,7 +3060,7 @@ async fn clear_checks(store: Store, graph: GraphStore, ns: String, other: String
     assert_eq!(before["chunks"], 2);
     assert!(
         neo4j_nodes(&graph, &ns).await >= 3,
-        "two facts and an entity are projected"
+        "two assertions and an entity are projected"
     );
     let other_before = namespace_rows(&store, &other).await;
     let other_nodes = neo4j_nodes(&graph, &other).await;
@@ -3089,7 +3089,7 @@ async fn clear_checks(store: Store, graph: GraphStore, ns: String, other: String
         session_id: "session".into(),
         external_id: Uuid::new_v4().to_string(),
         metadata: json!({}),
-        events: vec![EvidenceEvent {
+        events: vec![SourceEvent {
             role: "user".into(),
             content: "Ada uses Rust".into(),
             occurred_at: at,
@@ -3173,7 +3173,7 @@ async fn clear_checks(store: Store, graph: GraphStore, ns: String, other: String
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body["deleted"]["assertions"], 0, "{body}");
 
-    // A fact retained and projected after the clear is not dropped by the clear's revision gate.
+    // An assertion retained and projected after the clear is not dropped by the clear's revision gate.
     extract(
         &store,
         &ns,
@@ -3185,7 +3185,7 @@ async fn clear_checks(store: Store, graph: GraphStore, ns: String, other: String
     project_namespace(&store, &graph, &ns).await;
     assert!(
         neo4j_nodes(&graph, &ns).await >= 2,
-        "new facts are projected after a clear"
+        "new assertions are projected after a clear"
     );
 
     // The busy namespace clears once its lease expired.

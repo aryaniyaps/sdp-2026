@@ -1,0 +1,24 @@
+\chapter*{\uppercase{ABSTRACT}}
+\addcontentsline{toc}{section}{\bfseries \uppercase{Abstract}}
+AI agents that don't have persistent memory forget instructions and project
+decisions once a session ends, and when an instruction changes they often keep using
+the old one. For this project we built a long-term memory engine in Rust for such agents.
+What it remembers carries over between sessions, can be corrected later, and can be
+traced back to the original messages.
+
+The engine has five modules: source acquisition and processing, knowledge
+extraction and consolidation, temporal knowledge and graph management, hybrid
+retrieval and grounded reasoning, and model training and evaluation. Original messages
+are stored unchanged as source events. Assertions (typed statements about the user or
+project) are extracted along with the exact source quote they came from and stored as
+versions, so a correction replaces an old value without deleting it.
+Retrieval combines keyword, vector, time and graph search using Reciprocal Rank
+Fusion and returns each result with its source quotes. The extraction and answering is done by a small local
+Qwen3-4B model that we fine-tuned with QLoRA.
+
+M1 is implemented, M2 to M4 are implemented with some quality and benchmark
+work left, and the M5 model is trained and integrated while evaluation is still going on.
+So far all 142 stored source quotes matched their original text, and fine-tuning improved
+consolidation of related assertions from 1/16 to 13/16 and answers from 10/16 to 15/16.
+On the other hand extraction coverage dropped from 50/55 to 41/55 and dates are still handled poorly. The full
+LongMemEval-S run is pending.

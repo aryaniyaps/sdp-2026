@@ -104,7 +104,7 @@ test("namespace changes and clears never replay old conversation into memory", a
   }
 });
 
-test("dashboard namespace changes immediately during an active turn without moving its evidence", async () => {
+test("dashboard namespace changes immediately during an active turn without moving its source events", async () => {
   const root = await mkdtemp(join(tmpdir(), "pi-dashboard-"));
   const keys = ["MEMORY_NAMESPACE", "MEMORY_SPOOL", "MEMORY_DASHBOARD_SESSION"];
   const saved = keys.map((key) => process.env[key]);
@@ -129,7 +129,8 @@ test("dashboard namespace changes immediately during an active turn without movi
           finishRecall = resolve;
         });
       result = {
-        context: body.namespace === "project:a" ? "old namespace facts" : "",
+        context:
+          body.namespace === "project:a" ? "old namespace assertions" : "",
         degraded_reasons: [],
         max_distance: body.max_distance,
       };
@@ -185,7 +186,7 @@ test("dashboard namespace changes immediately during an active turn without movi
     assert.equal(
       await recall,
       undefined,
-      "a stale recall must not inject the previous namespace's facts",
+      "a stale recall must not inject the previous namespace's assertions",
     );
     // Rapid switching back must not overwrite the active turn's retention cursor.
     for (const next of [

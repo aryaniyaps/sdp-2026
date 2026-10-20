@@ -4,9 +4,9 @@
 
 ## Research question and acceptance
 
-Can a small instruction model trained on an 8 GB laptop GPU extract durable, source-grounded facts from varied conversations, consolidate supported observations, and answer with evidence-linked citations—including changed preferences, relationships, plans, routines and professional information?
+Can a small instruction model trained on an 8 GB laptop GPU extract durable, source-grounded assertions from varied conversations, consolidate supported inferences, and answer with evidence-linked citations—including changed preferences, relationships, plans, routines and professional information?
 
-A successful output must do more than parse as JSON. The operational path includes queued evidence, accepted assertions in PostgreSQL, supported derived observations, Neo4j projection, corrections to prior assertions, retrieval and cited reflection. Schema acceptance, semantic support, reference coverage and live completion are measured separately.
+A successful output must do more than parse as JSON. The operational path includes queued source events, accepted assertions in PostgreSQL, supported derived inferences, Neo4j projection, corrections to prior assertions, retrieval and cited reflection. Schema acceptance, semantic support, reference coverage and live completion are measured separately.
 
 ## General-purpose corpus
 
@@ -23,7 +23,7 @@ These episode counts include historical replay. Multiple tasks from one episode 
 
 Every partition covers family/friendships, food/dining, travel, education, career/workplace, appointments, household routines, shopping, arts, sports/recreation, community, pets/caregiving, accessibility/communication preferences, wellbeing routines without medical advice, small business, and software/technical projects. Software accounts for 240/2,095 training rows (11.46%); the model target is not restricted to coding.
 
-The general generation run produced 1,280 synthetic episodes. The final label audit retained 823 original passes and 242 repaired-and-reviewed episodes (1,065 total). Rejected labels were repaired against unchanged source evidence and reviewed again; failing cases were excluded. The corpus also includes bounded historical coding replay. The manifest preserves exact counts, selection provenance, prompt versions, split hashes and exclusions.
+The general generation run produced 1,280 synthetic episodes. The final label audit retained 823 original passes and 242 repaired-and-reviewed episodes (1,065 total). Rejected labels were repaired against unchanged source episodes and reviewed again; failing cases were excluded. The corpus also includes bounded historical coding replay. The manifest preserves exact counts, selection provenance, prompt versions, split hashes and exclusions.
 
 The teacher is GPT-5.6-sol through authenticated Pi. This is **sequence-level distillation** from generated targets, not teacher-logit/KL distillation. Labels and semantic audits use the same teacher family: they are quality filters, not independent human ground truth.
 
@@ -33,7 +33,7 @@ Scenario-family partitions are allocated before generation. All tasks from an ep
 
 Each kept row passes the project validators: exact source quotes and valid attribution for extraction, at least two distinct supplied supports for consolidation, and citations limited to supplied evidence for reflection. Semantic review additionally checks entailment, speaker identity, relationship direction, preference exceptions, corrections, rejected suggestions and temporal precision. Null timestamps are permitted when exact time is unknown; invented precision is an error.
 
-[Hindsight is 20/20](https://arxiv.org/abs/2512.12818) and its pinned extraction implementation informed contextualization and attribution. See [PROMPT_DESIGN.md](PROMPT_DESIGN.md) for exact source mapping, prompt revisions and unresolved development-probe failures. This project retains its own slot/evidence schema and validators. Shared prompt hashes prevent historical runs from being mislabeled as using newer prompts.
+[Hindsight is 20/20](https://arxiv.org/abs/2512.12818) and its pinned extraction implementation informed contextualization and attribution. See [PROMPT_DESIGN.md](PROMPT_DESIGN.md) for exact source mapping, prompt revisions and unresolved development-probe failures. This project retains its own slot/source schema and validators. The model contract (prompts, labels and outputs) keeps the trained wording `fact`, `observation` and "Evidence"; the service translates it to assertions of kind `attribute` and `inference`. Shared prompt hashes prevent historical runs from being mislabeled as using newer prompts.
 
 ## Model and actual training lineage
 
@@ -76,7 +76,7 @@ The 64-case matched internal comparison is complete with zero grading errors. Th
 
 This is a **multitask tradeoff with an extraction regression**, not evidence that every memory task improved. One student reflection failed the original UUID-citation contract; it remains a failure in the matched results. The external sixteen-window extraction diagnostic also regresses: supported claims are 22/26 (84.6%) versus 39/44 (88.6%); reference coverage is 13/40 (32.5%) versus 16/40 (40.0%). All sixteen windows pass structural validation for each model. These are not official LoCoMo QA scores. Final live acceptance remains separate evidence.
 
-Manual inspection also found recurrent temporal errors: “tomorrow” on June 1 became June 3; “this Friday” from October 8 became October 17; and date-only events gained fabricated midnight `event_at` values. These are substantive remaining defects, not presentation details or solved by the citation enum. Source evidence and date verification remain necessary.
+Manual inspection also found recurrent temporal errors: “tomorrow” on June 1 became June 3; “this Friday” from October 8 became October 17; and date-only events gained fabricated midnight `event_at` values. These are substantive remaining defects, not presentation details or solved by the citation enum. Source-quote checks and date verification remain necessary.
 
 ## Deployment-only reflection repair
 
@@ -86,7 +86,7 @@ The 64-case internal and 16-case external matched comparisons retain the origina
 
 ## Final operational and publication gates
 
-`verify_live_memory.py` must pass all required checks using the selected final model: durable assertions, updated current city, superseded historical city, unchanged preference, correct relationship, no invented geography, observation with two supports, Neo4j projection, source-backed recall and cited reflection. `build_release_receipt.py` requires those checks, the correct worker identity, final adapter/GGUF and completed training/evaluation receipts. A saved receipt with a failed or omitted check is not acceptance.
+`verify_live_memory.py` must pass all required checks using the selected final model: durable assertions, updated current city, superseded historical city, unchanged preference, correct relationship, no invented geography, inference with two supports, Neo4j projection, source-backed recall and cited reflection. `build_release_receipt.py` requires those checks, the correct worker identity, final adapter/GGUF and completed training/evaluation receipts. A saved receipt with a failed or omitted check is not acceptance.
 
 The Hugging Face package is allowlisted: adapter, GGUF, checksums, shared prompts/schema, inference helper, model card and documentation. Credentials, private conversations, teacher caches, raw LoCoMo data and optimizer states are excluded. Public attribution includes inherited Nebius data. The executed notebook records actual experiments and failures; it is not a claim that all original work occurred interactively in Jupyter.
 
@@ -96,8 +96,8 @@ The first Qwen3-1.7B adapter learned deterministic synthetic examples well. Natu
 
 Historical public data came from [Nebius SWE-rebench OpenHands trajectories](https://huggingface.co/datasets/nebius/SWE-rebench-openhands-trajectories), CC-BY-4.0. Fifty-two sampled repositories yielded 144 windows; 118 relabeled training windows remained before stage-1 token filtering. Provenance records repository, issue, trajectory, ranges and source hashes. This coding exposure is inherited by the final warm-start lineage even without later replay. The limited source slice is Python-heavy.
 
-On 8 October 2026, original blocked extraction job `731699d3-52c1-4d08-af65-fa6b2031a8b6` completed with structured decoding and the 1.7B bridge worker, and projection succeeded. This establishes recovery of that blocker, not final 4B semantic quality. A restart left one job under an obsolete lease; only its verified stale matching lease was expired, preserving evidence and assertions. Final cutovers must account for outstanding jobs and leases.
+On 8 October 2026, original blocked extraction job `731699d3-52c1-4d08-af65-fa6b2031a8b6` completed with structured decoding and the 1.7B bridge worker, and projection succeeded. This establishes recovery of that blocker, not final 4B semantic quality. A restart left one job under an obsolete lease; only its verified stale matching lease was expired, preserving source events and assertions. Final cutovers must account for outstanding jobs and leases.
 
 ## Boundaries of the claim
 
-The corpus supports a measured general-purpose English memory experiment across sixteen sampled domains. It does not establish universal reliability, multilingual transfer, production safety or very long-history performance. Synthetic labels and correlated grading can share systematic errors. Independent human review, broader external testing and longer-horizon retention tests remain necessary. Preserve evidence, correction history and deletion controls rather than treating extracted assertions as unquestionable truth.
+The corpus supports a measured general-purpose English memory experiment across sixteen sampled domains. It does not establish universal reliability, multilingual transfer, production safety or very long-history performance. Synthetic labels and correlated grading can share systematic errors. Independent human review, broader external testing and longer-horizon retention tests remain necessary. Preserve source events, correction history and deletion controls rather than treating extracted assertions as unquestionable truth.

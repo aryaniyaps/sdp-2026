@@ -29,8 +29,8 @@ export function observedExitCode(
   return null;
 }
 
-// Once recalled evidence enters a branch it can influence later assistant replies too.
-// Keep those replies in the ledger, but do not treat them as independent fact sources.
+// Once recalled memory enters a branch it can influence later assistant replies too.
+// Keep those replies in the ledger, but do not treat them as independent sources.
 export function memoryDerivedAssistantIds(branch: readonly {
   id: string;
   type: string;

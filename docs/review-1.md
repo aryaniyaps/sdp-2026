@@ -10,7 +10,7 @@
 
 ## Architecture mapping
 
-- `raw_events` and `chunks` are immutable evidence; failures remain recorded with processing state and error.
+- `raw_events` and `chunks` are immutable source events and chunks; failures remain recorded with processing state and error.
 - `memories` supplies namespace-scoped identity from normalized `subject::predicate`.
 - `memory_versions` has one active row per memory, validity intervals, 1,024-dimensional vectors, and generated PostgreSQL search vectors.
 - `memory_version_sources` retains many-to-many provenance; `memory_relations` records correction edges.

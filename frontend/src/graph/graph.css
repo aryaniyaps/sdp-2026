@@ -10,7 +10,7 @@ body.graph-mode {
   --faint: #727272;
   --accent: #a78bfa;
   --memory: #6dd3a0;
-  --fact: #a78bfa;
+  --assertion: #a78bfa;
   --entity: #b9bec8;
   --amber: #e8b85c;
   --red: #f07178;
@@ -414,7 +414,7 @@ body.graph-mode .row .rsub {
   margin-top: 2px;
 }
 body.graph-mode .row .rel {
-  color: var(--fact);
+  color: var(--assertion);
   font-weight: 600;
 }
 
@@ -558,7 +558,7 @@ body.graph-mode #tip {
   z-index: 5;
 }
 body.graph-mode #tip b {
-  color: var(--fact);
+  color: var(--assertion);
 }
 
 body.graph-mode .legend-dot {
@@ -571,11 +571,11 @@ body.graph-mode .legend-dot {
 body.graph-mode .legend-dot.memory {
   background: var(--memory);
 }
-body.graph-mode .legend-dot.fact,
-body.graph-mode .legend-dot.observation {
-  background: var(--fact);
+body.graph-mode .legend-dot.assertion,
+body.graph-mode .legend-dot.inference {
+  background: var(--assertion);
 }
-body.graph-mode .legend-dot.observation {
+body.graph-mode .legend-dot.inference {
   border-radius: 0;
   transform: rotate(45deg);
 }

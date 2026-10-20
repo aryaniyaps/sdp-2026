@@ -17,9 +17,9 @@ Existing custom configuration is preserved during preparation.
 | Service or file | Responsibility |
 | --- | --- |
 | `term` | ttyd starts Pi with the memory extension for each browser connection. Repeated URL arguments pass the project directory, namespace and session binding UUID to `pi-session.sh`. |
-| `engine` | Stores evidence, extracts facts with the worker model, serves the React UI, and exposes graph APIs internally. It has no Pi login. |
+| `engine` | Stores source events, extracts assertions with the worker model, serves the React UI, and exposes graph APIs internally. It has no Pi login. |
 | `gpu-tunnel` | Optional (profile `gpu-tunnel`). A chisel server that a GPU workstation dials into over HTTPS; the workstation's Ollama then appears as `gpu-tunnel.internal:11436`. |
-| `postgres`, `neo4j` | Authoritative evidence storage and graph projection. |
+| `postgres`, `neo4j` | Authoritative source and assertion storage, and the graph projection. |
 | `ollama`, `ollama-init` | Serve and prepare `qwen3-embedding:0.6b`, and the worker model when it is not lent by a GPU workstation. |
 | `caddy` / `Caddyfile.template` | Frontend assets, graph reads, terminal HTTP and WebSocket proxying. `/` redirects to `/demo`. `conf.d/gpu-tunnel.caddy` adds the tunnel route, which retains its own authentication secret. The dashboard requires no login. |
 | `Dockerfile` | Builds the React frontend, Rust service, Pi integration, and ttyd runtime. |

@@ -8,7 +8,7 @@ const RELATIONSHIPS_PER_NODE: usize = 20;
 /// Characters of an assertion statement used as a node name.
 const NAME_CHARS: usize = 60;
 
-/// One node of the Neo4j projection: an Assertion (fact) or a KnowledgeEntity.
+/// One node of the Neo4j projection: an Assertion or a KnowledgeEntity.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ProjectionNode {
     pub id: String,

@@ -1,4 +1,4 @@
-//! HTTP routes for evidence memory. Retrieval and graph logic live in their own modules.
+//! HTTP routes for the V2 memory API. Retrieval and graph logic live in their own modules.
 
 use crate::{
     AppError, AppState,
@@ -48,16 +48,16 @@ pub use reflect::reflect_engine;
     ),
     components(schemas(
         RetainRequest,
-        EvidenceEvent,
+        SourceEvent,
         EntityInput,
         Cardinality,
         ClaimInput,
         RelatedInput,
         Extraction,
-        ObservationInput,
+        InferenceInput,
         Consolidation,
         AssertionView,
-        EvidenceSource,
+        SourceQuote,
         Job,
         RecallRequest,
         RecallResponse,
@@ -114,15 +114,15 @@ struct Namespace {
 }
 /// Bounds concurrent early embedding so a bulk import cannot flood the embedder.
 static EMBEDDING_GATE: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
-#[utoipa::path(post,path="/api/v2/retain",responses((status=200,body=Value)),tag="Evidence memory",request_body=RetainRequest)]
+#[utoipa::path(post,path="/api/v2/retain",responses((status=200,body=Value)),tag="Memory",request_body=RetainRequest)]
 async fn retain(
     State(s): State<Arc<AppState>>,
     Json(r): Json<RetainRequest>,
 ) -> Result<Json<Value>, AppError> {
     let (episode_id, job_id, created) = s.store.retain(&r).await?;
     if created {
-        // Make the new evidence semantically searchable now instead of after
-        // extraction. Embedding is not on the acknowledgement path: the evidence is
+        // Make the new source events semantically searchable now instead of after
+        // extraction. Embedding is not on the acknowledgement path: the source is
         // already durable, and the extract job fills any gap left by an outage.
         let state = s.clone();
         let namespace = r.namespace.clone();
@@ -131,8 +131,8 @@ async fn retain(
                 return;
             };
             let outcome = async {
-                let evidence = state.store.episode_evidence(&namespace, episode_id).await?;
-                crate::worker::embed_missing_chunks(&state, &evidence).await
+                let sources = state.store.episode_events(&namespace, episode_id).await?;
+                crate::worker::embed_missing_chunks(&state, &sources).await
             }
             .await;
             if let Err(error) = outcome {
@@ -144,14 +144,14 @@ async fn retain(
         json!({"episode_id":episode_id,"job_id":job_id,"created":created}),
     ))
 }
-#[utoipa::path(get,path="/api/v2/jobs",responses((status=200,body=Vec<Job>)),tag="Evidence memory",params(("namespace"=String,Query)))]
+#[utoipa::path(get,path="/api/v2/jobs",responses((status=200,body=Vec<Job>)),tag="Memory",params(("namespace"=String,Query)))]
 async fn jobs(
     State(s): State<Arc<AppState>>,
     Query(q): Query<Namespace>,
 ) -> Result<Json<Value>, AppError> {
     Ok(Json(json!(s.store.jobs(&q.namespace).await?)))
 }
-#[utoipa::path(get,path="/api/v2/jobs/{id}",responses((status=200,body=Job)),tag="Evidence memory",params(("namespace"=String,Query),("id"=Uuid,Path)))]
+#[utoipa::path(get,path="/api/v2/jobs/{id}",responses((status=200,body=Job)),tag="Memory",params(("namespace"=String,Query),("id"=Uuid,Path)))]
 async fn job(
     State(s): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
@@ -159,7 +159,7 @@ async fn job(
 ) -> Result<Json<Job>, AppError> {
     Ok(Json(s.store.job(&q.namespace, id).await?))
 }
-#[utoipa::path(post,path="/api/v2/jobs/{id}/retry",responses((status=200,body=Value)),tag="Evidence memory",params(("namespace"=String,Query),("id"=Uuid,Path)))]
+#[utoipa::path(post,path="/api/v2/jobs/{id}/retry",responses((status=200,body=Value)),tag="Memory",params(("namespace"=String,Query),("id"=Uuid,Path)))]
 async fn retry(
     State(s): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
@@ -168,7 +168,7 @@ async fn retry(
     s.store.retry_job(&q.namespace, id).await?;
     Ok(Json(json!({"retry":true})))
 }
-#[utoipa::path(get,path="/api/v2/assertions/{id}",responses((status=200,body=AssertionView)),tag="Evidence memory",params(("namespace"=String,Query),("id"=Uuid,Path)))]
+#[utoipa::path(get,path="/api/v2/assertions/{id}",responses((status=200,body=AssertionView)),tag="Memory",params(("namespace"=String,Query),("id"=Uuid,Path)))]
 async fn assertion(
     State(s): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
@@ -176,14 +176,14 @@ async fn assertion(
 ) -> Result<Json<AssertionView>, AppError> {
     Ok(Json(s.store.assertion(&q.namespace, id).await?))
 }
-#[utoipa::path(post,path="/api/v2/assertions/{id}/retract",responses((status=200,body=Value)),tag="Evidence memory",params(("namespace"=String,Query),("id"=Uuid,Path)))]
+#[utoipa::path(post,path="/api/v2/assertions/{id}/retract",responses((status=200,body=Value)),tag="Memory",params(("namespace"=String,Query),("id"=Uuid,Path)))]
 async fn retract(
     State(s): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
     Query(q): Query<Namespace>,
 ) -> Result<Json<Value>, AppError> {
     Ok(Json(
-        json!({"stale_observations":s.store.retract(&q.namespace,id).await?}),
+        json!({"stale_inferences":s.store.retract(&q.namespace,id).await?}),
     ))
 }
 pub async fn namespace_status(s: &AppState, namespace: &str) -> Result<Value, AppError> {
@@ -224,24 +224,24 @@ GROUP BY operation_type
 ORDER BY operation_type
 "#).bind(namespace).fetch_all(&s.store.pool).await?;
     Ok(
-        json!({"namespace":namespace,"ready":outstanding==0,"outstanding_jobs":outstanding,"jobs":groups,"stale_observations":stale,"last_projection_completed_at":projection,"embedding_gaps":embedding_gaps,"worker_operations":worker_operations}),
+        json!({"namespace":namespace,"ready":outstanding==0,"outstanding_jobs":outstanding,"jobs":groups,"stale_inferences":stale,"last_projection_completed_at":projection,"embedding_gaps":embedding_gaps,"worker_operations":worker_operations}),
     )
 }
-#[utoipa::path(get,path="/api/v2/status",responses((status=200,body=Value)),tag="Evidence memory",params(("namespace"=String,Query)))]
+#[utoipa::path(get,path="/api/v2/status",responses((status=200,body=Value)),tag="Memory",params(("namespace"=String,Query)))]
 async fn status(
     State(s): State<Arc<AppState>>,
     Query(q): Query<Namespace>,
 ) -> Result<Json<Value>, AppError> {
     Ok(Json(namespace_status(&s, &q.namespace).await?))
 }
-#[utoipa::path(post,path="/api/v2/recall",responses((status=200,body=RecallResponse)),tag="Evidence memory",request_body=RecallRequest)]
+#[utoipa::path(post,path="/api/v2/recall",responses((status=200,body=RecallResponse)),tag="Memory",request_body=RecallRequest)]
 async fn recall(
     State(s): State<Arc<AppState>>,
     Json(r): Json<RecallRequest>,
 ) -> Result<Json<RecallResponse>, AppError> {
     Ok(Json(recall_engine(&s, r).await?))
 }
-#[utoipa::path(post,path="/api/v2/reflect",responses((status=200,body=Value)),tag="Evidence memory",request_body=RecallRequest)]
+#[utoipa::path(post,path="/api/v2/reflect",responses((status=200,body=Value)),tag="Memory",request_body=RecallRequest)]
 async fn reflect(
     State(s): State<Arc<AppState>>,
     Json(r): Json<RecallRequest>,
