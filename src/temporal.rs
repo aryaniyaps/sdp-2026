@@ -256,9 +256,116 @@ pub fn plan(query: &str, reference: DateTime<Utc>) -> Option<Window> {
     None
 }
 
+const WEEKDAYS: [(&str, chrono::Weekday); 7] = [
+    ("monday", chrono::Weekday::Mon),
+    ("tuesday", chrono::Weekday::Tue),
+    ("wednesday", chrono::Weekday::Wed),
+    ("thursday", chrono::Weekday::Thu),
+    ("friday", chrono::Weekday::Fri),
+    ("saturday", chrono::Weekday::Sat),
+    ("sunday", chrono::Weekday::Sun),
+];
+
+/// The single calendar day a piece of source text refers to relative to when it was said, such as
+/// "yesterday", "two days ago", "tomorrow", "in three days" or "last Friday". Only expressions that name
+/// one day count; "last week" does not. Text with no such expression, or with two that disagree, gives
+/// `None`, so nothing is guessed.
+pub fn mentioned_day(text: &str, said: DateTime<Utc>) -> Option<NaiveDate> {
+    let words: Vec<String> = text
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(str::to_string)
+        .collect();
+    let today = said.date_naive();
+    let word = |i: usize| words.get(i).map(String::as_str);
+    let mut found = Vec::new();
+    let mut i = 0;
+    while i < words.len() {
+        let w = words[i].as_str();
+        let day = match w {
+            "day" if word(i + 1) == Some("before") && word(i + 2) == Some("yesterday") => {
+                i += 2;
+                Some(today - Duration::days(2))
+            }
+            "day" if word(i + 1) == Some("after") && word(i + 2) == Some("tomorrow") => {
+                i += 2;
+                Some(today + Duration::days(2))
+            }
+            "yesterday" => Some(today - Duration::days(1)),
+            "tomorrow" => Some(today + Duration::days(1)),
+            "tonight" => Some(today),
+            "last" if word(i + 1) == Some("night") => Some(today - Duration::days(1)),
+            "last" | "this" | "next" | "past" => {
+                // "last Friday" is the latest Friday before today; "next Friday" the first after it.
+                // "this Friday" is the Friday of the current Monday-to-Sunday week.
+                match word(i + 1).and_then(|d| WEEKDAYS.iter().find(|(name, _)| *name == d)) {
+                    Some((_, weekday)) => {
+                        let target = weekday.num_days_from_monday() as i64;
+                        let now = today.weekday().num_days_from_monday() as i64;
+                        let offset = match w {
+                            "last" | "past" => -((now - target - 1).rem_euclid(7) + 1),
+                            "next" => (target - now - 1).rem_euclid(7) + 1,
+                            _ => target - now,
+                        };
+                        i += 1;
+                        Some(today + Duration::days(offset))
+                    }
+                    None => None,
+                }
+            }
+            "in" => match (word(i + 1).and_then(number), word(i + 2)) {
+                (Some(n), Some("day" | "days")) => Some(today + Duration::days(n)),
+                (Some(n), Some("week" | "weeks")) => Some(today + Duration::days(7 * n)),
+                _ => None,
+            },
+            _ => match (number(w), word(i + 1), word(i + 2)) {
+                (Some(n), Some("day" | "days"), Some("ago")) => Some(today - Duration::days(n)),
+                (Some(n), Some("week" | "weeks"), Some("ago")) => Some(today - Duration::days(7 * n)),
+                _ => None,
+            },
+        };
+        found.extend(day);
+        i += 1;
+    }
+    found.dedup();
+    match found.as_slice() {
+        [day] => Some(*day),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn mentioned_day_resolves_one_relative_day_and_refuses_the_rest() {
+        // Monday, 8 May 2023, as in LoCoMo's first session.
+        let said = Utc.with_ymd_and_hms(2023, 5, 8, 13, 56, 0).unwrap();
+        let day = |y, m, d| NaiveDate::from_ymd_opt(y, m, d);
+        for (text, expected) in [
+            ("I went to a LGBTQ support group yesterday.", day(2023, 5, 7)),
+            ("I will run a half marathon tomorrow.", day(2023, 5, 9)),
+            ("I passed my driving test two days ago", day(2023, 5, 6)),
+            ("I'll adopt a kitten in three days", day(2023, 5, 11)),
+            ("we met last Friday", day(2023, 5, 5)),
+            ("see you next Monday", day(2023, 5, 15)),
+            ("the party is this Saturday", day(2023, 5, 13)),
+            ("I slept badly last night", day(2023, 5, 7)),
+            ("the day before yesterday was rough", day(2023, 5, 6)),
+            ("a week ago I started painting", day(2023, 5, 1)),
+        ] {
+            assert_eq!(mentioned_day(text, said), expected, "{text}");
+        }
+        for text in [
+            "I love painting",
+            "last week was busy",
+            "yesterday I planned what to do tomorrow",
+            "I have a dog that is two days old",
+        ] {
+            assert_eq!(mentioned_day(text, said), None, "{text}");
+        }
+    }
     /// Tuesday, 6 October 2026.
     fn reference() -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 10, 6, 12, 0, 0).unwrap()

@@ -173,9 +173,10 @@ def load():
                     # Questions are asked after the last session.
                     "question_date": sessions[-1]["date"],
                     "evidence_turns": qa.get("evidence", []),
+                    # Recall reports a source by its session name, which is unique within one bank.
                     "evidence_sessions": sorted(
                         {
-                            f"{bank}:session_{m.group(1)}"
+                            f"session_{m.group(1)}"
                             for e in qa.get("evidence", [])
                             if (m := re.match(r"D(\d+):", e))
                         }
@@ -780,7 +781,7 @@ def retrieval_metrics(item, response):
 
 def quote_check(response, banks, bank):
     """Every source quote in a recall must occur verbatim in the dataset turn it cites."""
-    texts = {s["external_id"]: {t["metadata"]["dia_id"]: t["content"] for t in s["turns"]} for s in banks[bank]["sessions"]}
+    texts = {s["session_id"]: {t["metadata"]["dia_id"]: t["content"] for t in s["turns"]} for s in banks[bank]["sessions"]}
     checked = exact = 0
     for hit in response["results"]:
         for source in hit["sources"]:

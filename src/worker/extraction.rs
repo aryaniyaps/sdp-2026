@@ -98,6 +98,7 @@ LIMIT 80
                 );
                 continue;
             }
+            resolve_relative_day(&mut claim, &window_events);
             for index in &mut claim.source_indices {
                 *index = indexed_events[*index + range.start].0;
             }
@@ -122,6 +123,35 @@ LIMIT 80
         outcome["existing_assertions_dropped"] = json!(dropped_assertions);
     }
     Ok(outcome)
+}
+
+/// The student copies the time a message was sent into `event_at` even when the quote says
+/// "yesterday" or "in three days". When the claim's own quotes name exactly one relative day and the
+/// model's date is the day the message was sent, the date moves to the day the quote names: in
+/// `event_at`, in `valid_from` when it was the same instant, and where the statement spells it out.
+/// `source_indices` must still index `events`.
+pub(crate) fn resolve_relative_day(claim: &mut ClaimInput, events: &[SourceEvent]) {
+    let Some(said) = claim.source_indices.first().and_then(|&i| events.get(i)).map(|e| e.occurred_at) else {
+        return;
+    };
+    let Some(event_at) = claim.event_at.filter(|at| at.date_naive() == said.date_naive()) else {
+        return;
+    };
+    let Some(day) = crate::temporal::mentioned_day(&claim.quotes.join(" "), said) else {
+        return;
+    };
+    let shift = day - said.date_naive();
+    if shift.is_zero() {
+        return;
+    }
+    claim.event_at = Some(event_at + shift);
+    if claim.valid_from == Some(event_at) {
+        claim.valid_from = claim.event_at;
+    }
+    for format in ["%Y-%m-%d", "%-d %B %Y", "%B %-d, %Y"] {
+        let (old, new) = (said.date_naive().format(format).to_string(), day.format(format).to_string());
+        claim.statement = claim.statement.replace(&old, &new);
+    }
 }
 
 fn extraction_source(event: &SourceEvent) -> bool {
@@ -251,6 +281,52 @@ fn repair_prompt(
 #[cfg(test)]
 mod repair_tests {
     use super::*;
+
+    #[test]
+    fn a_relative_day_in_the_quote_moves_a_copied_message_date() {
+        use chrono::TimeZone;
+        let said = chrono::Utc.with_ymd_and_hms(2023, 5, 8, 13, 56, 0).unwrap();
+        let events = vec![SourceEvent {
+            role: "user".into(),
+            content: "Caroline: I went to a LGBTQ support group yesterday and it was so powerful.".into(),
+            occurred_at: said,
+            metadata: json!({}),
+        }];
+        let claim = |quote: &str, event_at| ClaimInput {
+            subject: EntityInput { name: "Caroline".into(), entity_type: "person".into(), aliases: vec![] },
+            predicate: "attended".into(),
+            value: "LGBTQ support group".into(),
+            statement: "Caroline attended an LGBTQ support group on 2023-05-08.".into(),
+            cardinality: Cardinality::Event,
+            kind: "event".into(),
+            confidence: 0.9,
+            valid_from: event_at,
+            event_at,
+            source_indices: vec![0],
+            quotes: vec![quote.into()],
+            entities: vec![],
+            correction: false,
+            explanation: String::new(),
+            related: vec![],
+        };
+        let mut copied = claim("I went to a LGBTQ support group yesterday", Some(said));
+        resolve_relative_day(&mut copied, &events);
+        assert_eq!(copied.event_at.unwrap().date_naive().to_string(), "2023-05-07");
+        assert_eq!(copied.valid_from, copied.event_at);
+        assert_eq!(copied.statement, "Caroline attended an LGBTQ support group on 2023-05-07.");
+        // A date the model already resolved, a quote without a relative day, or no date stays as it is.
+        let resolved = said - chrono::Duration::days(1);
+        for (quote, event_at) in [
+            ("I went to a LGBTQ support group yesterday", Some(resolved)),
+            ("I went to a LGBTQ support group", Some(said)),
+            ("I went to a LGBTQ support group yesterday", None),
+        ] {
+            let mut unchanged = claim(quote, event_at);
+            resolve_relative_day(&mut unchanged, &events);
+            assert_eq!(unchanged.event_at, event_at, "{quote}");
+            assert!(unchanged.statement.ends_with("2023-05-08."), "{quote}");
+        }
+    }
 
     #[test]
     fn recalled_answers_are_not_independent_sources_but_new_messages_are() {

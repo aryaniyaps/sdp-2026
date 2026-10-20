@@ -1,5 +1,5 @@
 {
-  "note": "Every change made because of a dev run, in order. Dev runs use the first two LoCoMo conversations (233 questions); the test run uses only the final version.",
+  "note": "Every change made because of a dev finding, in order. Diagnosis uses only the two dev conversations (conv-26, conv-30; 233 questions). Each version is measured on dev; the test run uses only the final version, and the eight other conversations are reported apart as held-out.",
   "iterations": [
     {
       "version": "v1-window-split",
@@ -15,6 +15,32 @@
       ],
       "dev_before": "conv-30 bank could not be built",
       "dev_after": "The retried conv-30 job split a 26-event window (engine log, 10:43:30Z) and succeeded; the bank finished extracting."
+    },
+    {
+      "version": "v2-relative-days",
+      "date": "2026-10-20",
+      "dev_run": "locomo-dev-v2",
+      "finding": "In conv-26, 'I went to a LGBTQ support group yesterday' said on 8 May 2023 was stored with event_at 8 May and the statement 'on 2023-05-08': the student copies the message time instead of resolving the relative day (the known date fault in Chapter 5). LoCoMo's gold answer is 7 May.",
+      "change": "After review, a claim whose own quotes name exactly one relative day (yesterday, tomorrow, N days ago, in N days, last/next/this <weekday>, last night) and whose event_at is the day the message was sent has event_at, a matching valid_from and the date spelled in its statement moved to the named day. Two disagreeing expressions or a period ('last week') change nothing. Unit tests mentioned_day_resolves_one_relative_day_and_refuses_the_rest and a_relative_day_in_the_quote_moves_a_copied_message_date.",
+      "files": [
+        "src/temporal.rs",
+        "src/worker/extraction.rs"
+      ],
+      "dev_before": "pending (locomo-dev-v1 banks were incomplete)",
+      "dev_after": "pending"
+    },
+    {
+      "version": "v2-harness-session-ids",
+      "date": "2026-10-20",
+      "dev_run": "locomo-dev-v1",
+      "finding": "Harness bug: recall reports a source by its session name (session_19), but the harness labelled evidence as conv-26:session_19, so session recall and the quote check would have scored zero.",
+      "change": "Evidence sessions and the quote check use the session name, which is unique within one conversation's bank.",
+      "files": [
+        "benchmark/run.py",
+        "benchmark/test_protocol.py"
+      ],
+      "dev_before": "session recall 0 on every item",
+      "dev_after": "conv-26:q0 session recall 1.0, 26/26 quotes verbatim"
     }
   ]
 }

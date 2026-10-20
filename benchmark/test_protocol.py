@@ -74,8 +74,8 @@ class ProtocolTests(unittest.TestCase):
         self.assertIsNone(run.last_json("no json here", "hypothesis"))
 
     def test_retrieval_and_quote_checks(self):
-        item = {"evidence_sessions": ["conv-x:session_1"], "evidence_turns": ["D1:1"]}
-        source = {"session_id": "conv-x:session_1", "quote": "I went to a support group",
+        item = {"evidence_sessions": ["session_1"], "evidence_turns": ["D1:1"]}
+        source = {"session_id": "session_1", "quote": "I went to a support group",
                   "metadata": {"dia_id": "D1:1"}}
         response = {"ranking": [{"sources": [source]}], "results": [{"sources": [source]}]}
         metrics = run.retrieval_metrics(item, response)
