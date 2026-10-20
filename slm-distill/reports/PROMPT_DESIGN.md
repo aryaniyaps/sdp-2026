@@ -2,6 +2,8 @@
 
 The product target is general-purpose memory. The completed coding-focused corpus and 4B stage-1 adapter are initial experiments, not evidence of general-purpose capability. The automatic coding-only stage-2 launcher was stopped before training began. Existing artifacts remain intact.
 
+The prompt text below keeps the model contract's wording ("Existing facts", `fact`, `observation`, "Evidence"), which the model was trained on; the service stores what it returns as assertions and inferences (see [docs/terminology.md](../../docs/terminology.md)).
+
 ## Primary sources
 
 - Latimer et al., *Hindsight is 20/20*, arXiv:2512.12818v1, §4.1.2 and Appendix A.1, printed pp. 23–24: https://arxiv.org/pdf/2512.12818v1#page=23

@@ -229,16 +229,18 @@ BONA FIDE CERTIFICATE}
 LIST OF FIGURES} \listoffigures
 \end{onehalfspacing}
 
+% Fix the reference numbering to the order used in the report (placed before
+% the glossary so its terminology citations do not renumber the chapters')
+\nocite{liu2024lost,wu2025longmemeval,packer2023memgpt,rasmussen2025zep,
+chhikara2025mem0,daga2026supermemory,latimer2025hindsight,neo4j2026http,
+zechner2026pi,postgres2026fts,kane2026pgvector,cormack2009rrf,
+zhang2025qwen3emb,dettmers2023qlora,maharana2024locomo,
+wikibase2026datamodel,lebo2013provo,mitchell2018nell,park2023generative}
+
 \include{Acronyms/acronyms}
 \include{Glossary/glossary}
 
 \pagenumbering{arabic}
-
-% Fix the reference numbering to the order used in the report
-\nocite{liu2024lost,wu2025longmemeval,packer2023memgpt,rasmussen2025zep,
-chhikara2025mem0,daga2026supermemory,latimer2025hindsight,neo4j2026http,
-zechner2026pi,postgres2026fts,kane2026pgvector,cormack2009rrf,
-zhang2025qwen3emb,dettmers2023qlora,maharana2024locomo}
 
 \ausection
 \include{1/Chapter1}

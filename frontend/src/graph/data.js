@@ -6,12 +6,20 @@ export function buildGraphData(proj, mem) {
   if (proj) {
     for (const n of proj.nodes) {
       const cls =
-        n.kind === "assertion" ? "fact" : n.kind === "entity" ? "entity" : null;
+        n.kind === "assertion"
+          ? "assertion"
+          : n.kind === "entity"
+            ? "entity"
+            : null;
       if (!cls || typeof n.id !== "string") {
         inf.unknownNodes++;
         continue;
       }
-      wn.set((cls === "fact" ? "f:" : "e:") + n.id, { cls, id: n.id, d: n });
+      wn.set((cls === "assertion" ? "f:" : "e:") + n.id, {
+        cls,
+        id: n.id,
+        d: n,
+      });
     }
     for (const r of proj.relationships) {
       let type, fk, tk;
@@ -41,7 +49,7 @@ export function buildGraphData(proj, mem) {
     }
   }
   if (mem) {
-    const dangling = new Set(); // one entry per memory and fact, however many quotes link them
+    const dangling = new Set(); // one entry per memory and assertion, however many quotes link them
     for (const m of mem.memories) {
       if (typeof m.id !== "string") {
         inf.unknownNodes++;

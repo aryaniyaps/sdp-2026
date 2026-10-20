@@ -12,7 +12,7 @@
 | Diagram | Report figure |
 |---|---|
 | `overall-architecture` | `fig3_1_architecture.png` |
-| `module-1-evidence-acquisition` | `fig3_2_module1.png` |
+| `module-1-source-acquisition` | `fig3_2_module1.png` |
 | `module-2-knowledge-extraction` | `fig3_3_module2.png` |
 | `module-3-temporal-graph` | `fig3_4_module3.png` |
 | `module-4-hybrid-retrieval` | `fig3_5_module4.png` |

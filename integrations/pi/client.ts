@@ -1,33 +1,33 @@
-import { EvidenceSpool } from "./spool.ts";
+import { SourceSpool } from "./spool.ts";
 import type { RecallResult, RetainBatch } from "./types.ts";
 
-export type { EvidenceEvent, RetainBatch, RecallResult } from "./types.ts";
+export type { SourceEvent, RetainBatch, RecallResult } from "./types.ts";
 export { defaultNamespace, digest } from "./identity.ts";
 export { messageText, observedExitCode } from "./messages.ts";
 
 /**
  * Cosine distance beyond which the automatic recall before each prompt ignores a vector match, so a
  * prompt that has nothing to do with the stored memory gets little or nothing instead of the nearest
- * unrelated text. Measured with qwen3-embedding:0.6b on one namespace (user:dev, about 320 facts):
- * the relevant facts were at 0.236, 0.300, 0.333, 0.386, 0.388 and 0.439, and the best unrelated
+ * unrelated text. Measured with qwen3-embedding:0.6b on one namespace (user:dev, about 320 assertions):
+ * the relevant assertions were at 0.236, 0.300, 0.333, 0.386, 0.388 and 0.439, and the best unrelated
  * hit for a full sentence at 0.445 to 0.564 (paraphrased questions 0.445 to 0.456, small talk 0.509,
  * a statement with nothing relevant stored 0.539). The margin is thin at the top: a coding task that
- * names a file had relevant hits at 0.368 to 0.462, and a wider sample found a relevant fact at 0.465.
- * It does not separate one or two word prompts. "ok" is 0.415 from the nearest fact and 0.340 from
+ * names a file had relevant hits at 0.368 to 0.462, and a wider sample found a relevant assertion at 0.465.
+ * It does not separate one or two word prompts. "ok" is 0.415 from the nearest assertion and 0.340 from
  * the nearest source text, "continue" 0.404 and 0.385, while a short prompt that has an answer is as
  * near ("staging" 0.307, "Meera" 0.448), so those prompts still inject some memory. Another embedding
  * model or another namespace needs its own calibration.
  */
 export const AUTOMATIC_RECALL_MAX_DISTANCE = 0.45;
 export class MemoryClient {
-  private readonly queue: EvidenceSpool;
+  private readonly queue: SourceSpool;
 
   constructor(
     readonly base: string,
     readonly spool: string,
     readonly timeout = 3000,
   ) {
-    this.queue = new EvidenceSpool(spool);
+    this.queue = new SourceSpool(spool);
   }
   async request<T>(
     path: string,

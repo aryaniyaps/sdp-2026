@@ -28,7 +28,7 @@ python3 benchmark/demo/verify.py
 Raw artifacts are local under `benchmark/runs/pi-coding-demo/`:
 `session-{1,2,3}.jsonl`, session stderr, the disposable repository, status snapshots,
 the durable spool and `demonstration-report.json`. The runner waits for retained
-evidence processing before writing its final `verification.json`; final-session
+source-event processing before writing its final `verification.json`; final-session
 memory processing was still queued when the independent API check completed.
 
 This proves the integration ran across sessions and delivered the changed decision

@@ -11,8 +11,8 @@ import { join } from "node:path";
 import { digest } from "./identity.ts";
 import type { RetainBatch } from "./types.ts";
 
-// Evidence reaches disk before HTTP. Retries reuse the same idempotency key.
-export class EvidenceSpool {
+// Source events reach disk before HTTP. Retries reuse the same idempotency key.
+export class SourceSpool {
   constructor(readonly directory: string) {}
   async enqueue(batch: RetainBatch): Promise<void> {
     // Persist before HTTP: a process crash never loses a previously acknowledged local event.

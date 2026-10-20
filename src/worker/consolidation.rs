@@ -1,28 +1,29 @@
-//! Derive observations only from supported facts.
+//! Derive inferences only from supported assertions. The prompt and the model's answer keep
+//! the trained names (`FACTS`, `observations`); see `crate::knowledge::kind_to_model`.
 
 use super::*;
 
 /// The consolidation prompt text; `slm-distill/aux_tasks.py` renders the same file.
 pub const CONSOLIDATE_TEMPLATE: &str = include_str!("consolidate_prompt.txt");
 
-pub fn consolidate_prompt(facts: &[Value]) -> String {
+pub fn consolidate_prompt(assertions: &[Value]) -> String {
     fill_template(
         CONSOLIDATE_TEMPLATE.trim_end_matches('\n'),
         &[(
             "FACTS",
-            &serde_json::to_string(facts).expect("facts serialize"),
+            &serde_json::to_string(assertions).expect("assertions serialize"),
         )],
     )
 }
 
 pub(super) async fn consolidate(state: &AppState, job: &Job) -> Result<Value, AppError> {
-    let facts:Vec<Value>=sqlx::query_scalar(r#"
+    let mut assertions:Vec<Value>=sqlx::query_scalar(r#"
 SELECT jsonb_build_object('id', a.id, 'subject_id', a.subject_id, 'subject', e.name, 'statement', a.statement, 'kind', a.kind, 'valid_from', a.valid_from)
 FROM assertions a
 JOIN entities e ON e.id = a.subject_id
 WHERE a.namespace = $1
   AND a.status = 'active'
-  AND a.kind <> 'observation'
+  AND a.kind <> 'inference'
   AND (a.subject_id IN
          (SELECT subject_id
           FROM assertions
@@ -35,10 +36,16 @@ ORDER BY a.valid_from DESC,
          a.id
 LIMIT 100
 "#).bind(&job.namespace).bind(&job.payload).fetch_all(&state.store.pool).await?;
-    if facts.len() < 2 {
-        return Ok(json!({"observation_ids":[],"reason":"fewer than two active facts"}));
+    for assertion in &mut assertions {
+        let kind = json!(crate::knowledge::kind_to_model(
+            assertion["kind"].as_str().unwrap_or_default()
+        ));
+        assertion["kind"] = kind;
     }
-    let prompt = consolidate_prompt(&facts);
+    if assertions.len() < 2 {
+        return Ok(json!({"inference_ids":[],"reason":"fewer than two active assertions"}));
+    }
+    let prompt = consolidate_prompt(&assertions);
     let mut input = prompt.clone();
     let mut validated = None;
     let mut last_validation_error = String::new();
@@ -54,7 +61,7 @@ LIMIT 100
         let validation = serde_json::from_value::<Consolidation>(output.clone())
             .map_err(|e| AppError::Provider(format!("consolidation schema: {e}")))
             .and_then(|parsed| {
-                validate_consolidation(&parsed, &facts)?;
+                validate_consolidation(&parsed, &assertions)?;
                 Ok(parsed)
             });
         match validation {
@@ -88,7 +95,7 @@ LIMIT 100
         ))
     })?;
     let mut vectors = Vec::new();
-    for o in &parsed.observations {
+    for o in &parsed.inferences {
         vectors.push(state.embedder.embed(&o.statement).await.ok());
     }
     state
@@ -97,19 +104,16 @@ LIMIT 100
         .await
 }
 
-fn validate_consolidation(parsed: &Consolidation, facts: &[Value]) -> Result<(), AppError> {
-    for observation in &parsed.observations {
-        let supports: std::collections::HashSet<_> = observation.supports.iter().copied().collect();
+/// Errors go back to the model in a repair prompt, so they use the names it was trained on.
+fn validate_consolidation(parsed: &Consolidation, assertions: &[Value]) -> Result<(), AppError> {
+    for inference in &parsed.inferences {
+        let supports: std::collections::HashSet<_> = inference.supports.iter().copied().collect();
         if supports.len() < 2
-            || !observation.confidence.is_finite()
-            || !(0.0..=1.0).contains(&observation.confidence)
-            || [
-                &observation.statement,
-                &observation.predicate,
-                &observation.value,
-            ]
-            .iter()
-            .any(|s| s.trim().is_empty())
+            || !inference.confidence.is_finite()
+            || !(0.0..=1.0).contains(&inference.confidence)
+            || [&inference.statement, &inference.predicate, &inference.value]
+                .iter()
+                .any(|s| s.trim().is_empty())
         {
             return Err(AppError::Validation(
                 "observation requires two distinct supports, valid confidence and nonempty fields"
@@ -117,19 +121,19 @@ fn validate_consolidation(parsed: &Consolidation, facts: &[Value]) -> Result<(),
             ));
         }
         if supports.iter().any(|id| {
-            !facts
+            !assertions
                 .iter()
-                .any(|fact| fact["id"].as_str() == Some(&id.to_string()))
+                .any(|assertion| assertion["id"].as_str() == Some(&id.to_string()))
         }) {
             return Err(AppError::Validation(
                 "observation support must come from the provided facts".into(),
             ));
         }
-        if !facts.iter().any(|fact| {
-            fact["subject_id"].as_str() == Some(&observation.subject_id.to_string())
+        if !assertions.iter().any(|assertion| {
+            assertion["subject_id"].as_str() == Some(&inference.subject_id.to_string())
                 && supports
                     .iter()
-                    .any(|id| fact["id"].as_str() == Some(&id.to_string()))
+                    .any(|id| assertion["id"].as_str() == Some(&id.to_string()))
         }) {
             return Err(AppError::Validation(
                 "observation subject must belong to at least one supplied support".into(),
@@ -150,9 +154,9 @@ mod prompt_tests {
         ))
         .unwrap();
         for case in fixture["consolidate"].as_array().unwrap() {
-            let facts = case["facts"].as_array().unwrap();
+            let assertions = case["facts"].as_array().unwrap();
             assert_eq!(
-                consolidate_prompt(facts),
+                consolidate_prompt(assertions),
                 case["prompt"].as_str().unwrap(),
                 "case {}",
                 case["name"]

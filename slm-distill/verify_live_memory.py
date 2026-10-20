@@ -102,7 +102,7 @@ def main():
         projection = request("GET", "/api/v2/graph/projection", params={"namespace": ns})
         receipt["projection"] = projection
         assertions = graph["assertions"]
-        observations = [x for x in assertions if x["kind"] == "observation" and x["status"] == "active"]
+        observations = [x for x in assertions if x["kind"] == "inference" and x["status"] == "active"]
         supports = [x for x in graph["edges"] if x["relation"] in ("supports", "derives")]
         receipt["checks"]["durable_assertions"] = len(assertions) >= 3
         receipt["checks"]["current_chennai"] = any("chennai" in x["statement"].lower() and x["status"] == "active" for x in assertions)

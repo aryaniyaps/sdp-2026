@@ -28,7 +28,7 @@ export interface GraphSnapshot {
   status: {
     ready: boolean;
     outstanding_jobs: number;
-    stale_observations: number;
+    stale_inferences: number;
     last_projection_completed_at: string | null;
     jobs: JobCount[];
   };

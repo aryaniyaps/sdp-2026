@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deletes everything one namespace knows (facts, entities, memories, source text, jobs) and empties its Neo4j graph.
+# Deletes everything one namespace knows (assertions, entities, memories, source text, jobs) and empties its Neo4j graph.
 # Other namespaces are not touched. Traces stay.
 # Usage: scripts/clear-graph.sh NAMESPACE [--yes]      BASE_URL defaults to http://127.0.0.1:8080
 set -euo pipefail

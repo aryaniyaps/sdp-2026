@@ -67,12 +67,12 @@ export function mountGraph(container) {
   const REL_FONT = "13px " + FONT_FAMILY;
   const COL = {
     memory: cssVar("--memory"),
-    fact: cssVar("--fact"),
+    assertion: cssVar("--assertion"),
     entity: cssVar("--entity"),
     bg: cssVar("--bg"),
     amber: cssVar("--amber"),
   };
-  const CLASSES = ["memory", "fact", "entity"];
+  const CLASSES = ["memory", "assertion", "entity"];
   const TAU = Math.PI * 2;
 
   /* ---------- state ---------- */
@@ -87,7 +87,7 @@ export function mountGraph(container) {
     loaded: false,
   };
   const layerSeen = { projection: false, memories: false };
-  const classVisible = { memory: true, fact: true, entity: true };
+  const classVisible = { memory: true, assertion: true, entity: true };
   let info = { unknownNodes: 0, badRelationships: 0, danglingSupports: 0 };
 
   const nodes = new Map(); // key -> node
@@ -96,10 +96,10 @@ export function mountGraph(container) {
   let linkList = [];
   let simNodes = []; // nodes taking part in the layout
   let simLinks = [];
-  let relLinks = []; // live fact to fact links
+  let relLinks = []; // live assertion to assertion links
   let drawOrder = []; // nodes by radius, big first so small nodes stay on top
   let labelOrder = []; // nodes by degree, important first
-  let evidence = new Map(); // fact id -> Map(memory key -> [quote])
+  let sources = new Map(); // assertion id -> Map(memory key -> [quote])
   let selected = null; // node key
   let hover = null; // node
   let hoverLink = null;
@@ -192,7 +192,7 @@ export function mountGraph(container) {
       lt: 0,
       inFocus: false,
       useFull: false,
-      observation: false,
+      inference: false,
       dimStatus: false,
       validToMs: null,
       match: true,
@@ -215,7 +215,7 @@ export function mountGraph(container) {
         " extraction " +
         (n.ext || "")
       ).toLowerCase();
-    } else if (n.cls === "fact") {
+    } else if (n.cls === "assertion") {
       const name = d.name || d.statement || shortId(d.id);
       n.label = cut(name, 34);
       n.fullLabel = cut(d.statement || name, 70);
@@ -228,7 +228,9 @@ export function mountGraph(container) {
         " " +
         (d.assertion_kind || "")
       ).toLowerCase();
-      n.observation = d.assertion_kind === "observation";
+      // "observation" is the pre-rename kind; migration 0013 queues a re-projection that replaces it
+      n.inference =
+        d.assertion_kind === "inference" || d.assertion_kind === "observation";
       const t = d.valid_to ? Date.parse(d.valid_to) : NaN;
       n.validToMs = Number.isNaN(t) ? null : t;
     } else {
@@ -242,7 +244,7 @@ export function mountGraph(container) {
   }
 
   function isDim(n, wall) {
-    if (n.cls !== "fact") return false;
+    if (n.cls !== "assertion") return false;
     const st = n.d.status;
     if (st === "superseded" || st === "retracted" || st === "stale")
       return true;
@@ -256,7 +258,7 @@ export function mountGraph(container) {
     info = inf;
     const pulseOK = {
       memory: layerSeen.memories,
-      fact: layerSeen.projection,
+      assertion: layerSeen.projection,
       entity: layerSeen.projection,
     };
     const added = [];
@@ -321,13 +323,13 @@ export function mountGraph(container) {
       }
     }
 
-    evidence = new Map();
+    sources = new Map();
     for (const w of wn.values()) {
       if (w.cls !== "memory") continue;
       const mk = "m:" + w.id;
       for (const s of w.d.supports || []) {
-        let byMemory = evidence.get(s.assertion_id);
-        if (!byMemory) evidence.set(s.assertion_id, (byMemory = new Map()));
+        let byMemory = sources.get(s.assertion_id);
+        if (!byMemory) sources.set(s.assertion_id, (byMemory = new Map()));
         if (!byMemory.has(mk)) byMemory.set(mk, []);
         byMemory.get(mk).push(s.quote);
       }
@@ -460,7 +462,7 @@ export function mountGraph(container) {
   }
 
   function updateCounts() {
-    const c = { memory: 0, fact: 0, entity: 0 };
+    const c = { memory: 0, assertion: 0, entity: 0 };
     for (const n of nodeList) if (!n.dying) c[n.cls]++;
     for (const k of CLASSES) $("c-" + k).textContent = String(c[k]);
     cvs.setAttribute(
@@ -468,8 +470,8 @@ export function mountGraph(container) {
       "Memory graph with " +
         c.memory +
         " memories, " +
-        c.fact +
-        " facts and " +
+        c.assertion +
+        " assertions and " +
         c.entity +
         " entities",
     );
@@ -556,7 +558,7 @@ export function mountGraph(container) {
   }
 
   function nodePath(n, sx, sy, r) {
-    if (n.observation) {
+    if (n.inference) {
       const d = r * 1.28;
       ctx.moveTo(sx, sy - d);
       ctx.lineTo(sx + d, sy);
@@ -581,7 +583,7 @@ export function mountGraph(container) {
   }
 
   function visRadius(n) {
-    return screenRadius(n) * (n.observation ? 1.28 : 1);
+    return screenRadius(n) * (n.inference ? 1.28 : 1);
   }
 
   /* screen circles of the nodes, on a coarse grid, so a label can avoid covering another node */
@@ -707,7 +709,7 @@ export function mountGraph(container) {
       ctx.stroke();
     }
 
-    /* arrowheads on fact to fact links, direction matters for relations such as supersedes */
+    /* arrowheads on assertion to assertion links, direction matters for relations such as supersedes */
     for (const l of relLinks) {
       if (l.v < 0.05) continue;
       const al = linkAlpha(l);
@@ -722,7 +724,7 @@ export function mountGraph(container) {
       if (len < 18) continue;
       const ux = dx / len,
         uy = dy / len;
-      const tipD = screenRadius(l.t) * (l.t.observation ? 1.28 : 1) + 2;
+      const tipD = screenRadius(l.t) * (l.t.inference ? 1.28 : 1) + 2;
       const tx = x2 - ux * tipD,
         ty = y2 - uy * tipD;
       ctx.globalAlpha = Math.min(1, al * 1.4);
@@ -1423,7 +1425,7 @@ export function mountGraph(container) {
 
   const { buildModel, renderModel } = createDetails({
     nodes,
-    getEvidence: () => evidence,
+    getSources: () => sources,
     colors: COL,
     select,
   });
@@ -1447,7 +1449,7 @@ export function mountGraph(container) {
     dtitle.textContent =
       n.cls === "memory"
         ? "Memory: " + cut(n.d.text, 40)
-        : n.cls === "fact"
+        : n.cls === "assertion"
           ? model.title + ": " + cut(n.d.name || n.d.statement, 40)
           : "Entity: " + cut(n.d.name, 40);
     dbody.replaceChildren(renderModel(model));
@@ -1808,7 +1810,7 @@ export function mountGraph(container) {
           (Number.isFinite(c.memories) ? c.memories : m.memories.length) +
           " memories (" +
           c.supported +
-          " supporting facts).",
+          " cited by assertions).",
       });
       const queued = c.jobs.extract_pending + c.jobs.extract_running;
       if (queued)
@@ -1861,7 +1863,7 @@ export function mountGraph(container) {
       notes.push(
         "Postgres memories truncated at " +
           m.memories.length +
-          " of the namespace. Memories that no fact cites yet and the most recent ones are kept first, the rest are not shown" +
+          " of the namespace. Memories that no assertion cites yet and the most recent ones are kept first, the rest are not shown" +
           (LIMIT_MEMORIES === null
             ? ". Add &memory_limit=1000 to the page URL to raise the limit."
             : "."),
@@ -1898,7 +1900,7 @@ export function mountGraph(container) {
                 " blocked behind " +
                 (j.extract_failed === 1 ? "it" : "them")
               : "") +
-            ". Their memories get no facts until the failed " +
+            ". Their memories get no assertions until the failed " +
             (j.extract_failed === 1 ? "job is" : "jobs are") +
             " retried.",
         );
@@ -1921,9 +1923,9 @@ export function mountGraph(container) {
       notes.push(
         info.danglingSupports +
           (info.danglingSupports === 1
-            ? " evidence link points"
-            : " evidence links point") +
-          " to a fact that is missing from the Neo4j projection, so it is not drawn.",
+            ? " source link points"
+            : " source links point") +
+          " to an assertion that is missing from the Neo4j projection, so it is not drawn.",
       );
     if (info.unknownNodes)
       notes.push(
@@ -1980,7 +1982,7 @@ export function mountGraph(container) {
   async function clearNamespace() {
     if (!hasNs) return;
     const typed = window.prompt(
-      'This deletes every fact, entity, memory and source text of the namespace "' +
+      'This deletes every assertion, entity, memory and source text of the namespace "' +
         NS +
         '" and empties its graph. It cannot be undone.\n\nType the namespace to confirm:',
     );

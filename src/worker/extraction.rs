@@ -1,15 +1,12 @@
-//! Extract facts from evidence and validate every quoted source.
+//! Extract assertions from source events and validate every quoted source.
 
 use super::*;
 
 pub(super) async fn extract(state: &AppState, job: &Job) -> Result<Value, AppError> {
     let episode: Uuid = serde_json::from_value(job.payload["episode_id"].clone())
         .map_err(|e| AppError::Validation(e.to_string()))?;
-    let evidence = state
-        .store
-        .episode_evidence(&job.namespace, episode)
-        .await?;
-    let events: Vec<_> = evidence.iter().map(|(_, e)| e).collect();
+    let sources = state.store.episode_events(&job.namespace, episode).await?;
+    let events: Vec<_> = sources.iter().map(|(_, e)| e).collect();
     let existing: Vec<Value> = if let Some(snapshot) = job.payload.get("existing_snapshot") {
         serde_json::from_value(snapshot.clone()).map_err(|e| AppError::Validation(e.to_string()))?
     } else {
@@ -20,7 +17,7 @@ JOIN entities e ON e.id = a.subject_id
 WHERE a.namespace = $1
   AND a.status IN ('active',
            'contested')
-  AND a.kind <> 'observation'
+  AND a.kind <> 'inference'
 ORDER BY a.valid_from DESC,
          a.id
 LIMIT 80
@@ -36,7 +33,7 @@ LIMIT 80
     let compact: Vec<Value> = events.iter().map(|event| compact_event(event)).collect();
     let ranges = windows(&compact);
     let mut claims = Vec::new();
-    let mut dropped_facts = 0;
+    let mut dropped_assertions = 0;
     for range in &ranges {
         let event_values: Vec<Value> = compact[range.clone()]
             .iter()
@@ -46,20 +43,20 @@ LIMIT 80
         // Only a model with a known context window gets a shrunk snapshot.
         let (window_existing, dropped) = match state.model.context_limits() {
             Some(limits) => {
-                let (kept, dropped) = fit_existing_facts(&existing, &event_values, &limits);
+                let (kept, dropped) = fit_existing_assertions(&existing, &event_values, &limits);
                 if dropped > 0 {
                     tracing::warn!(
                         namespace=%job.namespace, job_id=%job.id, dropped, kept=kept.len(),
                         num_ctx=limits.num_ctx,
-                        "existing facts shrunk to fit the local model context; raise OLLAMA_NUM_CTX to keep more"
+                        "existing assertions shrunk to fit the local model context; raise OLLAMA_NUM_CTX to keep more"
                     );
                 }
                 (kept, dropped)
             }
             None => (existing.clone(), 0),
         };
-        dropped_facts += dropped;
-        let window_events: Vec<EvidenceEvent> =
+        dropped_assertions += dropped;
+        let window_events: Vec<SourceEvent> =
             events[range.clone()].iter().map(|e| (*e).clone()).collect();
         let extraction =
             extract_window(state, &window_existing, &event_values, &window_events).await?;
@@ -79,7 +76,7 @@ LIMIT 80
         }
     }
     let parsed = Extraction { claims };
-    embed_missing_chunks(state, &evidence).await?;
+    embed_missing_chunks(state, &sources).await?;
     let mut vectors = Vec::new();
     for claim in &parsed.claims {
         vectors.push(state.embedder.embed(&claim.statement).await.ok());
@@ -89,8 +86,8 @@ LIMIT 80
         .apply_extraction(job, &parsed, vectors, &state.model.identity())
         .await?;
     let mut outcome = json!({"enhanced":result,"windows":ranges.len()});
-    if dropped_facts > 0 {
-        outcome["existing_facts_dropped"] = json!(dropped_facts);
+    if dropped_assertions > 0 {
+        outcome["existing_assertions_dropped"] = json!(dropped_assertions);
     }
     Ok(outcome)
 }
@@ -101,7 +98,7 @@ async fn extract_window(
     state: &AppState,
     existing: &[Value],
     event_values: &[Value],
-    validation_events: &[EvidenceEvent],
+    validation_events: &[SourceEvent],
 ) -> Result<Extraction, AppError> {
     let prompt = extract_prompt(existing, event_values);
     let mut input = prompt.clone();
@@ -135,8 +132,8 @@ async fn extract_window(
                 for claim in &extraction.claims {
                     validate_claim(claim, validation_events)?;
                     if claim.related.iter().any(|relation| {
-                        !existing.iter().any(|fact| {
-                            fact["id"].as_str() == Some(&relation.assertion_id.to_string())
+                        !existing.iter().any(|assertion| {
+                            assertion["id"].as_str() == Some(&relation.assertion_id.to_string())
                         })
                     }) {
                         return Err(AppError::Validation(
@@ -178,7 +175,7 @@ async fn extract_window(
     })
 }
 
-/// Keep all original source evidence when an invalid answer is too large to echo back.
+/// Keep all original source text when an invalid answer is too large to echo back.
 /// A regeneration with a bounded diagnostic is safer than truncating source events or
 /// repeatedly sending a repair that the model's preflight will always reject.
 fn repair_prompt(
@@ -220,7 +217,7 @@ mod repair_tests {
     use super::*;
 
     #[test]
-    fn oversized_invalid_answer_keeps_all_evidence_and_fits_on_wire() {
+    fn oversized_invalid_answer_keeps_all_source_text_and_fits_on_wire() {
         let prompt = extract_prompt(
             &[],
             &[

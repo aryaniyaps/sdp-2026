@@ -1,6 +1,6 @@
 # Memory model fine-tuning
 
-Training and evaluation scripts for `mem-extractor`, the project's conversation memory model. It extracts facts with source quotes, combines facts into observations, and answers questions with citations.
+Training and evaluation scripts for `mem-extractor`, the project's conversation memory model. It extracts assertions with source quotes, combines them into inferences, and answers questions with citations. The model contract keeps the wording the model was trained on: its prompts, labels and outputs say `fact`, `observation` and "Evidence", and the service translates these to the stored names `attribute` and `inference` (see [docs/terminology.md](../docs/terminology.md)).
 
 The final model is **Qwen3-4B-Instruct-2507**, trained with NF4 QLoRA on an 8 GB RTX 4070 laptop GPU. The training cap is 4,096 tokens. The saved model is at [aryaniyaps/mem-extractor](https://huggingface.co/aryaniyaps/mem-extractor/tree/77851da91c15fd4e20018a1b0ace13d29e7eb635).
 
@@ -85,7 +85,7 @@ env -u PYTHONPATH slm-distill/.venv/bin/python slm-distill/grade_research.py \
 
 Use separate labels and output folders for new runs. Repeat for the base and external set as described in the protocol. Report support and coverage separately from structural validity, keeping failed windows in the denominator.
 
-`verify_live_memory.py` checks the selected model through extraction, correction history, observations, graph projection, recall and cited answers in a fresh namespace.
+`verify_live_memory.py` checks the selected model through extraction, correction history, inferences, graph projection, recall and cited answers in a fresh namespace.
 
 ## Export and release
 

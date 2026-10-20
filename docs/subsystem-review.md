@@ -6,14 +6,14 @@ running; performance and accuracy claims require the final results.
 
 ## 1. Temporal storage, concurrency and graph projection
 
-The central problem is preserving evidence while changing beliefs. An episode is an
+The central problem is preserving sources while changing beliefs. An episode is an
 immutable request, identified by a namespace and idempotency key. The service hashes
-the request body: an identical retry returns the existing episode; changed evidence
-under the same key returns a conflict. Evidence is retained before inference begins.
+the request body: an identical retry returns the existing episode; changed source events
+under the same key return a conflict. Source events are retained before extraction begins.
 Assertions and their exact sources are separate records, so reinforcement can attach
-new provenance without inventing a new fact.
+new provenance without inventing a new assertion.
 
-Single-valued slots model state; multiple-valued slots model concurrent facts; events
+Single-valued slots model state; multiple-valued slots model concurrent values; events
 include occurrence time in their identity. A confident explicit correction closes the
 old state and creates the replacement. An unexplained conflict marks alternatives
 contested. Valid time answers when a belief applies, while recorded time identifies
@@ -36,11 +36,11 @@ the authoritative state. This is an eventual-consistency design: retrieval valid
 graph candidates in PostgreSQL and reports projection problems instead of trusting a
 possibly stale graph.
 
-Review evidence: `tests/evidence_graph.rs` exercises correction, retroactive validity,
+Review material: `tests/assertion_graph.rs` exercises correction, retroactive validity,
 dependency invalidation, lease expiry, concurrent claims and projection/reset behavior.
 Inspect a real assertion's source, interval, relation and projection trace in the UI.
 
-## 2. Evidence extraction and supported observations
+## 2. Assertion extraction and supported inferences
 
 The worker separates retaining a conversation from interpreting it. Pi runs in an
 isolated, tool-free process with a constrained JSON task; Ollama is an alternative
@@ -50,24 +50,24 @@ reuse inference without treating cached output as a committed database update.
 
 Extraction must pass schema, attribution and relationship validation. Source indices
 must exist, each quote must occur verbatim in its cited event, aliases must occur in
-supporting evidence, and related IDs must come from the provided existing assertions.
+a cited source quote, and related IDs must come from the provided existing assertions.
 Invalid extraction receives bounded repair attempts with the validation error. Tool
 output is evidence of observed execution; an assistant's statement alone does not
 prove a command passed.
 
-Consolidation creates observations supported by at least two active assertions in the
+Consolidation creates inferences supported by at least two active assertions in the
 same namespace. The engine copies their source provenance and records support edges.
-New observations point to existing supports, making the dependency graph acyclic.
-Identical observations reuse their identity and attach evidence. Superseding or
+New inferences point to existing supports, making the dependency graph acyclic.
+Identical inferences reuse their identity and attach the new supports. Superseding or
 retracting a support recursively invalidates descendants and schedules recomputation.
-Without this step, summaries can continue repeating a fact that has already changed.
+Without this step, summaries can continue repeating an assertion that has already changed.
 
 Exact quotations prove attribution, not semantic entailment. A model can still
 misinterpret a quote or choose an inconsistent predicate. The independent benchmark
 and human review must measure those errors; schema validation alone is insufficient.
 
-Review demonstration: derive a supported observation, correct one support, and show
-the old observation becomes stale while its historical provenance remains inspectable.
+Review demonstration: derive a supported inference, correct one support, and show
+the old inference becomes stale while its historical provenance remains inspectable.
 
 ## 3. Hybrid retrieval, bounded graph traversal and reflection
 
@@ -79,17 +79,17 @@ validity and support eligibility before a graph candidate can enter the context.
 
 Reciprocal rank fusion combines the candidate lists using the sum of `1/(60 + rank)`.
 This combines orderings without assuming that lexical and vector scores share a scale.
-UUID ordering resolves ties reproducibly. Whole evidence blocks are packed into an
+UUID ordering resolves ties reproducibly. Whole assertion and source blocks are packed into an
 estimated token budget, with bounded quote lengths and counts. The estimate uses
 characters, so it is a packing heuristic rather than an exact model tokenizer count.
 Raw source fallback remains attributed when no assertion candidate is available.
 
-Reflection receives only the packed evidence. It must cite retrieved assertion IDs;
+Reflection receives only the packed context as its evidence. It must cite retrieved assertion IDs;
 foreign citations are rejected, and no evidence produces abstention. Both recall and
 reflection persist traces. The observatory exposes component ranks, paths, source
 quotes, validity and elapsed stages so a reviewer can explain why a result appeared.
 
-Review comparison: run the same question with graph expansion or observations disabled.
+Review comparison: run the same question with graph expansion or inferences disabled.
 The formal experiment measures both retrieval and answer ablations, rather than using
 one attractive graph example as evidence of general improvement.
 

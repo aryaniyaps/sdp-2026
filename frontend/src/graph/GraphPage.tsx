@@ -3,8 +3,12 @@ import Button from "react-bootstrap/Button";
 import { mountGraph } from "./viewer.js";
 import "./graph.css";
 
-const layers = ["memory", "fact", "entity"] as const;
-const layerLabels = { memory: "Memories", fact: "Facts", entity: "Entities" };
+const layers = ["memory", "assertion", "entity"] as const;
+const layerLabels = {
+  memory: "Memories",
+  assertion: "Assertions",
+  entity: "Entities",
+};
 
 // React owns the controls; the canvas viewer owns layout, drawing, and pointer events.
 export function GraphPage() {
@@ -106,21 +110,25 @@ export function GraphPage() {
                 Memory: what was said
               </li>
               <li>
-                <span className="legend-dot fact" />
-                Fact: extracted from memories
+                <span className="legend-dot assertion" />
+                Assertion: extracted from memories
               </li>
               <li>
-                <span className="legend-dot observation" />
-                Observation: derived fact
+                <span className="legend-dot inference" />
+                Inference: derived from assertions
               </li>
               <li>
                 <span className="legend-dot entity" />
-                Entity: what facts mention
+                Entity: what assertions mention
               </li>
-              <li>Faded facts are superseded, retracted, stale, or expired.</li>
+              <li>
+                Faded assertions are superseded, retracted, stale, or expired.
+              </li>
               <li>Amber rings mark failed or blocked extraction.</li>
-              <li>Green links show evidence; gray links connect entities.</li>
-              <li>Purple arrows connect facts. Hover to see the relation.</li>
+              <li>Green links show sources; gray links connect entities.</li>
+              <li>
+                Purple arrows connect assertions. Hover to see the relation.
+              </li>
             </ul>
             <div className="hint">
               Scroll to zoom, drag the background to pan. Drag a node to pin it,

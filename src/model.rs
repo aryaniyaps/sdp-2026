@@ -59,7 +59,7 @@ pub struct OllamaLimits {
 }
 /// Conservative token estimate, used before any request is made: one token per three
 /// characters, except that every digit counts as a token of its own, plus ten percent. The
-/// digit rule matters because the existing-facts snapshot is full of UUIDs and timestamps,
+/// digit rule matters because the existing-assertions snapshot is full of UUIDs and timestamps,
 /// which Qwen tokenizes at about 1.9 characters per token; plain chars/3 undercounted that
 /// part of the prompt by a third.
 pub fn estimate_tokens(text: &str) -> usize {

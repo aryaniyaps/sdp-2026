@@ -29,7 +29,7 @@ Deployment must rebuild the engine/UI and Pi extension and apply the updated Cad
 
 The dashboard Clear namespace dialog supports cancellation, rejects mismatched confirmation, shows worker conflicts for retry, and distinguishes queued graph cleanup from completed cleanup. The live test cleanup waits for Pi to exit before removing its session directory, avoiding a shutdown write race.
 
-Immediate switching keeps an already-running turn’s evidence and cursor bound to its starting namespace, while the active namespace, Pi status, and subsequent memory operations change immediately. Stale automatic-recall responses from the previous namespace are not injected after a switch.
+Immediate switching keeps an already-running turn’s source events and cursor bound to its starting namespace, while the active namespace, Pi status, and subsequent memory operations change immediately. Stale automatic-recall responses from the previous namespace are not injected after a switch.
 
 Starter project acceptance: migration 0012 was exercised against a newly created `dashboard_seed_acceptance` database. The catalog contains `payments-api`, `mobile-app`, and `scratch`, and each opens with its own `project:<name>` namespace. A browser test holds the catalog response and verifies all three starter projects are visible immediately, then confirms the live catalog adds custom projects and selects `payments-api`.
 

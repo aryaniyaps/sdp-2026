@@ -1,4 +1,4 @@
-//! Extraction prompt and the existing-fact budget for local models.
+//! Extraction prompt and the existing-assertion budget for local models.
 
 #[cfg(test)]
 use crate::model::estimate_tokens;
@@ -10,11 +10,11 @@ use serde_json::Value;
 const REPAIR_RESERVE_TOKENS: usize = 1536;
 
 /// Most prompt tokens an extraction call is built to use, whatever the context window allows.
-/// The student is trained on prompts of this size; a longer snapshot of existing facts only
+/// The student is trained on prompts of this size; a longer snapshot of existing assertions only
 /// slows every call down.
 const MAX_PROMPT_TOKENS: usize = 6000;
 
-/// Fill `{{NAME}}` placeholders in one pass. A value is never scanned for placeholders, so a fact
+/// Fill `{{NAME}}` placeholders in one pass. A value is never scanned for placeholders, so a assertion
 /// or a quote that happens to contain `{{EVENTS}}` cannot change the prompt. Panics on a
 /// placeholder without a value: the templates are files in this repository.
 pub fn fill_template(template: &str, values: &[(&str, &str)]) -> String {
@@ -52,7 +52,7 @@ pub fn extract_prompt(existing: &[Value], events: &[Value]) -> String {
         &[
             (
                 "EXISTING",
-                &serde_json::to_string(existing).expect("existing facts serialize"),
+                &serde_json::to_string(existing).expect("existing assertions serialize"),
             ),
             (
                 "EVENTS",
@@ -71,7 +71,7 @@ fn words(text: &str) -> Vec<String> {
 }
 
 /// Words of the event content in the batch. The JSON keys, roles and timestamps around the
-/// content are not evidence, so they never count as a mention.
+/// content are not what anyone said, so they never count as a mention.
 fn batch_content_words(events: &[Value]) -> Vec<String> {
     events
         .iter()
@@ -80,12 +80,12 @@ fn batch_content_words(events: &[Value]) -> Vec<String> {
         .collect()
 }
 
-/// How strongly a fact is referred to by the batch: its subject counts 3, its value 2, and a
+/// How strongly a assertion is referred to by the batch: its subject counts 3, its value 2, and a
 /// text of fewer than three characters (`go`, `5`) counts 1, because such a text is a word in
 /// many unrelated sentences. A text counts only when all its words appear next to each other.
-fn mention_strength(fact: &Value, batch_words: &[String]) -> u8 {
+fn mention_strength(assertion: &Value, batch_words: &[String]) -> u8 {
     let score = |key: &str, weight: u8| -> u8 {
-        let text = words(fact[key].as_str().unwrap_or(""));
+        let text = words(assertion[key].as_str().unwrap_or(""));
         if text.is_empty() || !batch_words.windows(text.len()).any(|window| window == text) {
             return 0;
         }
@@ -98,16 +98,16 @@ fn mention_strength(fact: &Value, batch_words: &[String]) -> u8 {
     score("subject", 3) + score("value", 2)
 }
 
-/// Shrink the existing-facts snapshot until the extract prompt fits a local model's context,
-/// leaving room for the answer and a repair round. Returns the kept facts in their original
-/// order and how many were dropped. Facts whose subject or value appears as whole words in the
+/// Shrink the existing-assertions snapshot until the extract prompt fits a local model's context,
+/// leaving room for the answer and a repair round. Returns the kept assertions in their original
+/// order and how many were dropped. Assertions whose subject or value appears as whole words in the
 /// content of this batch's events are kept first, strongest match first (subject and value, then
 /// subject, then value; a text shorter than three characters counts for less), so a correction
-/// of such a fact still finds the fact it replaces. The rest are kept newest first, which is the
+/// of such a assertion still finds the assertion it replaces. The rest are kept newest first, which is the
 /// snapshot order. A correction that refers to its target only by pronoun cannot be matched by
 /// text and is protected only by recency. Pure and deterministic, so a retry builds the
 /// identical prompt and hits the model cache.
-pub fn fit_existing_facts(
+pub fn fit_existing_assertions(
     existing: &[Value],
     events: &[Value],
     limits: &OllamaLimits,
@@ -116,14 +116,16 @@ pub fn fit_existing_facts(
     let target = budget
         .saturating_sub(REPAIR_RESERVE_TOKENS.min(budget / 4))
         .min(MAX_PROMPT_TOKENS);
-    let fits = |facts: &[Value]| extraction_prompt_tokens(&extract_prompt(facts, events)) <= target;
+    let fits = |assertions: &[Value]| {
+        extraction_prompt_tokens(&extract_prompt(assertions, events)) <= target
+    };
     if fits(existing) {
         return (existing.to_vec(), 0);
     }
     let batch_words = batch_content_words(events);
     let strengths: Vec<u8> = existing
         .iter()
-        .map(|fact| mention_strength(fact, &batch_words))
+        .map(|assertion| mention_strength(assertion, &batch_words))
         .collect();
     let mut order: Vec<usize> = (0..existing.len()).collect();
     // Stable sort: equal strengths keep the snapshot order, which is newest first.
@@ -136,7 +138,7 @@ pub fn fit_existing_facts(
             .map(|index| existing[index].clone())
             .collect()
     };
-    // More facts never shorten the prompt, so the largest fitting count is found by bisection.
+    // More assertions never shorten the prompt, so the largest fitting count is found by bisection.
     let (mut low, mut high) = (0, existing.len());
     while low < high {
         let middle = (low + high).div_ceil(2);
@@ -158,7 +160,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn facts(count: usize) -> Vec<Value> {
+    fn assertions(count: usize) -> Vec<Value> {
         (0..count)
             .map(|n| {
                 json!({"id":format!("00000000-0000-4000-8000-{n:012}"),"subject":format!("Subject {n}"),"subject_id":format!("10000000-0000-4000-8000-{n:012}"),"predicate":"likes","value":format!("thing number {n} with some padding words"),"cardinality":"multiple","valid_from":"2026-01-02T00:00:00Z"})
@@ -173,7 +175,7 @@ mod tests {
 
     #[test]
     fn prompt_is_the_template_with_both_lists_filled_in() {
-        let existing = facts(2);
+        let existing = assertions(2);
         let events = batch("I moved to Lisbon. \"quoted\" and unicode \u{e9}");
         let prompt = extract_prompt(&existing, &events);
         assert!(!prompt.contains("{{"), "a placeholder was left unfilled");
@@ -233,8 +235,8 @@ mod tests {
     #[test]
     fn snapshot_that_fits_is_left_alone() {
         let limits = OllamaLimits::new(16384, 4096).unwrap();
-        let existing = facts(10);
-        let (kept, dropped) = fit_existing_facts(&existing, &batch("hello"), &limits);
+        let existing = assertions(10);
+        let (kept, dropped) = fit_existing_assertions(&existing, &batch("hello"), &limits);
         assert_eq!(dropped, 0);
         assert_eq!(kept, existing);
     }
@@ -244,10 +246,10 @@ mod tests {
         // repair-adjusted 4096-token context on its own. Use 5120 to test ranking
         // when there is actually room for a nonempty snapshot.
         let limits = OllamaLimits::new(5120, 1024).unwrap();
-        let existing = facts(80);
+        let existing = assertions(80);
         let events = batch("hello");
         assert!(estimate_tokens(&extract_prompt(&existing, &events)) > limits.prompt_budget());
-        let (kept, dropped) = fit_existing_facts(&existing, &events, &limits);
+        let (kept, dropped) = fit_existing_assertions(&existing, &events, &limits);
         assert!(dropped > 0 && !kept.is_empty());
         assert_eq!(kept.len() + dropped, 80);
         let prompt = extract_prompt(&kept, &events);
@@ -255,10 +257,10 @@ mod tests {
             extraction_prompt_tokens(&prompt) + limits.num_predict <= limits.num_ctx,
             "wire prompt must leave room for the answer"
         );
-        // Nothing but the oldest facts goes: the snapshot is newest first, so a kept prefix remains
+        // Nothing but the oldest assertions goes: the snapshot is newest first, so a kept prefix remains
         // in the original order.
         assert_eq!(kept, existing[..kept.len()].to_vec());
-        // One more fact would no longer fit the repair-adjusted target.
+        // One more assertion would no longer fit the repair-adjusted target.
         let mut one_more = kept.clone();
         one_more.push(existing[kept.len()].clone());
         let budget = limits.prompt_budget();
@@ -268,9 +270,9 @@ mod tests {
     #[test]
     fn small_context_drops_snapshot_but_keeps_source_prompt_within_wire_budget() {
         let limits = OllamaLimits::new(4096, 1024).unwrap();
-        let existing = facts(80);
+        let existing = assertions(80);
         let events = batch("Maya lives in Chennai.");
-        let (kept, dropped) = fit_existing_facts(&existing, &events, &limits);
+        let (kept, dropped) = fit_existing_assertions(&existing, &events, &limits);
         assert!(kept.is_empty());
         assert_eq!(dropped, existing.len());
         let prompt = extract_prompt(&kept, &events);
@@ -278,26 +280,26 @@ mod tests {
         assert!(extraction_prompt_tokens(&prompt) <= limits.prompt_budget());
     }
     #[test]
-    fn facts_mentioned_in_the_batch_survive_so_corrections_still_resolve() {
+    fn assertions_mentioned_in_the_batch_survive_so_corrections_still_resolve() {
         let limits = OllamaLimits::new(5120, 1024).unwrap();
-        let existing = facts(80);
+        let existing = assertions(80);
         let events = batch("Actually Subject 77 now prefers tea.");
-        let (kept, dropped) = fit_existing_facts(&existing, &events, &limits);
+        let (kept, dropped) = fit_existing_assertions(&existing, &events, &limits);
         assert!(dropped > 0);
         assert!(
             kept.contains(&existing[77]),
-            "the fact the batch corrects must stay"
+            "the assertion the batch corrects must stay"
         );
         let positions: Vec<usize> = kept
             .iter()
-            .map(|fact| existing.iter().position(|e| e == fact).unwrap())
+            .map(|assertion| existing.iter().position(|e| e == assertion).unwrap())
             .collect();
         assert!(
             positions.windows(2).all(|w| w[0] < w[1]),
             "original order kept"
         );
     }
-    fn corrected_fact_scenario(text: &str) -> (Vec<Value>, Vec<Value>, OllamaLimits) {
+    fn corrected_assertion_scenario(text: &str) -> (Vec<Value>, Vec<Value>, OllamaLimits) {
         let limits = OllamaLimits::new(5120, 1024).unwrap();
         let mut existing: Vec<Value> = (0..79)
             .map(|n| {
@@ -309,42 +311,43 @@ mod tests {
                 json!({"id":format!("00000000-0000-4000-8000-{n:012}"),"subject":format!("Subject {n}"),"subject_id":format!("10000000-0000-4000-8000-{n:012}"),"predicate":"likes","value":value,"cardinality":"multiple","valid_from":"2026-01-02T00:00:00Z"})
             })
             .collect();
-        // The oldest fact is the one the batch corrects.
+        // The oldest assertion is the one the batch corrects.
         existing.push(json!({"id":"00000000-0000-4000-8000-0000000000ff","subject":"Haz","subject_id":"10000000-0000-4000-8000-0000000000ff","predicate":"lives_in","value":"Porto","cardinality":"single","valid_from":"2025-01-02T00:00:00Z"}));
         (existing, batch(text), limits)
     }
     #[test]
-    fn short_values_inside_ordinary_words_do_not_crowd_out_the_corrected_fact() {
-        let (existing, events, limits) =
-            corrected_fact_scenario("I am going to move from Porto to Lisbon, Haz said, good news");
-        let (kept, dropped) = fit_existing_facts(&existing, &events, &limits);
+    fn short_values_inside_ordinary_words_do_not_crowd_out_the_corrected_assertion() {
+        let (existing, events, limits) = corrected_assertion_scenario(
+            "I am going to move from Porto to Lisbon, Haz said, good news",
+        );
+        let (kept, dropped) = fit_existing_assertions(&existing, &events, &limits);
         assert!(dropped > 0);
         assert!(
             kept.contains(&existing[79]),
-            "the Porto fact the batch corrects must stay"
+            "the Porto assertion the batch corrects must stay"
         );
     }
     #[test]
     fn short_values_that_are_whole_words_rank_below_a_subject_and_value_hit() {
         let (existing, events, limits) =
-            corrected_fact_scenario("Let us go. I move from Porto to Lisbon, Haz said, go go");
-        let (kept, dropped) = fit_existing_facts(&existing, &events, &limits);
+            corrected_assertion_scenario("Let us go. I move from Porto to Lisbon, Haz said, go go");
+        let (kept, dropped) = fit_existing_assertions(&existing, &events, &limits);
         assert!(dropped > 0);
         assert!(
             kept.contains(&existing[79]),
-            "a subject and value hit outranks 60 facts that only share the word go"
+            "a subject and value hit outranks 60 assertions that only share the word go"
         );
     }
     #[test]
     fn json_keys_and_roles_around_the_content_are_not_mentions() {
-        let facts = [
+        let assertions = [
             json!({"subject":"user","value":"event"}),
             json!({"subject":"role","value":"content"}),
             json!({"subject":"source_index","value":"2026"}),
         ];
         let words = batch_content_words(&batch("hello there"));
-        for fact in &facts {
-            assert_eq!(mention_strength(fact, &words), 0, "{fact}");
+        for assertion in &assertions {
+            assert_eq!(mention_strength(assertion, &words), 0, "{assertion}");
         }
     }
     #[test]
@@ -375,18 +378,18 @@ mod tests {
     #[test]
     fn shrink_is_deterministic() {
         let limits = OllamaLimits::new(5120, 1024).unwrap();
-        let existing = facts(80);
+        let existing = assertions(80);
         let events = batch("Subject 5 and Subject 70");
         assert_eq!(
-            fit_existing_facts(&existing, &events, &limits),
-            fit_existing_facts(&existing, &events, &limits)
+            fit_existing_assertions(&existing, &events, &limits),
+            fit_existing_assertions(&existing, &events, &limits)
         );
     }
     #[test]
-    fn events_that_alone_exceed_the_budget_leave_no_facts() {
+    fn events_that_alone_exceed_the_budget_leave_no_assertions() {
         let limits = OllamaLimits::new(5120, 1024).unwrap();
         let events = batch(&"word ".repeat(5000));
-        let (kept, dropped) = fit_existing_facts(&facts(5), &events, &limits);
+        let (kept, dropped) = fit_existing_assertions(&assertions(5), &events, &limits);
         assert!(kept.is_empty());
         assert_eq!(dropped, 5);
         // The model preflight, not this function, then refuses the prompt loudly.

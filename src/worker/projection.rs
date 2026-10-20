@@ -1,4 +1,4 @@
-//! Project authoritative PostgreSQL facts into Neo4j.
+//! Project authoritative PostgreSQL assertions into Neo4j.
 
 use super::*;
 

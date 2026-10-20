@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Live check of the memory worker model against a running service.
 
-It retains two small coding-session episodes through the API (the second one changes a fact and
+It retains two small coding-session episodes through the API (the second one changes a stated value and
 the first one contains a credential), waits for the worker jobs, and checks what recall returns:
 
   - the extract job and the consolidate job of each episode succeed (failures are printed),
-  - recall finds the fact that was told,
-  - the credential is not in any stored claim or recalled context,
+  - recall finds the value that was told,
+  - the credential is not in any stored assertion or recalled context,
   - after the correction the new value is the active one.
 
     scripts/worker-smoke.py                       # service on http://127.0.0.1:8080

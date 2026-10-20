@@ -1,9 +1,9 @@
-//! PostgreSQL transactions for evidence, assertions, and background jobs.
+//! PostgreSQL transactions for sources, assertions, and background jobs.
 
 mod assertions;
-mod evidence;
 mod jobs;
 mod maintenance;
+mod sources;
 
 use crate::{AppError, domain::normalize_component, knowledge::*, store::Store};
 use chrono::{DateTime, Utc};
@@ -124,7 +124,7 @@ WHERE namespace = $1
   AND id IN
     (SELECT id
      FROM dependents)
-  AND kind = 'observation'
+  AND kind = 'inference'
   AND status IN ('active',
                  'contested') RETURNING id
 "#,

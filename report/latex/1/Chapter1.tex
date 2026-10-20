@@ -15,18 +15,19 @@ to their corrections with no rule for which one is current.
 
 So a memory component has to decide what to keep and what to give back for a
 question. We built this as a separate service for a coding
-agent (Pi \cite{zechner2026pi}). It stores the original messages, pulls facts out of them, remembers
-when a fact changed, and when the agent asks, returns only the relevant facts along with
-the quote they came from.
+agent (Pi \cite{zechner2026pi}). It stores the original messages, extracts assertions from them, remembers
+when an assertion changed, and when the agent asks, returns only the relevant
+assertions along with the quote they came from.
 
 The word \emph{memory} in this report always means this kind of stored knowledge
-about the user and the project, not RAM or any other computer memory. Since a few
-other terms are also used in a specific sense, they are listed in the Glossary.
+about the user and the project, not RAM or any other computer memory. Other terms used in a specific sense, such as
+\emph{source} (a stored message) and \emph{assertion} (a statement extracted from it), are
+listed in the Glossary.
 
-The engine has five modules: M1 saves the original messages (Evidence Acquisition
-and Processing), M2 pulls facts out of them (Knowledge Extraction and Consolidation),
-M3 stores the facts with their history (Temporal Knowledge and Graph Management),
-M4 finds the right facts for a question (Hybrid Retrieval and Grounded Reasoning) and
+The engine has five modules: M1 saves the original messages as source events (Source
+Acquisition and Processing), M2 extracts assertions from them (Knowledge Extraction and
+Consolidation), M3 stores the assertions with their history (Temporal Knowledge and Graph
+Management), M4 finds the right assertions for a question (Hybrid Retrieval and Grounded Reasoning) and
 M5 trains the small local model the others use (Model Training and Evaluation). M1 to
 M4 make up the memory service and M5 is an offline pipeline.
 
@@ -49,9 +50,9 @@ Chennai on 10 October and still keep Chennai as her previous city.
 \begin{enumerate}[itemsep=0pt]
 \item Retain useful information for AI agents across sessions.
 \item Keep the updated instruction while preserving the earlier versions.
-\item Link every stored fact back to the original message so it can be verified.
-\item Fine-tune a small local model to extract facts, combine related facts and answer
-from evidence.
+\item Link every stored assertion back to the original message so it can be verified.
+\item Fine-tune a small local model to extract assertions, combine related assertions into
+inferences and answer with citations.
 \item Retrieve relevant information quickly within a limited context size.
 \item Evaluate memory accuracy and retrieval with repeatable tests, including the
 LongMemEval-S benchmark \cite{wu2025longmemeval}.
@@ -61,8 +62,8 @@ LongMemEval-S benchmark \cite{wu2025longmemeval}.
 On the fine-tuning side, our early models did well on generated test data but
 struggled on real conversations (only 18 of 33 conversation segments passed the
 extraction checks). The models also mixed up quotations, source references and dates.
- We revised the data, prompts and validation several times. One issue we have not solved: fine-tuning made combining facts and answering
-questions much better, but fact coverage dropped from 50/55 to 41/55.
+ We revised the data, prompts and validation several times. One issue we have not solved: fine-tuning made combining assertions and answering
+questions much better, but extraction coverage dropped from 50/55 to 41/55.
 
 On the integration side the model sometimes re-extracted an outdated value, so
 correction handling had to be reworked. Repeated messages made duplicates and one failed job could block the rest. The

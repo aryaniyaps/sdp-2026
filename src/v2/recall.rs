@@ -1,8 +1,7 @@
 //! Candidate retrieval, temporal planning, ranking, and context packing.
 
 use crate::{
-    AppError, AppState, knowledge::EvidenceSource, model::cached_generate,
-    observability::TraceBuilder,
+    AppError, AppState, knowledge::SourceQuote, model::cached_generate, observability::TraceBuilder,
 };
 use chrono::{DateTime, Utc};
 use pgvector::Vector;
@@ -38,8 +37,9 @@ pub struct RecallRequest {
     pub to: Option<DateTime<Utc>>,
     #[serde(default = "default_true")]
     pub graph: bool,
-    #[serde(default = "default_true")]
-    pub observations: bool,
+    /// Include inferences derived from two or more assertions. `observations` is the earlier name.
+    #[serde(default = "default_true", alias = "observations")]
+    pub inferences: bool,
     #[serde(default = "default_true")]
     pub temporal: bool,
     #[serde(default)]
@@ -54,12 +54,12 @@ pub struct RecallRequest {
     pub top_k: usize,
     /// Relevance floor for vector candidates, as a cosine distance greater than 0 and at most
     /// 2 (0 is identical, 1 unrelated, 2 opposite). When set, a candidate whose embedding is
-    /// farther than this from the query embedding is dropped before fusion, in the fact vector
+    /// farther than this from the query embedding is dropped before fusion, in the assertion vector
     /// channel, the raw text vector channel, the source text passes that `include_raw` adds,
-    /// and the graph expansion. A source text match or a graph fact that has an embedding
+    /// and the graph expansion. A source text match or a graph assertion that has an embedding
     /// farther than this is dropped, one with no embedding yet is kept. The candidates that
     /// remain keep the ranks they had without the floor, so it removes candidates and never
-    /// reorders the rest. Exact word matches on facts are never dropped. Without a query
+    /// reorders the rest. Exact word matches on assertions are never dropped. Without a query
     /// embedding no distance can be measured, so the candidates that have an embedding are
     /// left out and the response says so. When nothing is close enough the response is empty,
     /// not an error. Omitted, recall is unchanged. Distances depend on the embedding model, so
@@ -77,7 +77,7 @@ pub struct RecallHit {
     pub score: f64,
     pub ranks: HashMap<String, usize>,
     pub paths: Vec<Vec<String>>,
-    pub sources: Vec<EvidenceSource>,
+    pub sources: Vec<SourceQuote>,
     pub valid_from: Option<DateTime<Utc>>,
     pub valid_to: Option<DateTime<Utc>>,
     pub event_at: Option<DateTime<Utc>>,
@@ -98,7 +98,7 @@ pub struct RecallResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_distance: Option<f64>,
 }
-const FILTER: &str = "a.namespace=$1 AND (a.kind<>'observation' OR $5) AND a.status IN ('active','contested','superseded') AND (($2::timestamptz IS NULL AND a.status IN ('active','contested')) OR ($2 IS NOT NULL AND a.valid_from<=$2 AND (a.valid_to IS NULL OR a.valid_to>$2))) AND ($3::timestamptz IS NULL OR coalesce(a.event_at,a.valid_from)>=$3) AND ($4::timestamptz IS NULL OR coalesce(a.event_at,a.valid_from)<$4)";
+const FILTER: &str = "a.namespace=$1 AND (a.kind<>'inference' OR $5) AND a.status IN ('active','contested','superseded') AND (($2::timestamptz IS NULL AND a.status IN ('active','contested')) OR ($2 IS NOT NULL AND a.valid_from<=$2 AND (a.valid_to IS NULL OR a.valid_to>$2))) AND ($3::timestamptz IS NULL OR coalesce(a.event_at,a.valid_from)>=$3) AND ($4::timestamptz IS NULL OR coalesce(a.event_at,a.valid_from)<$4)";
 async fn candidates(
     s: &AppState,
     r: &RecallRequest,
@@ -139,7 +139,7 @@ async fn candidates(
         .bind(r.as_of)
         .bind(r.from)
         .bind(r.to)
-        .bind(r.observations)
+        .bind(r.inferences)
         .bind(&r.query);
     if strategy == "semantic" {
         q = q.bind(embedding.map(Vector::from));
@@ -158,8 +158,8 @@ async fn raw_source_rows(
     s: &AppState,
     ids: &[Uuid],
     namespace: &str,
-) -> Result<HashMap<Uuid, Vec<EvidenceSource>>, AppError> {
-    let mut out: HashMap<Uuid, Vec<EvidenceSource>> = HashMap::new();
+) -> Result<HashMap<Uuid, Vec<SourceQuote>>, AppError> {
+    let mut out: HashMap<Uuid, Vec<SourceQuote>> = HashMap::new();
     if ids.is_empty() {
         return Ok(out);
     }
@@ -183,7 +183,7 @@ WHERE c.id = ANY($1)
     .fetch_all(&s.store.pool)
     .await?
     {
-        out.entry(r.get("id")).or_default().push(EvidenceSource {
+        out.entry(r.get("id")).or_default().push(SourceQuote {
             chunk_id: r.get("id"),
             quote: r.get("quote"),
             role: r.get("role"),
@@ -194,28 +194,28 @@ WHERE c.id = ANY($1)
     }
     Ok(out)
 }
-/// What a recall hit shows for a fact: kind, statement, status, sources, valid_from, valid_to, event_at.
-type FactRow = (
+/// What a recall hit shows for an assertion: kind, statement, status, sources, valid_from, valid_to, event_at.
+type AssertionRow = (
     String,
     String,
     String,
-    Vec<EvidenceSource>,
+    Vec<SourceQuote>,
     DateTime<Utc>,
     Option<DateTime<Utc>>,
     Option<DateTime<Utc>>,
 );
-/// Those fields for many facts at once, in two statements (the facts, then all their sources in the order
-/// `Store::assertion` gives them). `Store::assertion` ran three statements per fact, and also loaded relations that a hit does not show.
-async fn fact_rows(
+/// Those fields for many assertions at once, in two statements (the assertions, then all their sources in the order
+/// `Store::assertion` gives them). `Store::assertion` ran three statements per assertion, and also loaded relations that a hit does not show.
+async fn assertion_rows(
     s: &AppState,
     namespace: &str,
     ids: &[Uuid],
-) -> Result<HashMap<Uuid, FactRow>, AppError> {
-    let mut facts = HashMap::new();
+) -> Result<HashMap<Uuid, AssertionRow>, AppError> {
+    let mut rows = HashMap::new();
     if ids.is_empty() {
-        return Ok(facts);
+        return Ok(rows);
     }
-    let mut sources: HashMap<Uuid, Vec<EvidenceSource>> = HashMap::new();
+    let mut sources: HashMap<Uuid, Vec<SourceQuote>> = HashMap::new();
     for row in sqlx::query(
         r#"
 SELECT s.assertion_id,
@@ -241,7 +241,7 @@ ORDER BY e.occurred_at,
         sources
             .entry(row.get("assertion_id"))
             .or_default()
-            .push(EvidenceSource {
+            .push(SourceQuote {
                 chunk_id: row.get("chunk_id"),
                 quote: row.get("quote"),
                 role: row.get("role"),
@@ -257,11 +257,11 @@ ORDER BY e.occurred_at,
         .await?
     {
         let id: Uuid = row.get("id");
-        facts.insert(id, (row.get("kind"), row.get("statement"), row.get("status"), sources.remove(&id).unwrap_or_default(), row.get("valid_from"), row.get("valid_to"), row.get("event_at")));
+        rows.insert(id, (row.get("kind"), row.get("statement"), row.get("status"), sources.remove(&id).unwrap_or_default(), row.get("valid_from"), row.get("valid_to"), row.get("event_at")));
     }
-    Ok(facts)
+    Ok(rows)
 }
-/// Evidence whose extraction job has not succeeded yet. Assertions cannot reflect it,
+/// Source text whose extraction job has not succeeded yet. Assertions cannot reflect it,
 /// so it is searched as raw text.
 const UNPROCESSED_CHUNK: &str = "EXISTS(SELECT 1 FROM episode_sources es JOIN memory_jobs j ON j.dedupe_key='extract:'||es.episode_id::text WHERE es.chunk_id=c.id AND j.kind='extract' AND j.status IN ('pending','running','failed'))";
 /// Natural-language questions rarely contain every word of the stored sentence, so
@@ -286,23 +286,23 @@ fn any_word_query(query: &str) -> String {
     }
     words.join(" or ")
 }
-/// Which retained evidence a raw semantic pass may search.
+/// Which retained source text a raw semantic pass may search.
 #[derive(Clone, Copy, PartialEq)]
 enum RawScope {
-    /// Only evidence whose extraction has not succeeded.
+    /// Only source text whose extraction has not succeeded.
     Unprocessed,
     /// Every retained chunk in the namespace.
     All,
 }
 /// Raw-text candidates for requests assertions cannot answer alone, each with its rank in its
 /// own list, best first. `search_all` lets the lexical pass cover already interpreted
-/// evidence too; `semantic` selects the evidence a vector pass covers, if any. `any_word` ORs
+/// source text too; `semantic` selects the source text a vector pass covers, if any. `any_word` ORs
 /// the query words; without it the query keeps the all-words semantics every request had
 /// before, so a request that does not ask for the new behaviour retrieves exactly what it did.
 /// With `max_distance` both passes drop chunks whose embedding is farther than it from the
 /// query embedding. The lexical pass keeps a chunk that has no embedding yet, so fresh
-/// evidence still appears. A chunk keeps the rank it has without the bound, so dropping far
-/// chunks leaves gaps and does not promote the chunks that remain over facts, whose ranks
+/// source text still appears. A chunk keeps the rank it has without the bound, so dropping far
+/// chunks leaves gaps and does not promote the chunks that remain over assertions, whose ranks
 /// come from lists the bound does not reorder. The vector pass is ordered by distance, so
 /// what it keeps is a prefix and its ranks are unchanged anyway. Without a query embedding
 /// no distance exists: the lexical pass then keeps only chunks that have no embedding.
@@ -396,6 +396,48 @@ async fn raw_fallback_candidates(
             .collect();
     }
     Ok((lexical, nearest))
+}
+/// Which names a context block uses. Recall shows the stored ones; the reflection model was
+/// trained on context that called a quote "Evidence" and used the earlier kind names.
+#[derive(Clone, Copy)]
+pub enum Labels {
+    Stored,
+    Model,
+}
+/// One hit as the context text shows it: the statement with its kind, status and interval, then
+/// up to three source quotes.
+pub fn context_block(hit: &RecallHit, labels: Labels) -> String {
+    let (quote_label, kind, status) = match labels {
+        Labels::Stored => ("Source", hit.kind.as_str(), hit.status.as_str()),
+        Labels::Model => (
+            "Evidence",
+            crate::knowledge::kind_to_model(&hit.kind),
+            if hit.status == "raw" {
+                "evidence"
+            } else {
+                hit.status.as_str()
+            },
+        ),
+    };
+    let quotes = hit
+        .sources
+        .iter()
+        .take(3)
+        .map(|s| {
+            format!(
+                "  {quote_label} ({}, {}, {}): {}",
+                s.session_id,
+                s.role,
+                s.occurred_at,
+                s.quote.chars().take(1200).collect::<String>()
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        "[{}] {} [{}; {}; valid_from={:?}; valid_to={:?}; event_at={:?}]\n{}\n",
+        hit.id, hit.statement, kind, status, hit.valid_from, hit.valid_to, hit.event_at, quotes
+    )
 }
 pub async fn recall_engine(s: &AppState, mut r: RecallRequest) -> Result<RecallResponse, AppError> {
     if r.namespace.trim().is_empty()
@@ -514,7 +556,7 @@ LIMIT 10
             degraded.push(format!("semantic unavailable: {e}"));
             if r.max_distance.is_some() {
                 degraded.push(
-                    "max_distance cannot be measured without the query embedding: retained source text and graph facts that have an embedding are left out"
+                    "max_distance cannot be measured without the query embedding: retained source text and graph assertions that have an embedding are left out"
                         .into(),
                 );
             }
@@ -586,7 +628,7 @@ LIMIT 10
             .bind(r.as_of)
             .bind(r.from)
             .bind(r.to)
-            .bind(r.observations)
+            .bind(r.inferences)
             .bind(&graph_ids)
             .fetch_all(&s.store.pool)
             .await?
@@ -597,8 +639,8 @@ LIMIT 10
         graph_ids.retain(|id| seen.insert(*id));
         graph_ranked = graph_ids.iter().copied().zip(1..).collect();
         if let Some(bound) = r.max_distance {
-            // A fact only the graph reached has to be about the question too, or the graph
-            // fills the context with whatever its seeds happen to touch. A fact with no
+            // An assertion only the graph reached has to be about the question too, or the graph
+            // fills the context with whatever its seeds happen to touch. An assertion with no
             // embedding yet is kept, as source text is. The ranks stay those of the order
             // before this gate, so it leaves gaps and reorders nothing.
             let sql = match &embedding {
@@ -614,7 +656,7 @@ LIMIT 10
                 .bind(r.as_of)
                 .bind(r.from)
                 .bind(r.to)
-                .bind(r.observations)
+                .bind(r.inferences)
                 .bind(&graph_ids);
             let query = match &embedding {
                 Ok(vector) => query.bind(Vector::from(vector.clone())).bind(bound),
@@ -654,14 +696,14 @@ LIMIT 10
             ranks.entry(id).or_default().insert(strategy.into(), rank);
         }
     }
-    // Retained evidence remains searchable before extraction has interpreted it,
+    // Retained source text remains searchable before extraction has interpreted it,
     // and when nothing else matched. Keep its origin explicit.
     let mut fallback_ids = HashSet::new();
     if !r.raw_only {
         let (unprocessed, failed): (i64, i64) = sqlx::query_as("SELECT count(*),count(*) FILTER(WHERE status='failed') FROM memory_jobs WHERE namespace=$1 AND kind='extract' AND status IN ('pending','running','failed')").bind(&r.namespace).fetch_one(&s.store.pool).await?;
         if failed > 0 {
             degraded.push(format!(
-                "{failed} extraction jobs failed; the newest evidence is served as raw text until they are retried"
+                "{failed} extraction jobs failed; the newest source text is served as raw text until they are retried"
             ));
         }
         if ranks.is_empty() || unprocessed > 0 || r.include_raw {
@@ -692,13 +734,13 @@ LIMIT 10
             }
         }
     }
-    // The rows every hit shows are loaded for all hits at once: two statements for the facts and one for the source
-    // text, where each hit used to cost its own round trips (three for a fact), hundreds of them for a large candidate set.
+    // The rows every hit shows are loaded for all hits at once: two statements for the assertions and one for the source
+    // text, where each hit used to cost its own round trips (three for an assertion), hundreds of them for a large candidate set.
     let is_raw = |id: &Uuid| r.raw_only || fallback_ids.contains(id);
     let raw_ids: Vec<Uuid> = ranks.keys().filter(|id| is_raw(id)).copied().collect();
-    let fact_ids: Vec<Uuid> = ranks.keys().filter(|id| !is_raw(id)).copied().collect();
+    let assertion_ids: Vec<Uuid> = ranks.keys().filter(|id| !is_raw(id)).copied().collect();
     let mut raw_by_id = raw_source_rows(s, &raw_ids, &r.namespace).await?;
-    let mut facts_by_id = fact_rows(s, &r.namespace, &fact_ids).await?;
+    let mut assertions_by_id = assertion_rows(s, &r.namespace, &assertion_ids).await?;
     let mut ranking = Vec::new();
     for (id, ranks) in ranks {
         let score = ranks.values().map(|rank| 1.0 / (60.0 + *rank as f64)).sum();
@@ -708,7 +750,7 @@ LIMIT 10
                 (
                     "source_chunk".into(),
                     sources.first().map(|s| s.quote.clone()).unwrap_or_default(),
-                    "evidence".into(),
+                    "raw".into(),
                     sources,
                     None,
                     None,
@@ -716,7 +758,7 @@ LIMIT 10
                 )
             } else {
                 let (kind, statement, status, sources, valid_from, valid_to, event_at) =
-                    facts_by_id.remove(&id).ok_or(AppError::NotFound)?;
+                    assertions_by_id.remove(&id).ok_or(AppError::NotFound)?;
                 (
                     kind,
                     statement,
@@ -749,32 +791,7 @@ LIMIT 10
         if results.len() >= r.top_k {
             break;
         }
-        let quotes = hit
-            .sources
-            .iter()
-            .take(3)
-            .map(|s| {
-                format!(
-                    "  Evidence ({}, {}, {}): {}",
-                    s.session_id,
-                    s.role,
-                    s.occurred_at,
-                    s.quote.chars().take(1200).collect::<String>()
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        let block = format!(
-            "[{}] {} [{}; {}; valid_from={:?}; valid_to={:?}; event_at={:?}]\n{}\n",
-            hit.id,
-            hit.statement,
-            hit.kind,
-            hit.status,
-            hit.valid_from,
-            hit.valid_to,
-            hit.event_at,
-            quotes
-        );
+        let block = context_block(hit, Labels::Stored);
         let n = estimate_tokens(&block);
         if tokens + n <= r.max_tokens {
             tokens += n;

@@ -1,4 +1,4 @@
-//! Shrink retained evidence to what a small model reads, and cut it into windows that fit.
+//! Shrink retained source events to what a small model reads, and cut it into windows that fit.
 //!
 //! A coding session can hold hundreds of events and a single tool result can be 100 kB, far
 //! more than a 1.7B student reads well. Each event is shortened for the prompt only. Claims are
@@ -6,7 +6,7 @@
 //! is accepted. `slm-distill/prompt.py` repeats these rules for training data and is checked
 //! against this file by a shared fixture.
 
-use crate::{knowledge::EvidenceEvent, model::estimate_tokens};
+use crate::{knowledge::SourceEvent, model::estimate_tokens};
 use serde_json::{Map, Value, json};
 use std::ops::Range;
 
@@ -90,7 +90,7 @@ fn compact_metadata(metadata: &Value) -> Value {
 }
 
 /// One event as the prompt shows it.
-pub fn compact_event(event: &EvidenceEvent) -> Value {
+pub fn compact_event(event: &SourceEvent) -> Value {
     json!({
         "role": event.role,
         "content": shorten_content(&event.content),
@@ -124,8 +124,8 @@ mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
 
-    fn event(role: &str, content: &str, metadata: Value) -> EvidenceEvent {
-        EvidenceEvent {
+    fn event(role: &str, content: &str, metadata: Value) -> SourceEvent {
+        SourceEvent {
             role: role.into(),
             content: content.into(),
             occurred_at: Utc.with_ymd_and_hms(2026, 10, 7, 9, 30, 15).unwrap(),
@@ -258,7 +258,7 @@ mod tests {
         ))
         .unwrap();
         for case in fixture["compaction"].as_array().unwrap() {
-            let events: Vec<EvidenceEvent> = serde_json::from_value(case["raw"].clone()).unwrap();
+            let events: Vec<SourceEvent> = serde_json::from_value(case["raw"].clone()).unwrap();
             let compact: Vec<Value> = events.iter().map(compact_event).collect();
             let expected: Vec<&str> = case["compact_json"]
                 .as_array()

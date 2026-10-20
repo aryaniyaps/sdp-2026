@@ -7,11 +7,14 @@ left to do.
 
 \section{\uppercase{Datasets}}
 Each training row has the same shape: the input is a short conversation plus a task
-(extract, consolidate or reflect), and the output is the expected memory, i.e. facts,
-observations or an answer, each tied to a source quote. For example in the Maya
+(extract, consolidate or reflect), and the output is the expected memory, i.e. assertions,
+inferences or an answer, each tied to a source quote. For example in the Maya
 episode the user says ``I live in Chennai.'' and later ``Bengaluru is now my home city.'',
-and the expected output is the fact ``Maya, home city, Bengaluru'' with
-\code{correction:true}, \code{source:user} and that quote.
+and the expected output is the assertion ``Maya, home city, Bengaluru'' with
+\code{correction:true}, \code{source:user} and that quote. The training rows and prompts keep
+the wording the model was trained on (kinds \code{fact} and \code{observation}, the heading
+``Existing facts:''); the service translates these to \code{attribute} and \code{inference} at the
+model boundary, so the renaming used in this report does not change the model's contract.
 
 The fine-tuning data started out as only coding conversations and we later expanded
 it to 16 domains (family, food, travel, education, work, software and so on). All
@@ -37,14 +40,14 @@ become a memory.
 
 For testing outside our own data distribution we used LoCoMo \cite{maharana2024locomo}, which has
 real-style conversations over many sessions. We took 16 conversation segments from 10
-conversations, with 40 reference facts. A typical one is Caroline and Melanie chatting
+conversations, with 40 reference assertions. A typical one is Caroline and Melanie chatting
 about a pottery class and a painting; the expected memory is that Melanie made a plate
 in pottery class and Caroline painted a picture inspired by her beach visit.
 
 \section{\uppercase{Fine-Tuning and Model Selection}}
 The model is Qwen3-4B-Instruct-2507, fine-tuned with QLoRA \cite{dettmers2023qlora} and served
 through Ollama. Following Figure~\ref{fig:m5}, GPT-5.6-sol labelled the episodes for the extract,
-consolidate and reflect tasks, every label was checked for structure and evidence (and
+consolidate and reflect tasks, every label was checked for structure and source quotes (and
 repaired if needed), and the valid ones were frozen into the 2,095/424/442 split. Rows
 were tokenised with a 4,096 token limit and the prompt was masked so only the target
 is supervised. Training used QLoRA on the frozen base with NF4 quantisation and rank
@@ -77,7 +80,7 @@ steps.
 \includegraphics[width=\textwidth]{figures/fig5_3_new_session.jpg}\\
 \small (b) Asking in a new session
 \end{minipage}
-\caption[Demo: recording facts, then recalling them in a new session]{(a) The user gives a certificate expiry date, a weekly review time and the
+\caption[Demo: recording details, then recalling them in a new session]{(a) The user gives a certificate expiry date, a weekly review time and the
 dashboard owner, which are submitted for memory processing. (b) A fresh session in
 another project directory asks for the same details without repeating them}
 \label{fig:demo-a}
@@ -97,22 +100,23 @@ asynchronous, so it can't confirm storage yet. In (b) a new session in \code{mob
 \begin{minipage}[t]{0.49\textwidth}
 \centering
 \includegraphics[width=\textwidth]{figures/fig5_5_graph.jpg}\\
-\small (b) Corrected fact in the graph
+\small (b) Corrected assertion in the graph
 \end{minipage}
-\caption[Demo: recalled answer and the corrected fact in the graph]{(a) Memory from the first session is added to the context and the agent
+\caption[Demo: recalled answer and the corrected assertion in the graph]{(a) Memory from the first session is added to the context and the agent
 answers March 3, Tuesday at 11:00 and Kavya. (b) The graph shows Friday at 16:30 as
 the current release-freeze time, linked to the previous Thursday at 17:00 value, with the
 supporting message and history in the side panel}
 \label{fig:demo-b}
 \end{figure}
 
-In Figure~\ref{fig:demo-b}(a) the agent answers from the recalled facts (March 3, since no year was
+In Figure~\ref{fig:demo-b}(a) the agent answers from the recalled assertions (March 3, since no year was
 given, then Tuesday 11:00 and Kavya) and says the information came from an earlier
-session and wasn't checked against the current files. In (b) the Friday 16:30 freeze is
+session. It also notes that the extracted assertion stored the date as 2026-03-03 although
+the user gave no year, which shows why answers cite their source quotes. In (b) the Friday 16:30 freeze is
 linked to the old Thursday 17:00 value by \code{contradicts} and \code{supersedes}, same as
 Bengaluru and Chennai.
 
-\section{\uppercase{Results and Observations}}
+\section{\uppercase{Results and Findings}}
 Most of what we know so far comes from the demos, a database audit and the model
 comparison.
 
@@ -125,7 +129,7 @@ preference.
 
 The database audit found that all 142 stored source quotes matched their original text
 exactly, though a matching quote doesn't prove the model understood it correctly. It
-also found 8 observations, each linked to at least two supporting facts. Dates are still
+also found 8 inferences, each linked to at least two supporting assertions. Dates are still
 weak: a message sent on June 1 said ``tomorrow'' and the system read it as June 3.
 
 Table~\ref{tab:comparison} compares Qwen3-4B before and after fine-tuning, on 64 unseen tasks
@@ -140,11 +144,11 @@ across the 16 domains and on 16 external conversation samples.
 \hline
 \multicolumn{1}{|c|}{\textbf{Measurement}} & \textbf{Before} & \textbf{After} \\
 \hline
-Correctly combined related facts & 1/16 & 13/16 \\
+Correctly combined related assertions & 1/16 & 13/16 \\
 \hline
-Correct answers using supplied evidence & 10/16 & 15/16 \\
+Correct answers from supplied memories & 10/16 & 15/16 \\
 \hline
-Expected facts recovered & 50/55 & 41/55 \\
+Expected assertions recovered & 50/55 & 41/55 \\
 \hline
 Extracted claims supported by the source & 92.1\% & 90.5\% \\
 \hline
@@ -152,18 +156,18 @@ Corrections handled correctly & 8/8 & 8/8 \\
 \hline
 Outputs passing format checks & 64/64 & 63/64 \\
 \hline
-Expected facts recovered (16 external samples) & 16/40 & 13/40 \\
+Expected assertions recovered (16 external samples) & 16/40 & 13/40 \\
 \hline
 \end{tabularx}
 \end{reporttable}
 \end{table}
 
-Combining facts and answering clearly got better (1/16 to 13/16 and 10/16 to 15/16),
-and corrections were right in all 8 cases both times. But extraction got worse. Facts
+Combining assertions and answering clearly got better (1/16 to 13/16 and 10/16 to 15/16),
+and corrections were right in all 8 cases both times. But extraction got worse. Assertions
 recovered dropped from 50/55 to 41/55 internally and 16/40 to 13/40 on the external
 samples, supported claims dipped a bit from 92.1\% to 90.5\%, and one output failed the
 format check. Honestly this was a bit disappointing and we haven't fully figured out
-why yet. Passing the format check also says nothing about whether the facts are right
+why yet. Passing the format check also says nothing about whether the extracted assertions are right
 (the June 1 date passed it). Since the full benchmark isn't done, we can't claim an overall improvement on
 long conversation histories yet.
 
@@ -177,13 +181,14 @@ integration are done and evaluation is still going on. The pending items for eac
 module are listed in the next section.
 
 \section{\uppercase{Conclusion and Future Work}}
-We built all five modules of the memory engine: evidence capture, fact extraction and
+We built all five modules of the memory engine: source capture, assertion extraction and
 consolidation, temporal graph management, hybrid retrieval with grounded answers,
 and model training. Four are implemented and M5 is trained and integrated with
 evaluation still going on. In the demos and audit, information from one session was
-recalled in a new one, a corrected fact was stored with its history without touching
-unrelated facts, and all 142 source quotes matched. Fine-tuning helped a lot with
-combining facts (1/16 to 13/16) and answering from evidence (10/16 to 15/16).
+recalled in a new one, a corrected assertion was stored with its history without touching
+unrelated assertions, and all 142 source quotes matched. Fine-tuning helped a lot with
+combining assertions (1/16 to 13/16) and answering from retrieved memories (10/16 to
+15/16).
 
 Some things aren't there yet. Extraction regressed after fine-tuning (50/55 to 41/55
 internal, 16/40 to 13/40 external), relative dates are sometimes wrong, and without the
@@ -191,7 +196,7 @@ full LongMemEval-S run we can't say it's better over long histories. Future work
 module:
 \begin{itemize}[itemsep=0pt]
 \item M1: API access control and verified backup and restore.
-\item M2: better missed-fact coverage, date interpretation and source attribution;
+\item M2: better coverage of missed assertions, date interpretation and source attribution;
 measure the review step's quality and latency.
 \item M3: evaluate ambiguous updates, aliases and longer correction histories.
 \item M4: finish LongMemEval-S, compare graph and consolidation ablations, report

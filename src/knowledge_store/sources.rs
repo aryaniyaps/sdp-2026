@@ -18,7 +18,7 @@ impl Store {
                 || e.content.len() > 1_000_000
             {
                 return Err(AppError::Validation(
-                    "invalid evidence role or content size".into(),
+                    "invalid source event role or content size".into(),
                 ));
             }
         }
@@ -38,7 +38,7 @@ impl Store {
         {
             if row.get::<String, _>("content_hash") != hash {
                 return Err(AppError::Conflict(
-                    "idempotency key reused with different evidence".into(),
+                    "idempotency key reused with different source events".into(),
                 ));
             }
             let id: Uuid = row.get("id");
@@ -81,11 +81,11 @@ impl Store {
         tx.commit().await?;
         Ok((episode, job, true))
     }
-    pub async fn episode_evidence(
+    pub async fn episode_events(
         &self,
         namespace: &str,
         episode: Uuid,
-    ) -> Result<Vec<(Uuid, EvidenceEvent)>, AppError> {
+    ) -> Result<Vec<(Uuid, SourceEvent)>, AppError> {
         let rows = sqlx::query(
             r#"
 SELECT c.id,
@@ -114,7 +114,7 @@ ORDER BY es.ordinal
             .map(|r| {
                 (
                     r.get("id"),
-                    EvidenceEvent {
+                    SourceEvent {
                         role: r.get("role"),
                         content: r.get("content"),
                         occurred_at: r.get("occurred_at"),

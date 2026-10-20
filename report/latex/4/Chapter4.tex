@@ -12,8 +12,8 @@ the main store and handles both full-text and vector search, and Neo4j 5.26 hold
 graph copy used for graph-based retrieval.
 
 The models run locally on Ollama. Our extraction model is a fine-tuned
-Qwen3-4B-Instruct-2507, which extracts facts, combines them and answers from evidence,
-and Qwen3-Embedding-0.6B makes the vectors. On the agent side we use the Pi agent
+Qwen3-4B-Instruct-2507, which extracts assertions, combines them into inferences and
+writes cited answers. Qwen3-Embedding-0.6B makes the vectors. On the agent side we use the Pi agent
 harness to capture messages and inject memory. The dashboard (session controls and
 the memory graph) is React + TypeScript with Vite and Bootstrap.
 
@@ -23,58 +23,58 @@ access to the app and the Pi console.
 
 \section{\uppercase{Algorithms}}
 There are six algorithms. Context selection is in M2; entity resolution and versioning
-is in M3; consolidation and invalidation is split between M2 (making observations) and
+is in M3; consolidation and invalidation is split between M2 (making inferences) and
 M3 (marking them stale); and retrieval, rank fusion with packing, and answer generation
 are all in M4. 
 
 \subsection{Priority-Based Context Selection}
 \label{sec:alg-context}
-The extraction model needs to see the facts already stored about the same people,
+The extraction model needs to see the assertions already stored about the same people,
 otherwise it can't tell a repeat from a correction, but they may not all fit its input
-limit. So facts mentioned in the new messages are ranked first (recency breaks ties) and
+limit. So assertions mentioned in the new messages are ranked first (recency breaks ties) and
 a binary search finds the largest prefix that fits.
 
 \begin{algorithm}[tbp]
 \caption{Priority-based context selection}
 \label{alg:context}
 \begin{pseudo}
-Input: existing facts, new messages, available input space
+Input: existing assertions, new messages, input space
 
-IF all existing facts fit:
-    RETURN all facts
-Score facts by subject and value mentions in new messages
+IF all existing assertions fit:
+    RETURN all assertions
+Score assertions by subject and value mentions in new messages
 Rank stronger matches first; use recency to break ties
 Use binary search to find the largest ranked subset that
     fits
-RETURN selected facts in their original order
+RETURN selected assertions in their original order
 \end{pseudo}
 \end{algorithm}
 
 For Maya, when E3 (``I moved from Chennai to Bengaluru today\ldots'') comes in, she
-has four stored facts: Chennai, NovaTech, software engineer and remote. Assume for the
-example that only three fit. The home city fact matches E3 on both subject and value,
+has four stored assertions: Chennai, NovaTech, software engineer and remote. Assume for
+the example that only three fit. The home city assertion matches E3 on both subject and value,
 so it ranks first and the other three follow by recency. Binary search settles on three
-facts, the home city one included, and these go to the extractor with E3.
+assertions, the home city one included, and these go to the extractor with E3.
 
 \subsection{Entity Resolution and Memory Versioning}
-This decides which entity a claim is about and what it does to the stored facts. The
-important rule is that a conflicting value never overwrites silently, and the old fact is
+This decides which entity a claim is about and what it does to the stored assertions. The
+important rule is that a conflicting value never overwrites silently, and the old assertion is
 superseded, not deleted, which is what lets us answer the ``previous city'' part of E5.
 
 \begin{algorithm}[tbp]
 \caption{Entity resolution and memory versioning}
 \label{alg:versioning}
 \begin{pseudo}
-Input: a new fact and stored memories
+Input: a new claim and stored memories
 
 Match entity by type and normalised name, or a unique
     stored alias; otherwise create an entity
-IF the same fact exists:
-    Attach the new evidence
-ELSE IF no conflicting single-value fact exists:
-    Store the new fact as active
+IF the same assertion exists:
+    Attach the new source quote
+ELSE IF no conflicting single-value assertion exists:
+    Store the claim as a new active assertion
 ELSE IF explicit correction AND confidence >= 0.8:
-    Supersede the old fact; activate the new fact
+    Supersede the old assertion; activate the new one
 ELSE:
     Mark both values as disputed
 \end{pseudo}
@@ -82,31 +82,31 @@ ELSE:
 
 The E3 claim is Maya, home city Bengaluru, single-valued,
 \code{correction=true}, confidence 0.95, quote ``Bengaluru is now my home city.'' Maya is
-found, so no new entity. The same fact doesn't exist (R1 says Chennai), there is a
-conflicting single-valued fact, and the claim is a correction with 0.95 $\geq$ 0.8. So R1
+found, so no new entity. The same assertion doesn't exist (R1 says Chennai), there is a
+conflicting single-valued assertion, and the claim is a correction with 0.95 $\geq$ 0.8. So R1
 Chennai is superseded with validity 1--10 Oct, and R2 Bengaluru is active from 10 Oct
 with E3 as its source.
 
 \subsection{Memory Consolidation and Invalidation}
-The model proposes an observation but the code decides whether to save it. Supports
+The model proposes an inference but the code decides whether to save it. Supports
 are rechecked just before saving since they may have changed while the model was
-running. Invalidation goes the other way and marks dependent observations stale.
+running. Invalidation goes the other way and marks dependent inferences stale.
 
 \begin{algorithm}[tbp]
 \caption{Memory consolidation and invalidation}
 \label{alg:consolidation}
 \begin{pseudo}
-Input: active facts about the affected entities
+Input: active assertions about the affected entities
 
-Ask the Extractor SLM to combine related facts into
-    observations
-Require at least two distinct supporting facts
-Check support IDs and the observation's subject
-Recheck that supporting facts are active before saving
-Store each observation with its evidence links
+Ask the Extractor SLM to combine related assertions into
+    inferences
+Require at least two distinct supporting assertions
+Check support IDs and the inference's subject
+Recheck that supporting assertions are active before saving
+Store each inference with its support links
 
-WHEN a supporting fact changes or is retracted:
-    Recursively find dependent observations
+WHEN a supporting assertion changes or is retracted:
+    Recursively find dependent inferences
     Mark them as stale
 \end{pseudo}
 \end{algorithm}
@@ -114,7 +114,7 @@ WHEN a supporting fact changes or is retracted:
 For Maya the inputs are A1 (NovaTech), A2 (software engineer) and A3 (remote). The
 model proposes ``Maya works remotely as a software engineer at NovaTech.'' with all
 three as supports. It has three distinct supports, the IDs exist, the subject is Maya, and
-all three are still active, so it is saved as O1. If A3 were retracted later, O1 would be
+all three are still active, so it is saved as I1. If A3 were retracted later, I1 would be
 found as a dependent and marked stale.
 
 \subsection{Hybrid Retrieval and Graph Traversal}
@@ -130,7 +130,7 @@ Input: a question and optional date restrictions
 Resolve supported date phrases when planning is enabled
 Find candidates using keyword and vector searches
 Include time-based candidates when a date window exists
-Start graph traversal from matching facts and entities
+Start graph traversal from matching assertions and entities
 Expand through entity/support links for two bounded rounds
 Filter results by validity and any supplied relevance
     cutoff
@@ -139,7 +139,7 @@ RETURN candidate lists for ranking
 \end{algorithm}
 
 E5 has no date phrase, so there is no time-based list. Keyword and vector search
-find R2 (Bengaluru) and the work facts. The graph step starts from these and the Maya
+find R2 (Bengaluru) and the work assertions. The graph step starts from these and the Maya
 entity: \code{MENTIONS} reaches Maya, and the \code{supersedes} link of R2 reaches R1
 (Chennai). The graph hits are rechecked in PostgreSQL for status, time and distance, and
 the lexical, semantic and graph lists are passed on.
@@ -159,7 +159,7 @@ FOR each memory:
     Score = SUM[1 / (60 + rank)] across search lists
 Sort by decreasing score; break ties by memory ID
 FOR each ranked memory:
-    Build a block containing the fact and source evidence
+    Build a block with the assertion and its source quotes
     Add it if it fits; otherwise consider the next memory
     Stop when the requested number of memories is reached
 RETURN the packed context
@@ -171,20 +171,20 @@ lists. Then R2 scores $3 \times 1/61 \approx 0.0492$ and R1 scores $3 \times 1/6
 first and no tie-break is needed. With Pi's settings (\code{top\_k} 10, 2,048 tokens) both
 blocks fit easily, and R2 goes out with the E3 quote attached.
 
-\subsection{Evidence-Based Answer Generation}
+\subsection{Source-Grounded Answer Generation}
 This decides whether the model's answer is accepted. Bad output is rejected rather
 than patched up, so every citation the user sees points to a memory that was actually
 retrieved.
 
 \begin{algorithm}[tbp]
-\caption{Evidence-based answer generation}
+\caption{Source-grounded answer generation}
 \label{alg:answer}
 \begin{pseudo}
 Input: a question and retrieved memories
 
 IF no memories were retrieved:
     RETURN "Insufficient evidence."
-Ask the extractor SLM to answer from the retrieved evidence
+Ask the extractor SLM to answer from the retrieved memories
 Restrict citation IDs to the retrieved memories
 Check the response format and citation IDs
 Require citations when sufficient evidence is claimed
@@ -192,7 +192,7 @@ RETURN the answer, or reject invalid output
 \end{pseudo}
 \end{algorithm}
 
-For E5 the evidence is R2, R1 and the work facts, so the model is called.  Only R1, R2 and the work fact IDs are
+For E5 the retrieved memories are R2, R1 and the work assertions, so the model is called.  Only R1, R2 and the work assertion IDs are
 allowed as citations; the answer cites R2 for Bengaluru and R1 for Chennai, so it passes.
 
 \section{\uppercase{Integration with the Pi Agent}}
