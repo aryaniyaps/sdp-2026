@@ -109,6 +109,31 @@
       ],
       "dev_before": "assertions only 0.459; mixed by fused rank 0.768 (top_k 20), 0.807 (top_k 60); plain retrieval 0.824 (top_k 60)",
       "dev_after": "hybrid 0.828 at top_k 60 (multi-hop 0.77 vs 0.67, open-domain 0.85 vs 0.77 for plain retrieval; 7,046 context tokens, 43% of full context)"
+    },
+    {
+      "version": "v6-extractor-coverage",
+      "date": "2026-10-21",
+      "dev_run": "locomo-dev-v3-general-v1 and locomo-dev-v3-general-v2",
+      "finding": "Extraction coverage was the main fault of the v1 worker (iteration v5): its training episodes asked for two or three claims each.",
+      "change": "Stage C QLoRA from the released adapter on 1,119 new coverage rows (480 two-person conversations labelled with every durable fact by Claude Sonnet 5.5, slm-distill/expand_coverage_corpus.py) plus 600 replayed stage B rows, training cap raised from 4,096 to 6,144 tokens so the new rows fit. Rule fixed in benchmark/pipeline-v2.sh before the comparison: v2 is used if its dev enhanced accuracy is at least v1's.",
+      "files": [
+        "slm-distill/expand_coverage_corpus.py",
+        "slm-distill/assemble_coverage_sets.py",
+        "benchmark/pipeline-v2.sh"
+      ],
+      "dev_before": {
+        "worker": "general-v1",
+        "enhanced": 0.8240343347639485,
+        "assertions_only": 0.51931330472103,
+        "raw_hybrid": 0.8111587982832618
+      },
+      "dev_after": {
+        "worker": "general-v2",
+        "enhanced": 0.8497854077253219,
+        "assertions_only": 0.630901287553648,
+        "raw_hybrid": 0.8369098712446352
+      },
+      "decision": "mem-extractor:general-v2"
     }
   ]
 }

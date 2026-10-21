@@ -2,7 +2,7 @@
   "seed": 20261005,
   "engine": {
     "bind": "127.0.0.1:8090",
-    "worker_model": "mem-extractor:general-v1",
+    "worker_model": "mem-extractor:general-v2",
     "embedding_model": "qwen3-embedding:0.6b",
     "num_ctx": 12288,
     "num_predict": 3072,
