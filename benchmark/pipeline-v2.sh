@@ -33,7 +33,21 @@ restart_engine() {  # $1: worker model
 }
 
 note "pipeline starting at commit $(git rev-parse --short HEAD)"
-while pgrep -f "train.py --qlora --eval-on-epoch" >/dev/null; do sleep 60; done
+# Training runs here, not in another process to wait for: a checkpoint every 20 steps, and a failed
+# attempt (the first run ran out of GPU memory at step 178 of 215) resumes from the newest one.
+if [ ! -f "$ADAPTER/adapter_config.json" ]; then
+  pid=$(ss -ltnp | grep 127.0.0.1:8090 | grep -o 'pid=[0-9]*' | cut -d= -f2)
+  [ -n "$pid" ] && kill "$pid"  # the engine's embedder must not take GPU memory during training
+  for attempt in 1 2 3 4 5 6; do
+    note "training attempt $attempt"
+    (cd slm-distill && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True HF_HUB_OFFLINE=1 "$PY" train.py \
+       --qlora --eval-on-epoch --loss-chunk-size 256 --max-length 6144 --base Qwen/Qwen3-4B-Instruct-2507 \
+       --revision cdbee75f17c01a7cc42f958dc650907174af0554 --sets data/research-v4/coverage-sets \
+       --out out/local-4b-coverage --epochs 1 --adapter "$DISTILL/out/local-4b-general/final" \
+       --accum 8 --lr 3e-5 --rank 16 --save-steps 20 --resume) >> slm-distill/data/research-v4/train.log 2>&1 && break
+    sleep 30
+  done
+fi
 [ -f "$ADAPTER/adapter_config.json" ] || fail "training left no adapter at $ADAPTER"
 note "training finished: $(grep -aoE "'eval_loss': '[0-9.]+'" slm-distill/data/research-v4/train.log | tail -1)"
 

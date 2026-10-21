@@ -101,6 +101,9 @@ def main() -> None:
     ap.add_argument("--rank", type=int, default=64)
     ap.add_argument("--max-steps", type=int, default=-1, help="stop early, for a smoke run")
     ap.add_argument("--limit", type=int, help="use only the first N training rows")
+    ap.add_argument("--save-steps", type=int, default=0,
+                    help="also save a resumable checkpoint (with optimizer state) every N steps")
+    ap.add_argument("--resume", action="store_true", help="continue from the newest checkpoint in --out")
     args = ap.parse_args()
 
     assert args.loss_chunk_size > 0, "loss chunk size must be positive"
@@ -151,7 +154,8 @@ def main() -> None:
             per_device_train_batch_size=1, gradient_accumulation_steps=args.accum,
             learning_rate=args.lr, lr_scheduler_type="cosine", warmup_steps=max(3, steps_per_epoch // 20),
             logging_steps=5, eval_strategy=("epoch" if args.eval_on_epoch else "steps") if len(val_ds) else "no", eval_steps=max(10, steps_per_epoch // 2),
-            per_device_eval_batch_size=1, save_strategy="epoch", save_total_limit=2, save_only_model=True,
+            per_device_eval_batch_size=1, save_strategy="steps" if args.save_steps else "epoch",
+            save_steps=args.save_steps or 500, save_total_limit=2, save_only_model=not args.save_steps,
             bf16=True, gradient_checkpointing=True, gradient_checkpointing_kwargs={"use_reentrant": False},
             optim="adamw_torch_fused", max_grad_norm=1.0, weight_decay=0.0, report_to=[], seed=13,
         ),
@@ -159,7 +163,8 @@ def main() -> None:
         data_collator=DataCollatorForSeq2Seq(tok, padding=True, label_pad_token_id=-100),
     )
     trainer.loss_chunk_size = args.loss_chunk_size
-    result = trainer.train()
+    resume = args.resume and any(args.out.glob("checkpoint-*"))
+    result = trainer.train(resume_from_checkpoint=True if resume else None)
     trainer.save_state()
     (args.out/"training-result.json").write_text(json.dumps({"metrics": result.metrics, "global_step": trainer.state.global_step, "peak_vram_bytes": torch.cuda.max_memory_allocated(), "loss_chunk_size": args.loss_chunk_size}, indent=2)+"\n")
     final = args.out / "final"
