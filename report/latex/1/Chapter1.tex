@@ -54,8 +54,8 @@ Chennai on 10 October and still keep Chennai as her previous city.
 \item Fine-tune a small local model to extract assertions, combine related assertions into
 inferences and answer with citations.
 \item Retrieve relevant information quickly within a limited context size.
-\item Evaluate memory accuracy and retrieval with repeatable tests, including the
-LongMemEval-S benchmark \cite{wu2025longmemeval}.
+\item Evaluate memory accuracy and retrieval with repeatable tests on a public long-conversation
+benchmark, LoCoMo \cite{maharana2024locomo}.
 \end{enumerate}
 
 \section{\uppercase{Challenges Faced}}
@@ -72,4 +72,5 @@ limit, so now we check input length and split long conversations into smaller pi
 
 \section{\uppercase{Organisation of the Report}}
 Chapter~\ref{ch:survey} reviews existing memory systems, Chapter~\ref{ch:design} the architecture and modules,
-Chapter~\ref{ch:impl} the tools and algorithms, and Chapter~\ref{ch:results} the data, fine-tuning, demo and results.
+Chapter~\ref{ch:impl} the tools and algorithms, and Chapter~\ref{ch:results} the data, fine-tuning and demo, then the benchmark results, their analysis and the
+comparison with published memory systems.

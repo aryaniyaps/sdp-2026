@@ -16,9 +16,11 @@ Retrieval combines keyword, vector, time and graph search using Reciprocal Rank
 Fusion and returns each result with its source quotes. The extraction and answering is done by a small local
 Qwen3-4B model that we fine-tuned with QLoRA.
 
-M1 is implemented, M2 to M4 are implemented with some quality and benchmark
-work left, and the M5 model is trained and integrated while evaluation is still going on.
-So far all 142 stored source quotes matched their original text, and fine-tuning improved
-consolidation of related assertions from 1/16 to 13/16 and answers from 10/16 to 15/16.
-On the other hand extraction coverage dropped from 50/55 to 41/55 and dates are still handled poorly. The full
-LongMemEval-S run is pending.
+We evaluated the engine on LoCoMo, a public benchmark of ten long conversations (1,540 questions), with the
+same reader model under every condition and two independent model judges. With the engine the reader answered
+83.1\% of the questions correctly, against 80.0\% with plain retrieval over the raw text, 43.0\% when keeping
+only the most recent 8,192 tokens, and 0.3\% with no memory. Giving the reader the whole conversation reached
+89.0\%, but needed more than three times as many tokens. The same picture held on the eight conversations never
+used for development, and every one of the 99,971 source quotes returned by the engine matched the conversation
+exactly. A deterministic property suite confirmed that corrections keep their history and that the engine abstains
+without evidence. It also exposed a date-handling fault that was fixed after the test.
