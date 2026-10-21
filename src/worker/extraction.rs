@@ -126,7 +126,8 @@ LIMIT 80
 }
 
 /// The student often copies the time a message was sent into `event_at` when the quote says
-/// "yesterday", and sometimes miscounts "in three days". When the claim's own quotes name exactly one
+/// "yesterday", sometimes miscounts "in three days", and sometimes leaves `event_at` empty, which the
+/// store fills with the time the message was sent. When the claim's own quotes name exactly one
 /// relative day, that day is the event date: in `event_at`, in `valid_from` when it was the same
 /// instant, and where the statement spells out the model's date. `source_indices` must still index
 /// `events`.
@@ -139,8 +140,10 @@ pub(crate) fn resolve_relative_day(claim: &mut ClaimInput, events: &[SourceEvent
     else {
         return;
     };
-    let Some(event_at) = claim.event_at else {
-        return;
+    let event_at = match claim.event_at {
+        Some(event_at) => event_at,
+        None if claim.cardinality == Cardinality::Event => claim.valid_from.unwrap_or(said),
+        None => return,
     };
     let Some(day) = crate::temporal::mentioned_day(&claim.quotes.join(" "), said) else {
         return;
@@ -346,14 +349,38 @@ mod repair_tests {
             "2023-05-11"
         );
         assert_eq!(miscounted.statement, "Caroline will present on 2023-05-11.");
-        // A date the model already resolved, a quote without a relative day, or no date stays as it is.
+        // An empty event date would become the message time in the store, so it is resolved too.
+        let mut empty = claim("I went to a LGBTQ support group yesterday", None);
+        empty.statement = "Caroline attended an LGBTQ support group yesterday.".into();
+        resolve_relative_day(&mut empty, &events);
+        assert_eq!(
+            empty.event_at.unwrap().date_naive().to_string(),
+            "2023-05-07"
+        );
+        assert_eq!(empty.valid_from, None);
+        // A date the model already resolved, a quote without a relative day, or a state without a
+        // date stays as it is.
         let resolved = said - chrono::Duration::days(1);
-        for (quote, event_at) in [
-            ("I went to a LGBTQ support group yesterday", Some(resolved)),
-            ("I went to a LGBTQ support group", Some(said)),
-            ("I went to a LGBTQ support group yesterday", None),
+        for (quote, event_at, cardinality) in [
+            (
+                "I went to a LGBTQ support group yesterday",
+                Some(resolved),
+                Cardinality::Event,
+            ),
+            (
+                "I went to a LGBTQ support group",
+                Some(said),
+                Cardinality::Event,
+            ),
+            ("I went to a LGBTQ support group", None, Cardinality::Event),
+            (
+                "I went to a LGBTQ support group yesterday",
+                None,
+                Cardinality::Multiple,
+            ),
         ] {
             let mut unchanged = claim(quote, event_at);
+            unchanged.cardinality = cardinality;
             resolve_relative_day(&mut unchanged, &events);
             assert_eq!(unchanged.event_at, event_at, "{quote}");
             assert!(unchanged.statement.ends_with("2023-05-08."), "{quote}");
