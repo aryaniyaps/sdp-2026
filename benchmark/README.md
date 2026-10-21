@@ -4,6 +4,22 @@ This directory measures whether the memory engine helps an agent answer question
 records enough to let anyone check the numbers. The results are in `Benchmark_Report.ipynb` (an executed copy
 is `Benchmark_Report.html`). Every number in it is recomputed from the stored run records.
 
+## Result of the test run
+
+`runs/locomo-final` (commit `fb044f2`, worker `mem-extractor:general-v2`), all 1,540 questions, Jev:
+
+| condition | accuracy | context tokens |
+|---|---|---|
+| `enhanced` | 83.1% | 6,790 |
+| `raw_hybrid` | 80.0% | 4,473 |
+| `recent_window` | 43.0% | 8,168 |
+| `full_context` | 89.0% | 22,400 |
+| `no_memory` | 0.3% | 7 |
+
+Every pre-registered criterion passed, on all ten conversations and on the eight held out. GPT-4o-mini gives the
+same numbers within one point (agreement 96.7%, kappa 0.93). `verify` found no problems in 11,000 answers and 22,000
+judgments. The report chapter's tables are generated from these records by `export_tex.py`.
+
 ## What is measured
 
 **LoCoMo** [Maharana et al., ACL 2024] has ten long two-person conversations (272 sessions, about 16k tokens
@@ -77,8 +93,8 @@ benchmark/overnight.sh locomo-final             # every stage, unattended; progr
 `overnight.sh` keeps the machine awake, restarts the engine if its health check fails, and retries each stage.
 Every stage writes one file per unit of work under `runs/<run>/` and skips what exists, so any stage can be
 re-run after an interruption. Rate limits pause every worker of that provider (honouring `Retry-After`, otherwise
-backing off up to 15 minutes) and are retried for up to six hours. On the laptop used here (RTX 4070, 8 GB) the run
-takes about seven hours, most of it building memory.
+backing off up to 15 minutes) and are retried for up to six hours. On the laptop used here (RTX 4070, 8 GB) the test run
+took 7 h 45 min: 4 h 13 min building memory, then answering and judging.
 
 Single stages: `python3 benchmark/run.py {ingest,recall,answer,judge,report,verify} --split test --run locomo-final`,
 with `--conditions`, `--judges` and `--repeat N` to narrow them.
@@ -108,6 +124,7 @@ records. The notebook's spot-check section prints random items in full so they c
 | `iterations.json` | every change made because of a dev finding |
 | `vendor/mem0/` | Mem0's evaluation prompts and metrics at a pinned commit, with SHA-256 |
 | `build_notebook.py`, `pyproject.toml`, `uv.lock` | the report notebook and its pinned environment |
+| `export_tex.py` | the LaTeX tables of the report's results chapter, from `runs/<run>/report.json` |
 | `runs/<run>/` | `manifest.json`, `source.tar.gz` (frozen code), `ingestion/`, `recall/`, `answers/`, `judgments/`, `repeats/`, `report.json`, `items.jsonl`, `verification.json` |
 | `demo/` | the separate three-session Pi coding demonstration |
 

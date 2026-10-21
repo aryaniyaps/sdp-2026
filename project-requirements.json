@@ -1,19 +1,76 @@
 {
   "objective": "Implement the accepted source-grounded temporal graph memory plan end to end; run all 500 cleaned LongMemEval-S questions, primary baselines, repetitions, ablations, human audit, and a real Pi coding demonstration.",
   "completion_requires": {
-    "storage": ["multi-valued assertions and single-state corrections", "event/validity/recorded timestamps", "grounded entity aliases", "transactional outbox and lease fencing", "Neo4j replay/rebuild/reset"],
-    "memory": ["attributed exact quotes", "reinforce/extend/supersede/contradict/derive", "acyclic supported inferences", "transitive invalidation and recomputation", "resumable schema-validating subscription worker", "Ollama and cached inference"],
-    "retrieval": ["parallel lexical/semantic/temporal arms", "bounded graph paths", "authoritative candidate validation", "deterministic RRF", "bounded context packing", "raw source fallback", "cited reflection and abstention", "graph/inference ablations", "observatory and documented APIs"],
-    "pi": ["automatic recall", "message/tool capture", "observed exit status", "commit and branch provenance", "no injected-memory reingestion", "retry/resume idempotency", "offline durable spool", "explicit tools/status", "three-session real coding demo"],
-    "evaluation": ["dataset/upstream/model/config/code manifests", "no ground-truth ingestion", "all 500 full histories", "three primary conditions", "two additional repeats on fixed 100-question sample", "500-question retrieval and 100-question answer ablations", "blinded subscription judge", "two human reviewers and adjudication", "paired confidence intervals", "operational metrics", "raw reproducible artifacts and report"],
-    "delivery": ["one-command runtime", "isolated database and Neo4j tests", "TypeScript tests/checks", "benchmark protocol tests", "rendered UI verification", "four subsystem design/review explanations", "requirement-by-requirement final completion audit"]
+    "storage": [
+      "multi-valued assertions and single-state corrections",
+      "event/validity/recorded timestamps",
+      "grounded entity aliases",
+      "transactional outbox and lease fencing",
+      "Neo4j replay/rebuild/reset"
+    ],
+    "memory": [
+      "attributed exact quotes",
+      "reinforce/extend/supersede/contradict/derive",
+      "acyclic supported inferences",
+      "transitive invalidation and recomputation",
+      "resumable schema-validating subscription worker",
+      "Ollama and cached inference"
+    ],
+    "retrieval": [
+      "parallel lexical/semantic/temporal arms",
+      "bounded graph paths",
+      "authoritative candidate validation",
+      "deterministic RRF",
+      "bounded context packing",
+      "raw source fallback",
+      "cited reflection and abstention",
+      "graph/inference ablations",
+      "observatory and documented APIs"
+    ],
+    "pi": [
+      "automatic recall",
+      "message/tool capture",
+      "observed exit status",
+      "commit and branch provenance",
+      "no injected-memory reingestion",
+      "retry/resume idempotency",
+      "offline durable spool",
+      "explicit tools/status",
+      "three-session real coding demo"
+    ],
+    "evaluation": [
+      "dataset/upstream/model/config/code manifests",
+      "no ground-truth ingestion",
+      "all 500 full histories",
+      "three primary conditions",
+      "two additional repeats on fixed 100-question sample",
+      "500-question retrieval and 100-question answer ablations",
+      "blinded subscription judge",
+      "two human reviewers and adjudication",
+      "paired confidence intervals",
+      "operational metrics",
+      "raw reproducible artifacts and report"
+    ],
+    "delivery": [
+      "one-command runtime",
+      "isolated database and Neo4j tests",
+      "TypeScript tests/checks",
+      "benchmark protocol tests",
+      "rendered UI verification",
+      "four subsystem design/review explanations",
+      "requirement-by-requirement final completion audit"
+    ]
   },
-  "execution_handoff": {
-    "requested_by_user": "just document benchmark docs. my friend will run it",
+  "status": "implementation delivered; LoCoMo evaluation completed with an improvement over plain retrieval and recent-window baselines; LongMemEval-S and the human audit were not run",
+  "evaluation_run": {
+    "benchmark": "LoCoMo (10 conversations, 1,540 questions, categories 1-4), chosen by the user in place of LongMemEval-S",
+    "run": "benchmark/runs/locomo-final (commit fb044f2, worker mem-extractor:general-v2)",
     "runbook": "benchmark/README.md",
-    "partial_run": "review-full-v3",
-    "reason_execution_stopped": "subscription-sharing usage limit",
-    "remaining_team_work": "run all 500 questions, repetitions, ablations, judging, actual human audit and final empirical completion audit"
-  },
-  "status": "implementation and benchmark handoff delivered; empirical evaluation incomplete and delegated to the project team; no improvement claim"
+    "report": "report/latex/5/Chapter5.tex, benchmark/Benchmark_Report.ipynb",
+    "result": "all criteria fixed in benchmark/config.json passed: memory engine 83.1% (Jev) vs plain retrieval 80.0%, recent window 43.0%, full context 89.0% at 30% of its tokens, no memory 0.3%; both judges agree on 96.7% (kappa 0.93); verify: 11,000 answers and 22,000 judgments, 0 problems",
+    "not_done": [
+      "LongMemEval-S (skipped by the user)",
+      "two human reviewers and adjudication (a random spot-check section in the notebook instead)"
+    ]
+  }
 }

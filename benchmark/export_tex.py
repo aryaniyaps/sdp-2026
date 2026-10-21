@@ -68,10 +68,10 @@ def main_results(r):
                      num(x.get("reader_seconds_p50"), 1)])
     return table("main", "LoCoMo results by condition (all ten conversations, categories 1--4)",
                  "|l|r|r|r|r|r|r|>{\\raggedleft\\arraybackslash}X|",
-                 ["Condition", "n", "Jev", "GPT-4o-mini", "F1", "BLEU-1", "Context tokens", "Reader s, p50"], rows,
+                 ["Condition", "n", "Jev", "GPT-4o-mini", "F1", "BLEU-1", "Tokens", "Reader s"], rows,
                  "Jev and GPT-4o-mini: percentage of answers judged correct against the gold answer with Mem0's LoCoMo "
                  "rubric. F1 and BLEU-1: Mem0's token overlap with the gold answer. Context tokens: mean tokens given "
-                 "to the reader besides the question. The last three rows are on the 300-question stratified sample.")
+                 "to the reader besides the question. Reader s: median seconds per answer. The last three rows are on the 300-question stratified sample.")
 
 
 def paired(r, judge):
@@ -185,6 +185,10 @@ def published(r, pub):
                      num(ours_full.get("context_tokens_mean")), "+0.00"])
         rows.append(["\\textbf{This work: memory engine (Haiku 5.5)}", f"{g(ours):.2f}",
                      num(ours.get("context_tokens_mean")), f"{g(ours) - g(ours_full):+.2f}"])
+        raw = c.get("raw_hybrid", {})
+        if g(raw) is not None:
+            rows.append(["\\textbf{This work: plain retrieval (Haiku 5.5)}", f"{g(raw):.2f}",
+                         num(raw.get("context_tokens_mean")), f"{g(raw) - g(ours_full):+.2f}"])
     return table("published", "Published LoCoMo results \\cite{chhikara2025mem0} beside this work (GPT-4o-mini judge)",
                  "|Y|r|r|r|", ["System", "J (\\%)", "Context tokens", "J minus own full context"], rows,
                  "Published systems answer with GPT-4o-mini; this work answers with Claude Haiku 5.5, so absolute "
