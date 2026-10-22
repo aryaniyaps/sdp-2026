@@ -64,7 +64,7 @@
   "status": "implementation delivered; LoCoMo evaluation completed with an improvement over plain retrieval and recent-window baselines; LongMemEval-S and the human audit were not run",
   "evaluation_run": {
     "benchmark": "LoCoMo (10 conversations, 1,540 questions, categories 1-4), chosen by the user in place of LongMemEval-S",
-    "run": "benchmark/runs/locomo-final (commit fb044f2, worker mem-extractor:general-v2)",
+    "run": "benchmark/runs/locomo-final (commit c45e938, worker mem-extractor:general-v2)",
     "runbook": "benchmark/README.md",
     "report": "report/latex/5/Chapter5.tex, benchmark/Benchmark_Report.ipynb",
     "result": "all criteria fixed in benchmark/config.json passed: memory engine 83.1% (Jev) vs plain retrieval 80.0%, recent window 43.0%, full context 89.0% at 30% of its tokens, no memory 0.3%; both judges agree on 96.7% (kappa 0.93); verify: 11,000 answers and 22,000 judgments, 0 problems",

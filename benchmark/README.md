@@ -6,7 +6,7 @@ is `Benchmark_Report.html`). Every number in it is recomputed from the stored ru
 
 ## Result of the test run
 
-`runs/locomo-final` (commit `fb044f2`, worker `mem-extractor:general-v2`), all 1,540 questions, Jev:
+`runs/locomo-final` (commit `c45e938`, worker `mem-extractor:general-v2`), all 1,540 questions, Jev:
 
 | condition | accuracy | context tokens |
 |---|---|---|

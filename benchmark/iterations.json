@@ -140,7 +140,7 @@
       "date": "2026-10-21",
       "dev_run": "none: found by the property suite of the test run (properties-final), after the LoCoMo test was frozen",
       "finding": "Relative dates resolved 0/12 with the general-v2 worker: it writes the resolved date into the statement but often leaves event_at empty, and the store filled an empty event date with the time the message was sent. The LoCoMo reader still answered all 12 property date questions from the statement.",
-      "change": "resolve_relative_day also handles an event claim whose event_at is empty (src/worker/extraction.rs, commit 43af5bd). The LoCoMo test run (locomo-final) is not re-run; its numbers are for the engine before this fix.",
+      "change": "resolve_relative_day also handles an event claim whose event_at is empty (src/worker/extraction.rs, commit 148caa2). The LoCoMo test run (locomo-final) is not re-run; its numbers are for the engine before this fix.",
       "files": [
         "src/worker/extraction.rs"
       ],

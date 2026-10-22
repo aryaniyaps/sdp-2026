@@ -195,7 +195,7 @@ evidence in all 6 cases, never stored an API key, and after each of the 12 updat
 These tests also caught a bug that the LoCoMo judge could not see: none of the 12 relative dates (like
 ``yesterday'') were resolved in the test run. The new model writes the date into the sentence but often leaves the
 date field empty, and the store then filled it with the time the message was sent. We fixed this after the test
-run (commit \code{43af5bd}), and on re-running the tests all 10 events that were extracted have the right date. The
+run (commit \code{148caa2}), and on re-running the tests all 10 events that were extracted have the right date. The
 LoCoMo numbers above are from before this fix. The other failures were all facts the extractor never produced,
 which is the same coverage problem the ablation shows.
 
