@@ -2,26 +2,26 @@
 
 \chapter{\uppercase{System Design}}
 \label{ch:design}
-This chapter describes the design requirements, the architecture and the five modules,
-following the Maya example through them.
+This chapter goes through the design requirements, the architecture and the five
+modules, using the Maya example.
 
 \section{\uppercase{Design Requirements}}
-We worked from a few rules. Original messages are saved exactly as sent \emph{before}
-any extraction, which runs later as a queued job, so a failed model call can't lose a
-conversation. A changed assertion becomes a new version and the old value is kept with its
-validity interval. Every assertion links to an exact source quote. All data belongs to a
-namespace (e.g.\ \code{user:maya}), whatever we hand to a model has to fit a token budget,
-and models run locally on Ollama. Neo4j is only a copy that can be rebuilt from PostgreSQL.
+We followed a few rules. Original messages are saved exactly as sent \emph{before} any
+extraction happens. Extraction runs later as a queued job, so a failed model call can't lose
+a conversation. When an assertion changes we add a new version and keep the old value with
+its validity interval. Every assertion links to an exact source quote. All data belongs to a
+namespace (e.g.\ \code{user:maya}), anything we give a model has to fit a token budget, and
+the models run locally on Ollama. Neo4j is only a copy that can be rebuilt from PostgreSQL.
 
 \section{\uppercase{Overall Architecture}}
-Figure~\ref{fig:architecture} shows the architecture. The client is the Pi coding agent, whose memory
-client saves every message through the memory service and asks for recall before
-answering. The service is a Rust application with API handlers and background workers.
-PostgreSQL with pgvector is the main store for M1 to M4: source events and chunks,
+Figure~\ref{fig:architecture} shows the architecture. The client is the Pi coding agent. Its memory client
+saves every message through the memory service and asks for recall before answering. The
+service itself is a Rust application with API handlers and background workers. PostgreSQL
+with pgvector is the main store for M1 to M4 and holds the source events and chunks,
 entities, assertions, quotes, vectors and the job queue. Ollama runs our fine-tuned worker
-model and a Qwen3 embedding model. Neo4j keeps a graph copy of assertions and entities,
-and M4 rechecks every graph hit against PostgreSQL. M5 runs offline, and live chats are
-\emph{not} used as training data.
+model and a Qwen3 embedding model. Neo4j keeps a graph copy of the assertions and
+entities, and M4 checks every graph hit against PostgreSQL again before using it. M5 runs
+offline, and we do \emph{not} use live chats as training data.
 
 \begin{figure}[!htbp]
 \centering
@@ -32,81 +32,83 @@ and M4 rechecks every graph hit against PostgreSQL. M5 runs offline, and live ch
 
 \section{\uppercase{M1 Source Acquisition and Processing}}
 M1 saves the source events before anything else (Figure~\ref{fig:m1}). For Maya, the 10 October
-conversation arrives as a retain request with namespace \code{user:maya}, session S2 and the
-events E3 (her message) and E4 (the agent's reply). The batch is first written to a local
-spool so nothing is lost if the service is down, and then sent to \code{POST /api/v2/retain}.
-If the same key arrives again with the same hash the existing IDs are returned, so retries
-don't create duplicates. The episode, events, chunks and a pending extraction job are
-saved in one transaction, and each chunk is embedded into a 1,024-dimensional vector.
-Background workers lease a namespace for 15 minutes and retry a job up to 5 times.
+conversation comes in as a retain request with namespace \code{user:maya}, session S2 and two
+events, E3 (her message) and E4 (the agent's reply). Pi first writes the batch to a local spool,
+so nothing is lost if the service is down, and then sends it to \code{POST /api/v2/retain}. If the
+same key comes again with the same hash, the service just returns the existing IDs, so
+retries don't create duplicates. The episode, events, chunks and a pending extraction job are
+saved in one transaction, and each chunk gets a 1,024-dimensional vector. Background
+workers lease a namespace for 15 minutes and try a job up to 5 times.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth,height=0.42\textheight,keepaspectratio]{figures/fig3_2_module1.png}
+\includegraphics[width=0.53\textwidth,height=0.8\textheight,keepaspectratio]{figures/fig3_2_module1.png}
 \caption{Module 1: Source Acquisition and Processing}
 \label{fig:m1}
 \end{figure}
 
 \section{\uppercase{M2 Knowledge Extraction and Consolidation}}
-M2 has two stages, both using our local model through Ollama (Figure~\ref{fig:m2}).
-\textbf{Extraction:} the prompt builder fits the new events and the relevant existing
-assertions into the model's input (Section~\ref{sec:alg-context}). For Maya, ``Maya / Chennai'' is shown
-next to E3, and the model returns home city Bengaluru, flagged as a correction, with an
-exact quote. Output that fails the schema or quotes text that isn't in the source is
-retried up to two times. Secrets are filtered out before the claim goes to M3.
-\textbf{Consolidation:} after M3 commits, the model may combine two or more active
-assertions about the same subject into one inference. Maya's three work assertions become
-``Maya works remotely as a software engineer at NovaTech.''
+M2 has two stages and both use our local model through Ollama (Figure~\ref{fig:m2}). In
+extraction, the prompt builder fits the new events and the relevant existing assertions into
+the model's input (Section~\ref{sec:alg-context}). For Maya, ``Maya / Chennai'' is shown next to E3, and the
+model returns home city Bengaluru, marked as a correction, with an exact quote. If the
+output breaks the schema or quotes text that isn't in the source, we ask again, up to two
+more times. Secrets are filtered out before the claim goes to M3. In consolidation, after M3
+commits, the model can combine two or more active assertions about the same subject
+into one inference. Maya's three work assertions become ``Maya works remotely as a
+software engineer at NovaTech.''
+
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth,height=0.42\textheight,keepaspectratio]{figures/fig3_3_module2.png}
+\includegraphics[width=0.61\textwidth,height=0.8\textheight,keepaspectratio]{figures/fig3_3_module2.png}
 \caption{Module 2: Knowledge Extraction and Consolidation}
 \label{fig:m2}
 \end{figure}
 
 \section{\uppercase{M3 Temporal Knowledge and Graph Management}}
-M3 is the only module that writes assertions, inside one PostgreSQL transaction that
-holds a namespace lock (Figure~\ref{fig:m3}). It first resolves the entity (Maya). If the same value
-already exists it is reinforced, and if the slot is empty a new assertion is made. If a
-single-valued slot gets a different value and the claim is a reviewed correction with
-confidence at least 0.8, the old assertion is superseded; otherwise both are marked
-contested. So R1 Chennai becomes valid from 1 to 10 October and superseded, and R2
-Bengaluru is active from 10 October with the E3 quote. A projection worker then copies
-the change to Neo4j \cite{neo4j2026http}, checking revisions so an old one can't overwrite a newer one.
+M3 is the only module that writes assertions. It works inside one PostgreSQL transaction
+that holds a namespace lock (Figure~\ref{fig:m3}). First it finds the entity (Maya). If the same value
+is already stored, it is reinforced, and if the slot is empty, a new assertion is made. If a
+single-valued slot gets a different value, the old assertion is superseded when the claim is a
+reviewed correction with confidence of at least 0.8; otherwise both are marked contested.
+So R1 Chennai becomes valid from 1 to 10 October and superseded, and R2 Bengaluru is
+active from 10 October with the E3 quote. A projection worker then copies the change to
+Neo4j \cite{neo4j2026http}. It checks revision numbers so an old revision can't overwrite a newer one.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth,height=0.42\textheight,keepaspectratio]{figures/fig3_4_module3.png}
+\includegraphics[width=0.77\textwidth,height=0.8\textheight,keepaspectratio]{figures/fig3_4_module3.png}
 \caption{Module 3: Temporal Knowledge and Graph Management}
 \label{fig:m3}
 \end{figure}
 
 \section{\uppercase{M4 Hybrid Retrieval and Grounded Reasoning}}
 M4 answers recall requests (Figure~\ref{fig:m4}). On 13 October Pi sends E5 for \code{user:maya} with
-\code{top\_k} 10, a maximum distance of 0.45 and a 2,048 token budget. The query goes to
-keyword, vector and (with a date window) time-based search, the top results seed a Neo4j
-expansion, and the lists are merged with Reciprocal Rank Fusion and packed into the
-budget with source quotes. An optional reflect endpoint writes a cited answer.
+\code{top\_k} 10, a maximum distance of 0.45 and a budget of 2,048 tokens. The query goes to
+keyword search, vector search and, if there is a date window, time-based search. The top
+results are the starting points for a Neo4j expansion. All the lists are merged with Reciprocal
+Rank Fusion and packed into the budget along with their source quotes. There is also an
+optional reflect endpoint that writes an answer with citations.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth,height=0.42\textheight,keepaspectratio]{figures/fig3_5_module4.png}
+\includegraphics[width=0.52\textwidth,height=0.8\textheight,keepaspectratio]{figures/fig3_5_module4.png}
 \caption{Module 4: Hybrid Retrieval and Grounded Reasoning}
 \label{fig:m4}
 \end{figure}
 
 \section{\uppercase{M5 Model Training and Evaluation}}
-M5 runs offline and produces the worker model used by M2 and M4 (Figure~\ref{fig:m5}). A
-generator makes short episodes across 16 domains, a teacher model labels them, and the
-checked labels are used to train the model with QLoRA, which is then evaluated and
-imported into Ollama (details in Chapter~\ref{ch:results}). In the end, when Maya asks E5, Pi answers ``You
-now live in Bengaluru, following your move on 10 October 2026. Before that, you lived in
-Chennai. You work remotely as a software engineer at NovaTech.''
+M5 runs offline and produces the worker model that M2 and M4 use (Figure~\ref{fig:m5}). A
+generator makes short episodes across 16 domains and a teacher model labels them. We train
+the model on the checked labels with QLoRA, evaluate it and import it into Ollama (details in
+Chapter~\ref{ch:results}). In the end, when Maya asks E5, Pi answers ``You now live in Bengaluru,
+following your move on 10 October 2026. Before that, you lived in Chennai. You work
+remotely as a software engineer at NovaTech.''
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth,height=0.42\textheight,keepaspectratio]{figures/fig3_6_module5.png}
+\includegraphics[width=0.66\textwidth,height=0.8\textheight,keepaspectratio]{figures/fig3_6_module5.png}
 \caption{Module 5: Model Training and Evaluation}
 \label{fig:m5}
 \end{figure}

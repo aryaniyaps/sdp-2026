@@ -2,22 +2,21 @@
 
 \chapter{\uppercase{Implementation}}
 \label{ch:impl}
-This chapter covers the tools we used, the six main algorithms (with the Maya example
-walked through each) and how the engine plugs into Pi.
+This chapter covers the tools we used, the six main algorithms with the Maya example,
+and how the engine connects to Pi.
 
 \section{\uppercase{Implementation Environment}}
 The memory service is written in Rust, using Tokio for the background workers, Axum
 for the API and SQLx for PostgreSQL. PostgreSQL 17 with pgvector is the main store and
-does both full-text and vector search, and Neo4j 5.26 holds the graph copy. The models
-run locally on Ollama: our fine-tuned Qwen3-4B-Instruct-2507 extracts assertions, combines
-them into inferences and writes cited answers, and Qwen3-Embedding-0.6B makes the
-vectors. The dashboard is React + TypeScript. Training used Python, PyTorch, Transformers,
-PEFT and bitsandbytes, with llama.cpp to make the GGUF, and Docker Compose runs the services.
+does both full-text and vector search, and Neo4j 5.26 holds the graph copy. The models run
+locally on Ollama. Our fine-tuned Qwen3-4B-Instruct-2507 does the extraction,
+consolidation and cited answers, and Qwen3-Embedding-0.6B makes the vectors. The
+dashboard is React with TypeScript. For training we used Python, PyTorch, Transformers,
+PEFT, bitsandbytes and llama.cpp, and Docker Compose runs all the services.
 
 \section{\uppercase{Algorithms}}
-Context selection is in M2, entity resolution and versioning in M3, consolidation and
-invalidation is split between M2 and M3, and retrieval, rank fusion and answer generation
-are in M4.
+Context selection belongs to M2, entity resolution and versioning to M3, consolidation
+to both M2 and M3, and retrieval, rank fusion and answer generation to M4.
 
 \subsection{Priority-Based Context Selection}
 \label{sec:alg-context}
@@ -40,10 +39,10 @@ RETURN the selected assertions in their original order
 \end{algorithm}
 
 \subsection{Entity Resolution and Memory Versioning}
-The key rule is that a conflicting value never silently overwrites the old one, and the
-old assertion is superseded, not deleted (Algorithm~\ref{alg:versioning}). The E3 claim (home city
+A conflicting value never silently overwrites the old one. The old assertion is marked
+superseded and stays in the database (Algorithm~\ref{alg:versioning}). The E3 claim (home city
 Bengaluru, correction, confidence 0.95) conflicts with R1 Chennai and $0.95 \geq 0.8$, so R1 is
-superseded with validity 1--10 October and R2 Bengaluru becomes active.
+superseded with validity 1 to 10 October and R2 Bengaluru becomes active.
 
 \begin{algorithm}[!htbp]
 \caption{Entity resolution and memory versioning}
@@ -107,8 +106,8 @@ Stop at top_k memories; RETURN the packed context
 \end{algorithm}
 
 \subsection{Source-Grounded Answer Generation}
-Bad output is rejected rather than patched, so every citation the user sees points to a
-memory that was actually retrieved (Algorithm~\ref{alg:answer}). For E5 the answer cites R2 for
+We reject bad output instead of trying to fix it, so every citation the user sees points
+to a memory that was actually retrieved (Algorithm~\ref{alg:answer}). For E5 the answer cites R2 for
 Bengaluru and R1 for Chennai, so it passes.
 
 \begin{algorithm}[!htbp]

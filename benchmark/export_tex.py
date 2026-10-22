@@ -45,7 +45,7 @@ def interval(ci):
 
 
 def table(label, caption, spec, header, rows, note=None):
-    lines = ["\\begin{table}[H]", f"\\caption{{{caption}}}", f"\\label{{tab:bench-{label}}}", "\\centering",
+    lines = ["\\begin{table}[!htbp]", f"\\caption{{{caption}}}", f"\\label{{tab:bench-{label}}}", "\\centering",
              "\\begin{reporttable}", f"\\begin{{tabularx}}{{\\textwidth}}{{{spec}}}", "\\hline",
              " & ".join(f"\\textbf{{{h}}}" for h in header) + " \\\\", "\\hline"]
     lines += [" & ".join(str(c) for c in row) + " \\\\ \\hline" for row in rows]

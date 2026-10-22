@@ -2,9 +2,8 @@
 
 \chapter{\uppercase{Literature Survey}}
 \label{ch:survey}
-This chapter looks at existing work on long-term memory for agents. Every number
-quoted here is the one reported by the authors on their own setup; we did not rerun any
-of these systems.
+This chapter looks at existing work on long-term memory for agents. All numbers here
+are the ones the authors reported on their own setup, since we did not rerun these systems.
 
 \section{\uppercase{Long Context and External Memory}}
 The simplest memory is to keep the entire conversation in the prompt. Liu et al.\
@@ -13,22 +12,21 @@ than information near the start or end, so a bigger context window does not remo
 the need to choose what the model reads. It is also slow (17\,s p95 latency for the full
 history in the Mem0 paper).
 
-All the systems below do the same basic thing: they keep memory outside the
-prompt and only show the model a selected part of it. Where they differ is
-what they store, who decides how a stored item changes (the model or the code), and
-whether the old value of a changed item is kept.
+All the systems below keep memory outside the prompt and show the model only a
+selected part of it. They differ in what they store, in who decides how a stored item
+changes (the model or the code), and in whether the old value is kept.
 
 \section{\uppercase{Memory Systems}}
 \textbf{MemGPT.} Packer et al.\ \cite{packer2023memgpt} split the prompt into a main context and
 external recall and archival storage, and let the model move data between them using
 function calls. On deep memory retrieval they report 92.5\% for GPT-4 with MemGPT
-against 32.1\% for GPT-4 reading a summary.  The catch is that a missed function call means a missed update.
+against 32.1\% for GPT-4 reading a summary.  If the model misses a function call, the update is lost.
 
 \textbf{Zep and Graphiti.} Rasmussen et al.\ \cite{rasmussen2025zep} store a temporal knowledge graph of
 episodes, entities and ``facts'' (their term). Each one has a valid time and an invalid time,
 and a contradicting one closes the old one instead of deleting it. They report 71.2\% on
 LongMemEval with gpt-4o against 60.2\% for the full 115k-token history, from a single
-run.  This is closest to ours, except that in Zep the graph is the main store while we
+run.  This is the closest to our design, but Zep uses the graph as its main store and we
 keep the real data in PostgreSQL.
 
 \textbf{Mem0.} In Mem0 \cite{chhikara2025mem0} an LLM extracts candidate ``facts'', compares each one with
@@ -36,8 +34,8 @@ the nearest stored memories and picks one of add, update, delete or no-op. On Lo
 they report a judge score of 66.9 against 72.9 for the full history, with p95 latency of
 1.4\,s against 17\,s. Only one benchmark and an unnamed judge model were used, and the
 open-source release has since dropped update, delete and graph memory. We use the
-same extract-then-compare idea, but in our system the update decision is made by fixed
-code rules and not by the LLM for each extracted item.
+same extract-then-compare idea, but in our system fixed code rules make the update
+decision instead of the LLM.
 
 \textbf{Supermemory.} Supermemory \cite{daga2026supermemory} stores atomic memories linked to source
 chunks, with ``updates'', ``extends'' and ``derives'' links and two timestamps on each. Its
@@ -53,7 +51,7 @@ long-term conversational memory and is the only benchmark used in the Mem0 paper
 The published results aren't really comparable, since each uses its own models and judge.
 
 \section{\uppercase{Methods Used in This Project}}
-We used a few well known methods as building blocks. PostgreSQL full-text search
+We built on a few well known methods. PostgreSQL full-text search
 \cite{postgres2026fts} with GIN indexes is our keyword search. pgvector \cite{kane2026pgvector} adds vector columns and
 nearest-neighbour search to the same database, which we use with cosine distance on
 1,024-dimensional vectors. Reciprocal Rank Fusion \cite{cormack2009rrf} merges several ranked lists
@@ -86,6 +84,8 @@ Hindsight & Retain step & Not peer reviewed; budget not stated \\
 \end{reporttable}
 \end{table}
 
-Table~\ref{tab:related} puts the five systems side by side. In all of them either the model decides updates or the rule is tied to a graph database. So we took the extract-then-compare
-idea, the validity intervals and the fused recall, but made the update rule plain
-service code, kept PostgreSQL as the source of truth, tied every assertion to an exact quote, and trained a small local extraction model.
+Table~\ref{tab:related} compares the five systems. In each of them either the model decides
+updates or the update rule is tied to a graph database. We took the extract-then-compare
+idea, the validity intervals and the fused recall from them. Our update rule is plain service
+code, PostgreSQL is the source of truth, every assertion is tied to an exact quote, and a small
+local model does the extraction.
