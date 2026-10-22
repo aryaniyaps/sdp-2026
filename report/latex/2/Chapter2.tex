@@ -13,8 +13,8 @@ than information near the start or end, so a bigger context window does not remo
 the need to choose what the model reads. It is also slow (17\,s p95 latency for the full
 history in the Mem0 paper).
 
-All the systems below handle this the same basic way. They keep memory outside
-the prompt and only put a selected part of it in front of the model. Where they differ is
+All the systems below do the same basic thing: they keep memory outside the
+prompt and only show the model a selected part of it. Where they differ is
 what they store, who decides how a stored item changes (the model or the code), and
 whether the old value of a changed item is kept.
 
@@ -22,7 +22,7 @@ whether the old value of a changed item is kept.
 \textbf{MemGPT.} Packer et al.\ \cite{packer2023memgpt} split the prompt into a main context and
 external recall and archival storage, and let the model move data between them using
 function calls. On deep memory retrieval they report 92.5\% for GPT-4 with MemGPT
-against 32.1\% for GPT-4 reading a summary.  A missed function call means a missed update.
+against 32.1\% for GPT-4 reading a summary.  The catch is that a missed function call means a missed update.
 
 \textbf{Zep and Graphiti.} Rasmussen et al.\ \cite{rasmussen2025zep} store a temporal knowledge graph of
 episodes, entities and ``facts'' (their term). Each one has a valid time and an invalid time,
@@ -45,15 +45,15 @@ results are only from the vendor's own report and the engine is closed source.
 
 \textbf{Hindsight.} Hindsight \cite{latimer2025hindsight} is built around three operations, retain, recall and
 reflect. Recall combines four retrieval strategies using rank fusion and packs the result
-into a token budget. This directly influenced our recall step. It is not peer reviewed though.
+into a token budget. Our recall step is based on this, though the paper is not peer reviewed.
 
 \textbf{Benchmarks.} LongMemEval \cite{wu2025longmemeval} tests chat assistants on long-term interactive memory, and
 Zep, Hindsight and Supermemory all report on it. LoCoMo \cite{maharana2024locomo} evaluates very
 long-term conversational memory and is the only benchmark used in the Mem0 paper.
- The published results aren't really comparable since each uses its own models and judge.
+The published results aren't really comparable, since each uses its own models and judge.
 
 \section{\uppercase{Methods Used in This Project}}
-We use a few well known methods as building blocks. PostgreSQL full-text search
+We used a few well known methods as building blocks. PostgreSQL full-text search
 \cite{postgres2026fts} with GIN indexes is our keyword search. pgvector \cite{kane2026pgvector} adds vector columns and
 nearest-neighbour search to the same database, which we use with cosine distance on
 1,024-dimensional vectors. Reciprocal Rank Fusion \cite{cormack2009rrf} merges several ranked lists
@@ -86,6 +86,6 @@ Hindsight & Retain step & Not peer reviewed; budget not stated \\
 \end{reporttable}
 \end{table}
 
-Table~\ref{tab:related} puts the five systems side by side.  In all of them the model decides updates or the rule is tied to a graph database.  So we took the extract-then-compare
+Table~\ref{tab:related} puts the five systems side by side. In all of them either the model decides updates or the rule is tied to a graph database. So we took the extract-then-compare
 idea, the validity intervals and the fused recall, but made the update rule plain
 service code, kept PostgreSQL as the source of truth, tied every assertion to an exact quote, and trained a small local extraction model.
