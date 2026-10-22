@@ -198,7 +198,7 @@ the old one.
 These tests also caught a bug the LoCoMo judge could not see. None of the 12 relative dates
 (like ``yesterday'') were resolved in the test run. The new model writes the date into the
 sentence but often leaves the date field empty, and the store then filled it with the time the
-message was sent. We fixed this after the test run (commit \code{148caa2}). When we re-ran the
+message was sent. We fixed this after the test run (commit \code{bd76df3}). When we re-ran the
 tests, all 10 events that were extracted had the right date. The LoCoMo numbers above are
 from before this fix. The other failures were facts the extractor never produced, the same
 coverage problem the ablation shows.

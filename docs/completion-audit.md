@@ -4,7 +4,7 @@ Updated on 2026-10-21 after the LoCoMo test run. The authoritative scope is
 `project-requirements.json`.
 
 The benchmark was run on LoCoMo instead of LongMemEval-S (the user's choice): ten
-conversations, 1,540 questions, the run `benchmark/runs/locomo-final` (commit `c45e938`).
+conversations, 1,540 questions, the run `benchmark/runs/locomo-final` (commit `c08dc7f`).
 Every success criterion fixed in `benchmark/config.json` before the run passed. The
 results are in `report/latex/5/Chapter5.tex` and `benchmark/Benchmark_Report.ipynb`;
 `python3 benchmark/run.py verify --split test --run locomo-final` checks 11,000
@@ -27,6 +27,6 @@ the two-reviewer human audit were not run.
 Earlier runs (`review-full-v3` and the LongMemEval runs before it) were retired when
 implementation changes invalidated their freezes and are excluded from all claims. One fault
 was found after the test run, by its property suite: relative dates were stored as the day of
-the conversation when the extractor left the event date empty. It was fixed in `148caa2` and
+the conversation when the extractor left the event date empty. It was fixed in `bd76df3` and
 checked with the property run `properties-v7`; the LoCoMo numbers are for the engine before
 that fix.
