@@ -16,7 +16,7 @@ Build (TeX Live):
 
     latexmk -pdf authesis.tex
 
-Without latexmk, run `pdflatex`, `bibtex authesis`, then `pdflatex` twice. The bibliography needs `IEEEtran.bst` (Debian/Ubuntu package `texlive-publishers`); if it is missing, bibtex reports "I couldn't open style file IEEEtran.bst" and the reference list comes out empty.
+Without latexmk, run `pdflatex`, `bibtex authesis`, then `pdflatex` twice. `IEEEtran.bst` is included in this folder, so no extra TeX package is needed.
 
 Clean up build files with `latexmk -c`.
 
