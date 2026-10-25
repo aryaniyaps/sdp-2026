@@ -22,6 +22,7 @@ The meanings below are the ones we use throughout.
   Source quote  & The exact passage of a source event that an assertion cites. It must appear word for word in the original text. \\
   Spool         & A local folder of files on the client where batches wait if the memory service can't be reached. \\
   Job / worker  & A job is a stored task (e.g.\ ``extract assertions from this episode''); a worker is a background process that picks up and runs jobs. \\
+  Tokio worker  & A worker that runs as a background task on Tokio, the asynchronous runtime of the Rust memory service. It repeatedly takes a job from the PostgreSQL queue, runs it and marks it done or retries it. \\
   Lease         & A time-limited lock a worker takes on a namespace so that two workers don't process it at the same time. \\
   Claim         & A candidate assertion proposed by the model before the system has checked and stored it. \\
   Assertion     & A typed, temporal statement about an entity that the model extracted from source events, e.g.\ ``Maya lives in Bengaluru'', stored with its source quote and validity interval. It can be wrong, contested, superseded or retracted. \\
