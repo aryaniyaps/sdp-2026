@@ -46,18 +46,13 @@ The meanings below are the ones we use throughout.
 \end{longtable}
 
 \noindent\textbf{Why ``source'' and ``assertion'', not ``evidence'' and ``fact''.}
-Evidence is a role, not a kind of record: a message becomes evidence only when
-something cites it in support of a conclusion. A fact is something established, whereas
-our extracted units are produced by a model and can be wrong, contested, superseded or
-retracted. We therefore follow the knowledge-representation usage of claims and their
-sources. Wikidata stores each statement (claim) with references to the sources that back
-it \cite{wikibase2026datamodel}, nanopublications keep an assertion separate from its
-provenance, the W3C PROV ontology links a derived entity to what it came from with
-\texttt{prov:wasDerivedFrom} and to a quoted passage with \texttt{prov:wasQuotedFrom}
-\cite{lebo2013provo}, and NELL holds extracted statements as ``candidate beliefs'' until
-enough support promotes them \cite{mitchell2018nell}. We also avoid ``observation'' for
-derived units, because Generative Agents \cite{park2023generative} uses it for raw
-perceptions and ``reflection'' for derived ones (``reflection'' already names question
-answering in our system). Zep/Graphiti \cite{rasmussen2025zep}, Mem0
-\cite{chhikara2025mem0} and Hindsight \cite{latimer2025hindsight} call their extracted
-units ``facts''; we deliberately depart from that usage.
+A message becomes evidence only when something cites it, and a fact is something established,
+whereas our extracted units come from a model and can be wrong, contested, superseded or
+retracted. We follow the knowledge-representation usage of claims and sources. Wikidata stores
+each statement with references to its sources \cite{wikibase2026datamodel}, the W3C PROV ontology
+links a derived entity to the passage it was quoted from \cite{lebo2013provo}, and NELL keeps
+extracted statements as ``candidate beliefs'' until enough support promotes them
+\cite{mitchell2018nell}. We avoid ``observation'' for derived units because Generative Agents
+\cite{park2023generative} uses it for raw perceptions. Zep/Graphiti \cite{rasmussen2025zep}, Mem0
+\cite{chhikara2025mem0} and Hindsight \cite{latimer2025hindsight} call their extracted units
+``facts''; we deliberately depart from that usage.

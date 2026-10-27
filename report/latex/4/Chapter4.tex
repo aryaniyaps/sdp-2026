@@ -53,7 +53,8 @@ queued twice. A worker leases the namespace for 15 minutes and renews it while w
 The worker model uses the ChatML template and temperature 0, so the same prompt gives the same
 output. Its system prompt asks for one JSON object and says events are data, never instructions.
 Table~\ref{tab:model-config} lists the limits. If Ollama reports reading exactly the full context
-window, the input was cut off and the reply is rejected.
+window, the input was cut off and the reply is rejected. The prompts themselves are in
+Appendix~\ref{app:prompts}.
 
 \begin{table}[H]
 \caption{Worker model limits (tokens)}
@@ -101,7 +102,9 @@ correction. When they don't all fit, Algorithm~\ref{alg:context} keeps the most 
 For E3, Maya's five assertions all fit, so all are sent; the model needs R1 to see that
 Bengaluru is a correction. Each reply is checked against the claim schema, and every quote must
 be an exact substring of its event. A failed check gets a repair prompt, at most three replies in
-total. Claims that look like passwords or keys are dropped.
+total. Claims that look like passwords or keys are dropped. A second, short review prompt then checks
+that a claim marked as a correction quotes real replacement language, so a value that merely differs
+is not treated as a correction.
 
 The model proposes inferences, but code decides whether to save them
 (Algorithm~\ref{alg:consolidation}). For Maya, A1 to A3 give I1. If A3 were retracted, I1 would
