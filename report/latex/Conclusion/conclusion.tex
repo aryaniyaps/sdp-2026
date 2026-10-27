@@ -1,0 +1,19 @@
+\chapter{\uppercase{Conclusion and Future Work}}
+\label{ch:conclusion}
+We built a long-term memory engine and connected it to the Pi coding agent. All five modules
+work on one laptop: M1 saves every message first, M2 extracts quoted assertions with our
+fine-tuned 4B model, M3 keeps old values with their dates, M4 fuses four searches into a token
+budget, and M5 trains and exports the model. On LoCoMo the engine scored 83.1\%, against 80.0\%
+for plain retrieval and 43.0\% for a recent window. It was 6.0 points below the whole
+conversation with 30\% of the tokens, and all 99,971 quotes matched the source.
+
+\section{\uppercase{Limitations}}
+We used one benchmark, one reader model and model judges, and did not test LongMemEval or real
+coding sessions. Plain retrieval used fewer tokens (4,473 against 6,790), and the extractor
+still misses facts. The graph and consolidation made no measurable difference on LoCoMo, and the
+benchmark ran before the date fix in Section~\ref{sec:properties}.
+
+\section{\uppercase{Future Work}}
+We plan per-namespace access control and backups (M1), faster and more complete extraction
+(M2), a benchmark for updates and aliases (M3), and runs on LongMemEval and real coding
+sessions with human checks of the judges (M4, M5).

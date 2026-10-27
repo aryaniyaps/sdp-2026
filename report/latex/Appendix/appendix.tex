@@ -1,0 +1,44 @@
+\appendix
+\addcontentsline{toc}{chapter}{APPENDIX}
+\chapter{\uppercase{Database Schema}}
+\label{app:schema}
+This appendix lists the main columns of the PostgreSQL tables (Table~\ref{tab:app-schema}). Every
+table also has a \code{namespace} column, and every \code{id} is a UUID.
+
+\begin{table}[H]
+\caption{Main columns of the PostgreSQL tables}
+\label{tab:app-schema}
+\centering
+\begin{reporttable}
+\begin{tabularx}{\textwidth}{|L{3.0cm}|Y|}
+\hline
+\textbf{Table} & \textbf{Columns} \\
+\hline
+sessions & id, external\_id \\
+\hline
+episodes & id, session\_id, external\_id, content\_hash, metadata; unique (namespace, external\_id) \\
+\hline
+raw\_events & id, session\_id, role (user, assistant, system, tool), content, occurred\_at, metadata \\
+\hline
+chunks & id, raw\_event\_id, ordinal, content, embedding \code{vector(1024)}, search\_vector \code{tsvector} (generated); GIN and HNSW indexes \\
+\hline
+entities & id, entity\_type, name, normalized\_name \\
+\hline
+entity\_aliases & entity\_id, alias, source\_chunk\_id \\
+\hline
+assertions & id, subject\_id, predicate, value, normalized\_value, statement, slot\_key, cardinality (single, multiple, event), kind (attribute, preference, profile, goal, episode, inference, procedure, other), status (active, superseded, contested, stale, retracted), valid\_from, valid\_to, event\_at, recorded\_at, confidence (0 to 1), revision, model, episode\_id, embedding, search\_vector \\
+\hline
+assertion\_sources & assertion\_id, chunk\_id, quote \\
+\hline
+assertion\_entities & assertion\_id, entity\_id \\
+\hline
+assertion\_edges & from\_id, to\_id, relation (supersedes, extends, contradicts, supports, derives, causes), explanation \\
+\hline
+memory\_jobs & id, kind, dedupe\_key (unique), payload, status (pending, running, succeeded, failed), attempts, max\_attempts (5), lease\_token, lease\_until, available\_at, result, error \\
+\hline
+\end{tabularx}
+\end{reporttable}
+\end{table}
+
+A partial unique index on \code{assertions (namespace, slot\_key)}, limited to rows where
+\code{cardinality = 'single'} and \code{status = 'active'}, keeps one current value per slot.

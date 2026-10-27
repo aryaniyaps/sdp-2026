@@ -2,126 +2,315 @@
 
 \chapter{\uppercase{Implementation}}
 \label{ch:impl}
-This chapter covers the tools we used, the six main algorithms with the Maya example,
-and how the engine connects to Pi.
+This chapter explains how each module is built: its configuration, data and algorithms. We keep
+using the Maya example from Section~\ref{sec:maya}.
 
 \section{\uppercase{Implementation Environment}}
-The memory service is written in Rust, using Tokio for the background workers, Axum
-for the API and SQLx for PostgreSQL. PostgreSQL 17 with pgvector is the main store and
-does both full-text and vector search, and Neo4j 5.26 holds the graph copy. The models run
-locally on Ollama. Our fine-tuned Qwen3-4B-Instruct-2507 does the extraction,
-consolidation and cited answers, and Qwen3-Embedding-0.6B makes the vectors. The
-dashboard is React with TypeScript. For training we used Python, PyTorch, Transformers,
-PEFT, bitsandbytes and llama.cpp, and Docker Compose runs all the services.
+Docker Compose starts PostgreSQL, Neo4j and Ollama on one laptop, bound to \code{127.0.0.1}
+only (Table~\ref{tab:env}).
 
-\section{\uppercase{Algorithms}}
-Context selection belongs to M2, entity resolution and versioning to M3, consolidation
-to both M2 and M3, and retrieval, rank fusion and answer generation to M4.
+\begin{table}[H]
+\caption{Implementation environment}
+\label{tab:env}
+\centering
+\begin{reporttable}
+\begin{tabularx}{\textwidth}{|L{3.4cm}|Y|}
+\hline
+\textbf{Part} & \textbf{Technology and version} \\
+\hline
+Memory service & Rust with Tokio, Axum (HTTP API) and SQLx \\
+\hline
+Stores & PostgreSQL 17 with pgvector; Neo4j 5.26 over HTTP \\
+\hline
+Models & Ollama 0.13.5; \code{mem-extractor} (our Qwen3-4B, Q8\_0); \code{qwen3-embedding:0.6b} \\
+\hline
+Agent & Pi coding agent with our TypeScript memory client; React dashboard \\
+\hline
+Training & Python, PyTorch, Transformers, PEFT, bitsandbytes, llama.cpp \\
+\hline
+Hardware & One laptop with an 8 GB NVIDIA RTX 4070 \\
+\hline
+\end{tabularx}
+\end{reporttable}
+\end{table}
 
-\subsection{Priority-Based Context Selection}
-\label{sec:alg-context}
-The extractor needs to see the assertions already stored about the same people, or it
-can't tell a repeat from a correction, but they may not all fit its input limit
-(Algorithm~\ref{alg:context}). When E3 arrives Maya has four stored assertions; if only three fit, the
-home city one ranks first because E3 mentions both Maya and Chennai, and the rest follow
-by recency.
+\section{\uppercase{M1: Source Storage and the Job Queue}}
+\label{sec:m1-impl}
+The service runs its schema migrations at start-up and enables \code{vector} and \code{pgcrypto}.
+Appendix~\ref{app:schema} lists the tables. Chunks and assertions have a generated
+\code{tsvector} column with a GIN index \cite{postgres2026fts} and a \code{vector(1024)} column
+with an HNSW cosine index \cite{kane2026pgvector}.
+
+The retain handler accepts up to 1,000 events per batch. It locks the namespace and hashes the
+request. A known \code{external\_id} with the same hash returns the stored IDs; a different hash is
+rejected as a conflict. Otherwise the episode, events, chunks and extract job are saved in one
+transaction. Embeddings come from Ollama, and the model is warmed up at start-up so the first
+recall doesn't wait. Each job has a \code{dedupe\_key} such as \code{extract:EP2}, so it is never
+queued twice. A worker leases the namespace for 15 minutes and renews it while working.
+
+\section{\uppercase{M2: Extraction and Consolidation}}
+\label{sec:m2-impl}
+The worker model uses the ChatML template and temperature 0, so the same prompt gives the same
+output. Its system prompt asks for one JSON object and says events are data, never instructions.
+Table~\ref{tab:model-config} lists the limits. If Ollama reports reading exactly the full context
+window, the input was cut off and the reply is rejected.
+
+\begin{table}[H]
+\caption{Worker model limits (tokens)}
+\label{tab:model-config}
+\centering
+\begin{reporttable}
+\begin{tabularx}{\textwidth}{|L{4.6cm}|L{2.2cm}|Y|}
+\hline
+\textbf{Setting} & \textbf{Value} & \textbf{Meaning} \\
+\hline
+Context window & 12,288 & \code{OLLAMA\_NUM\_CTX} \\
+\hline
+Output limit & 3,072 & \code{OLLAMA\_NUM\_PREDICT} \\
+\hline
+Prompt budget & 9,216 & Context minus output \\
+\hline
+Repair reserve & 1,536 & Kept free for a repair round \\
+\hline
+Largest prompt & 6,000 & Longest prompt seen in training \\
+\hline
+\end{tabularx}
+\end{reporttable}
+\end{table}
+
+The extractor must see stored assertions about the same people to tell a repeat from a
+correction. When they don't all fit, Algorithm~\ref{alg:context} keeps the most relevant.
 
 \begin{algorithm}[!htbp]
 \caption{Priority-based context selection}
 \label{alg:context}
-\begin{pseudo}
-IF all existing assertions fit: RETURN all of them
-Score assertions by subject and value mentions in new messages
-Rank stronger matches first; break ties by recency
-Binary search for the largest ranked prefix that fits
-RETURN the selected assertions in their original order
-\end{pseudo}
+\begin{algorithmic}[1]
+\State $T \gets \min(\mathit{budget} - \mathit{reserve},\ 6000)$
+\If{the prompt with all assertions has at most $T$ tokens}
+  \State \Return all assertions
+\EndIf
+\For{each stored assertion $a$}
+  \State $s(a) \gets 3$ if its subject is in the new events, plus $2$ if its value is too
+\EndFor
+\State Sort the assertions by $s(a)$, highest first; ties stay newest first
+\State Binary search for the largest $n$ whose first $n$ assertions fit in $T$
+\State \Return those $n$ assertions in their original order
+\end{algorithmic}
 \end{algorithm}
 
-\subsection{Entity Resolution and Memory Versioning}
-A conflicting value never silently overwrites the old one. The old assertion is marked
-superseded and stays in the database (Algorithm~\ref{alg:versioning}). The E3 claim (home city
-Bengaluru, correction, confidence 0.95) conflicts with R1 Chennai and $0.95 \geq 0.8$, so R1 is
-superseded with validity 1 to 10 October and R2 Bengaluru becomes active.
+For E3, Maya's five assertions all fit, so all are sent; the model needs R1 to see that
+Bengaluru is a correction. Each reply is checked against the claim schema, and every quote must
+be an exact substring of its event. A failed check gets a repair prompt, at most three replies in
+total. Claims that look like passwords or keys are dropped.
 
-\begin{algorithm}[!htbp]
-\caption{Entity resolution and memory versioning}
-\label{alg:versioning}
-\begin{pseudo}
-Match entity by type and normalised name or alias; else create it
-IF the same assertion exists: attach the new source quote
-ELSE IF no conflicting single-value assertion: store as active
-ELSE IF explicit correction AND confidence >= 0.8:
-    Supersede the old assertion; activate the new one
-ELSE: mark both values as disputed
-\end{pseudo}
-\end{algorithm}
-
-\subsection{Memory Consolidation and Invalidation}
-The model proposes an inference but the code decides whether to save it
-(Algorithm~\ref{alg:consolidation}). For Maya, A1 (NovaTech), A2 (software engineer) and A3 (remote)
-give inference I1. If A3 were retracted later, I1 would be marked stale.
+The model proposes inferences, but code decides whether to save them
+(Algorithm~\ref{alg:consolidation}). For Maya, A1 to A3 give I1. If A3 were retracted, I1 would
+become stale.
 
 \begin{algorithm}[!htbp]
 \caption{Memory consolidation and invalidation}
 \label{alg:consolidation}
-\begin{pseudo}
-Ask the model to combine related active assertions into inferences
-Require >= 2 distinct supports; check support IDs and subject
-Recheck that the supports are still active, then save with links
-WHEN a support changes: mark dependent inferences stale (recursively)
-\end{pseudo}
+\begin{algorithmic}[1]
+\State Ask the model to combine related active assertions into inferences
+\For{each proposed inference $i$}
+  \If{$i$ has fewer than 2 distinct supports, or a support is unknown or from another subject}
+    \State Reject $i$
+  \ElsIf{all supports are still active}
+    \State Save $i$ and one \code{supports} edge to each support
+  \EndIf
+\EndFor
+\State \textbf{When} a support is superseded or retracted: mark every inference built on it \code{stale}
+\end{algorithmic}
 \end{algorithm}
 
-\subsection{Hybrid Retrieval and Graph Traversal}
-This returns separate ranked lists, and the graph expansion stops after two rounds so it
-doesn't pull in the whole graph (Algorithm~\ref{alg:retrieval}). For E5, keyword and vector search find
-R2 and the work assertions, and the \code{supersedes} link of R2 reaches R1 (Chennai).
+\section{\uppercase{M3: Versioning and the Knowledge Graph}}
+\label{sec:m3-impl}
+A conflicting value never overwrites the old one (Algorithm~\ref{alg:versioning}). The slot key
+is \code{<entity id>::<normalised predicate>}, and a partial unique index allows one active
+single-valued assertion per slot, so even a bug can't leave two current home cities. Every change
+gets a new \emph{revision} number.
+
+\begin{algorithm}[!htbp]
+\caption{Entity resolution and memory versioning}
+\label{alg:versioning}
+\begin{algorithmic}[1]
+\State Find the entity by type and normalised name or alias; create it if none matches
+\State $\mathit{slot} \gets$ entity id $+$ normalised predicate
+\If{an assertion in $\mathit{slot}$ has the same value}
+  \State Add the new source quote to it
+\ElsIf{$\mathit{slot}$ has no active single-valued assertion}
+  \State Save the claim as a new active assertion
+\ElsIf{the claim is a correction \textbf{and} confidence $\geq 0.8$}
+  \State Set the old assertion to \code{superseded} with $\mathit{valid\_to} \gets$ the new $\mathit{valid\_from}$
+  \State Save the new assertion as active, with a \code{supersedes} edge to the old one
+\Else
+  \State Mark both assertions \code{contested}
+\EndIf
+\State Queue a \code{project} job for every assertion that changed
+\end{algorithmic}
+\end{algorithm}
+
+Neo4j runs with a 512\,MB page cache and up to 1\,GB heap, accessed over HTTP
+\cite{neo4j2026http}. The graph is a copy that can always be rebuilt from PostgreSQL. The
+projection worker \code{MERGE}s each assertion, its entities and its edges, but only if the job's
+revision is not older than the stored one. A late job therefore never takes the graph back in
+time. A rebuild job raises a minimum revision, deletes older nodes and projects everything again.
+
+\section{\uppercase{M4: Retrieval and Answers}}
+\label{sec:m4-impl}
+Table~\ref{tab:recall-params} lists the recall settings. Pi uses smaller values because its
+prompt has less room.
+
+\begin{table}[H]
+\caption{Recall request settings}
+\label{tab:recall-params}
+\centering
+\begin{reporttable}
+\begin{tabularx}{\textwidth}{|L{3.3cm}|L{1.6cm}|L{1.4cm}|Y|}
+\hline
+\textbf{Field} & \textbf{Default} & \textbf{Pi} & \textbf{Meaning} \\
+\hline
+\code{top\_k} & 20 & 10 & Most results returned \\
+\hline
+\code{max\_tokens} & 8,192 & 2,048 & Token budget of the context \\
+\hline
+\code{include\_raw} & false & true & Mix source text with assertions \\
+\hline
+\code{as\_of}, \code{from}, \code{to} & none & none & Ask about an earlier date or window \\
+\hline
+\end{tabularx}
+\end{reporttable}
+\end{table}
+
+Each channel returns up to 40 results (Algorithm~\ref{alg:retrieval}). The graph expands two
+rounds from up to 20 seeds. Graph hits are re-checked in PostgreSQL, since the copy may lag.
 
 \begin{algorithm}[!htbp]
 \caption{Hybrid retrieval and graph traversal}
 \label{alg:retrieval}
-\begin{pseudo}
-Resolve date phrases; run keyword and vector search
-Add time-based candidates when there is a date window
-Expand from matching assertions and entities for two rounds
-Filter by validity and distance; RETURN the candidate lists
-\end{pseudo}
+\begin{algorithmic}[1]
+\State Turn date phrases in the query into a date window, if there are any
+\State $L_{kw} \gets$ keyword search over assertions and chunks
+\State $L_{vec} \gets$ vector search over assertions and chunks
+\If{a date window or \code{as\_of} is given}
+  \State $L_{time} \gets$ assertions in the window, newest first
+\EndIf
+\State $\mathit{seeds} \gets$ top 5 of $L_{kw}$ $\cup$ top 5 of $L_{vec}$ $\cup$ entities in the query
+\State $L_{graph} \gets$ neighbours of $\mathit{seeds}$ in Neo4j, two rounds
+\State Remove graph hits that fail the PostgreSQL status and date filter
+\State \Return $L_{kw}, L_{vec}, L_{time}, L_{graph}$
+\end{algorithmic}
 \end{algorithm}
 
-\subsection{Reciprocal Rank Fusion and Context Packing}
-Scores from different searches can't be compared, so only ranks are used
-(Algorithm~\ref{alg:rrf}). If R2 is first and R1 second in all three lists, R2 scores
-$3/61 \approx 0.0492$ and R1 $3/62 \approx 0.0484$, and both fit easily in Pi's 2,048 tokens.
+Channel scores can't be compared, so Reciprocal Rank Fusion \cite{cormack2009rrf} uses ranks:
+\begin{equation}
+\label{eq:rrf}
+\mathit{RRF}(d) = \sum_{L \,\ni\, d} \frac{1}{k + \mathit{rank}_L(d)}, \qquad k = 60.
+\end{equation}
+Algorithm~\ref{alg:rrf} then packs the results into the budget.
 
 \begin{algorithm}[!htbp]
 \caption{Reciprocal Rank Fusion and context packing}
 \label{alg:rrf}
-\begin{pseudo}
-Score(memory) = SUM over lists of 1 / (60 + rank)
-Sort by score; break ties by memory ID
-Add each memory with its source quotes if it fits the budget
-Stop at top_k memories; RETURN the packed context
-\end{pseudo}
+\begin{algorithmic}[1]
+\State Score every memory $d$ with Equation~\eqref{eq:rrf}; sort highest first, ties by ID
+\If{\code{include\_raw}}
+  \State Alternate source chunks and assertions, each in score order
+\EndIf
+\For{each memory $d$ in this order, until $\mathit{top\_k}$ are added}
+  \If{$d$ with its quotes fits in the remaining budget}
+    \State Add $d$ and up to 3 quotes of at most 1,200 characters each
+  \EndIf
+\EndFor
+\State \Return the packed context text
+\end{algorithmic}
 \end{algorithm}
 
-\subsection{Source-Grounded Answer Generation}
-We reject bad output instead of trying to fix it, so every citation the user sees points
-to a memory that was actually retrieved (Algorithm~\ref{alg:answer}). For E5 the answer cites R2 for
-Bengaluru and R1 for Chennai, so it passes.
+\begin{maya}[Maya example: recall for E5]
+Keyword search needs both ``live'' and ``work''. Only the text of E1 has both, so the
+assertions come from vector search and the graph. Table~\ref{tab:maya-rrf} shows example ranks.
+\begin{center}
+\begin{minipage}{\linewidth}
+\centering
+\captionof{table}{Example ranks and RRF scores for E5}
+\label{tab:maya-rrf}
+\begin{reporttable}
+\begin{tabularx}{\linewidth}{|L{2.4cm}|Y|Y|Y|Y|L{3.4cm}|}
+\hline
+\textbf{Memory} & \textbf{Keyword} & \textbf{Text vector} & \textbf{Assertion vector} & \textbf{Graph} & \textbf{RRF score} \\
+\hline
+C1 (text of E1) & 1 & 1 & -- & -- & $1/61 + 1/61 = 0.0328$ \\
+\hline
+R2 (Bengaluru) & -- & -- & 1 & 2 & $1/61 + 1/62 = 0.0325$ \\
+\hline
+I1 (work) & -- & -- & 3 & 1 & $1/63 + 1/61 = 0.0323$ \\
+\hline
+C3 (text of E3) & -- & 2 & -- & -- & $1/62 = 0.0161$ \\
+\hline
+\end{tabularx}
+\end{reporttable}
+\end{minipage}
+\end{center}
+Pi receives each memory with its status, dates and source quote:
+\begin{datablock}
+[C1] My name is Maya. I live in Chennai. I work as ...
+[R2] Maya's home city is Bengaluru. [attribute; active; from 2026-10-10]
+  Source (S2, user): Bengaluru is now my home city.
+[I1] Maya works remotely as a software engineer at NovaTech.
+\end{datablock}
+So the agent can answer: Bengaluru since 10 October, Chennai before, remote engineer at
+NovaTech. A reflect answer would cite R2 and C1.
+\end{maya}
+
+The optional reflect endpoint answers from the recall result (Algorithm~\ref{alg:answer}). Bad
+output is rejected, not repaired, so every citation points to a retrieved memory.
 
 \begin{algorithm}[!htbp]
 \caption{Source-grounded answer generation}
 \label{alg:answer}
-\begin{pseudo}
-IF nothing was retrieved: RETURN "Insufficient evidence."
-Ask the model to answer only from the retrieved memories
-Allow only retrieved IDs as citations; check the format
-Require citations when the answer claims enough evidence
-\end{pseudo}
+\begin{algorithmic}[1]
+\State Run recall for the question
+\If{recall returned nothing}
+  \State \Return ``Insufficient evidence.''
+\EndIf
+\State Ask the model to answer only from the recalled memories, citing their IDs
+\If{a citation is not a recalled ID, the format is wrong, or nothing is cited}
+  \State Reject the answer
+\EndIf
+\State \Return the answer with its citations
+\end{algorithmic}
 \end{algorithm}
 
+\section{\uppercase{M5: Training and Export}}
+\label{sec:m5-impl}
+We fine-tune Qwen3-4B-Instruct-2507 with QLoRA \cite{dettmers2023qlora}
+(Table~\ref{tab:qlora}). Prompt tokens get label $-100$, so loss is computed only on the target.
+The export script merges the adapter, converts it to Q8\_0 GGUF with llama.cpp and imports it
+into Ollama as \code{mem-extractor:general-v2}.
+
+\begin{table}[H]
+\caption{QLoRA training settings}
+\label{tab:qlora}
+\centering
+\begin{reporttable}
+\begin{tabularx}{\textwidth}{|L{4.2cm}|Y|}
+\hline
+\textbf{Setting} & \textbf{Value} \\
+\hline
+Quantisation & 4-bit NF4, double quantisation, bf16 compute \\
+\hline
+LoRA & rank 16, alpha 32, dropout 0.05, on all attention and MLP projections \\
+\hline
+Optimiser & fused AdamW, learning rate $2 \times 10^{-4}$, cosine schedule \\
+\hline
+Batch and length & 1 row, accumulation 16; up to 4,096 tokens (6,144 in Stage C) \\
+\hline
+\end{tabularx}
+\end{reporttable}
+\end{table}
+
 \section{\uppercase{Integration with the Pi Agent}}
-Pi's memory client saves every message with a namespace and session. When Maya asks
-E5, Pi sends a recall request for \code{user:maya} (\code{top\_k} 10, \code{max\_tokens} 2,048), and the
-result is added to the prompt only if it is non-empty and from the same namespace.
+Our Pi extension saves every message under a namespace (from \code{MEMORY\_NAMESPACE} or the
+project folder). The \code{external\_id} marks tool results, conversation branches and explicit
+``remember this'' requests. Before each answer Pi calls recall and adds a non-empty result from
+the same namespace to the prompt.

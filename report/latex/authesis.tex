@@ -20,6 +20,7 @@
 \usepackage{tabularx}
 \usepackage[none]{hyphenat}
 \usepackage[chapter]{algorithm}
+\usepackage{algpseudocode}
 \usepackage{multirow}
 \usepackage{float}
 \usepackage{booktabs}
@@ -28,6 +29,7 @@
 \usepackage{latexsym}
 \usepackage{verbatim}
 \usepackage{fancyvrb}
+\usepackage[most]{tcolorbox}
 \usepackage{ifthen}
 \usepackage{graphicx}
 \usepackage{url}
@@ -52,8 +54,7 @@
 
 \usepackage{colortbl}
 
-\floatstyle{ruled}
-\newfloat{algorithm}{htp}{loa}[chapter]
+\newfloat{algorithm}{htp}{loa}
 \floatname{algorithm}{Algorithm}
 
 \pagenumbering{roman}
@@ -77,30 +78,43 @@
 \renewcommand{\cftdot}{ }
 \cftsetrmarg{1.2in}
 
-\titleformat{\section}[hang]{\bfseries}{\makebox[20mm][l]{\thesection}}{0pt}{}{}
-\titleformat{\subsection}[hang]{\bfseries}{\makebox[20mm][l]{\thesubsection}}{0pt}{}{}
-\titleformat{\subsubsection}[hang]{\normalsize\bfseries}{\makebox[20mm][l]{\thesubsubsection}}{0pt}{}{}
-\titleformat{\paragraph}[hang]{\normalsize\bfseries}{\makebox[20mm][l]{\theparagraph}}{0pt}{}{}
-\titleformat{\subparagraph}[hang]{\normalsize\bfseries}{\makebox[20mm][l]{\thesubparagraph}}{0pt}{}{}
+\titleformat{\section}[hang]{\raggedright\bfseries}{\makebox[20mm][l]{\thesection}}{0pt}{}{}
+\titleformat{\subsection}[hang]{\raggedright\bfseries}{\makebox[20mm][l]{\thesubsection}}{0pt}{}{}
+\titleformat{\subsubsection}[hang]{\raggedright\normalsize\bfseries}{\makebox[20mm][l]{\thesubsubsection}}{0pt}{}{}
+\titleformat{\paragraph}[hang]{\raggedright\normalsize\bfseries}{\makebox[20mm][l]{\theparagraph}}{0pt}{}{}
+\titleformat{\subparagraph}[hang]{\raggedright\normalsize\bfseries}{\makebox[20mm][l]{\thesubparagraph}}{0pt}{}{}
+% The class's \AUsection and \AUsubsection allow a page break right after the heading.
+% Start a new page instead when fewer than a few lines of text would follow it.
+\usepackage{etoolbox}
+\pretocmd{\AUsection}{\Needspace*{8\baselineskip}}{}{\PackageWarning{authesis}{AUsection patch failed}}
+\pretocmd{\AUsubsection}{\Needspace*{7\baselineskip}}{}{\PackageWarning{authesis}{AUsubsection patch failed}}
+% Left-align long section titles instead of justifying them across two lines.
+\expandafter\patchcmd\csname\string\AUsection\endcsname{{#2}\par}{{\raggedright #2}\par}{}{\PackageWarning{authesis}{AUsection title patch failed}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Report-specific helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Indented "Maya example" block. The optional argument replaces the label,
-% e.g. \begin{maya}[Module 1 output on Maya.] ... \end{maya}
-\newenvironment{maya}[1][Maya example.]
-  {\begin{list}{}{\leftmargin=10mm\rightmargin=0mm\itemindent=0mm
-     \topsep=0.5\baselineskip\parsep=0.5\baselineskip}%
-   \item[]\textbf{#1}\ }
-  {\end{list}}
+% Shaded "Maya example" box, kept on one page. Everything for one example (text, data, tables)
+% goes inside it. Tables inside use \captionof{table}{...}, not a float.
+% The optional argument replaces the title: \begin{maya}[Maya example: M1] ... \end{maya}
+\newtcolorbox{maya}[1][Maya example]{enhanced, colback=gray!5,
+  colframe=gray!60, colbacktitle=gray!20, coltitle=black, fonttitle=\bfseries,
+  boxrule=0.5pt, arc=1mm, left=3mm, right=3mm, top=1.5mm, bottom=1.5mm,
+  before skip=0.8\baselineskip, after skip=0.8\baselineskip,
+  before upper={\setlength{\parskip}{0.4\baselineskip}\linespread{1.2}\selectfont}, title={#1}}
 
 % Code-like identifiers (namespaces, tables, API paths, model names)
 \newcommand{\code}[1]{\texttt{#1}}
 
-% Pseudocode box used inside the algorithm float
-\DefineVerbatimEnvironment{pseudo}{Verbatim}
-  {fontsize=\small,frame=single,framesep=3mm,xleftmargin=0mm}
+% Framed box for example data (JSON, table rows, Cypher). Single-spaced,
+% never split across pages, and long lines wrap inside the frame.
+\newtcblisting{datablock}{listing only, colback=white, colframe=gray!75,
+  boxrule=0.5pt, arc=0pt, left=2mm, right=2mm, top=1mm, bottom=1mm,
+  before skip=0.5\baselineskip, after skip=0.5\baselineskip,
+  listing options={basicstyle=\ttfamily\footnotesize\linespread{1}\selectfont,
+    columns=fullflexible, keepspaces=true, breaklines=true, showstringspaces=false,
+    upquote=true}}
 
 % Table helpers: small text, ragged columns, grid lines
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
@@ -138,11 +152,11 @@
   \vspace{0.6\baselineskip}
   \normalsize{\textit{submitted to the Faculty of}} \\
   \vspace{0.5\baselineskip}
-  \normalsize{\textbf{COMPUTER SCIENCE AND}}\\
-  \normalsize{\textbf{INFORMATION ENGINEERING}} \\
-  \vspace{1\baselineskip}
-  \normalsize{\textit{in partial fulfillment for the award of the degree of}}\\
-  \vspace{.2\baselineskip}
+  \normalsize{\textbf{COMPUTER SCIENCE AND INFORMATION ENGINEERING}} \\
+  \vspace{0.5\baselineskip}
+  \normalsize{\textit{in partial fulfillment for the award of the degree}}\\
+  \normalsize{\textit{\textbf{of}}}\\
+  \vspace{.1\baselineskip}
   \bigsize{{\textbf{BACHELOR OF TECHNOLOGY}}}\\
   \normalsize{\textit{\textbf{in}}}\\
   \bigsize{{\textbf{INFORMATION TECHNOLOGY}}}\\
@@ -229,14 +243,6 @@ BONA FIDE CERTIFICATE}
 LIST OF FIGURES} \listoffigures
 \end{onehalfspacing}
 
-% Fix the reference numbering to the order used in the report (placed before
-% the glossary so its terminology citations do not renumber the chapters')
-\nocite{liu2024lost,wu2025longmemeval,packer2023memgpt,rasmussen2025zep,
-chhikara2025mem0,daga2026supermemory,latimer2025hindsight,neo4j2026http,
-zechner2026pi,postgres2026fts,kane2026pgvector,cormack2009rrf,
-zhang2025qwen3emb,dettmers2023qlora,maharana2024locomo,
-wikibase2026datamodel,lebo2013provo,mitchell2018nell,park2023generative}
-
 \include{Acronyms/acronyms}
 \include{Glossary/glossary}
 
@@ -248,8 +254,13 @@ wikibase2026datamodel,lebo2013provo,mitchell2018nell,park2023generative}
 \include{3/Chapter3}
 \include{4/Chapter4}
 \include{5/Chapter5}
+\include{Conclusion/conclusion}
+\cleardoublepage
+\phantomsection
+\include{declaration_ai}
+\include{Appendix/appendix}
 
-\bibliographystyle{IEEEtran}
+\bibliographystyle{unsrt}
 \cleardoublepage
 \phantomsection
 \addcontentsline{toc}{chapter}{REFERENCES}

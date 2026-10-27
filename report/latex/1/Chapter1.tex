@@ -2,66 +2,48 @@
 
 \chapter{\uppercase{Introduction}}
 \label{ch:intro}
-AI agents are now used for coding projects that go on for weeks over many sessions,
-and every new session starts with an empty prompt. Whatever the user told the agent last
-week is simply gone unless the user types it in again. This project gives the agent a
-long-term memory outside the model.
+AI agents now work on coding projects that last weeks and span many sessions. Each new session
+starts with an empty prompt, so the user has to repeat what they said before. This project
+gives the agent a long-term memory that lives outside the model.
 
 \section{\uppercase{Background}}
-The obvious fix is to paste the whole history into the prompt every time, but this does
-not work well. Liu et al.\ \cite{liu2024lost} showed that language models use long inputs unevenly
-and miss details in the middle of the context, and old statements sit right next to their
-corrections with no rule for which one is current.
+Pasting the whole history into every prompt does not work well. Models miss details in the
+middle of long inputs \cite{liu2024lost}, and old statements sit next to their corrections with
+no rule for which is current. So we built a separate memory service for the Pi coding agent
+\cite{zechner2026pi}. It stores the original messages, extracts assertions from them and records
+when an assertion changed. For a question it returns only the relevant assertions and their
+quotes. Here \emph{memory} means this stored knowledge, not RAM; other terms are in the Glossary.
 
-So a memory component has to decide what to keep and what to give back for a
-question. We built this as a separate service for a coding agent (Pi \cite{zechner2026pi}). It stores the
-original messages, extracts assertions from them, remembers when an assertion changed,
-and returns only the relevant assertions along with the quote they came from. In this
-report \emph{memory} always means this kind of stored knowledge, not RAM; other terms
-such as \emph{source} and \emph{assertion} are explained in the Glossary.
-
-The engine has five modules: M1 Source Acquisition and Processing saves the original
-messages, M2 Knowledge Extraction and Consolidation extracts assertions from them, M3
-Temporal Knowledge and Graph Management stores the assertions with their history, M4
-Hybrid Retrieval and Grounded Reasoning finds the right assertions for a question, and
-M5 Model Training and Evaluation trains the small local model the others use. M1 to M4
-make up the memory service and M5 is an offline pipeline.
+The engine has five modules. M1 Source Acquisition and Processing saves the messages. M2
+Knowledge Extraction and Consolidation extracts assertions. M3 Temporal Knowledge and Graph
+Management stores them with their history. M4 Hybrid Retrieval and Grounded Reasoning finds
+the right ones for a question. M5 Model Training and Evaluation trains the small local model
+the others use. M1 to M4 form the memory service; M5 runs offline.
 
 \section{\uppercase{Problem Statement}}
-Agents without persistent memory lose instructions and project decisions when a task
-continues across sessions, and when an instruction changes they may reuse the old
-value. Users end up repeating context and fixing the same mistakes again.
-
-Throughout the report we use one small example, a user called Maya. On 1 October
-2026 she tells the agent ``My name is Maya. I live in Chennai. I work as a software
-engineer at NovaTech, and I work remotely.'' (message E1). On 10 October she says she has
-moved to Bengaluru (E3). On 13 October she asks what the agent remembers about where
-she lives, her previous city and her work (E5). An agent with no memory can't answer E5,
-and one that only kept E1 would confidently say Chennai, which is worse. We want it to
-know Bengaluru replaced Chennai on 10 October and still keep Chennai as her previous city.
+Agents without persistent memory lose instructions and decisions between sessions. When an
+instruction changes, they may reuse the old value, so users repeat context and fix the same
+mistakes.
 
 \section{\uppercase{Objectives}}
 \begin{enumerate}[itemsep=0pt]
 \item Retain useful information for AI agents across sessions.
-\item Keep the updated instruction while preserving the earlier versions.
-\item Link every stored assertion back to the original message so it can be verified.
-\item Fine-tune a small local model to extract assertions, combine them into
-inferences and answer with citations.
+\item Keep the updated instruction while preserving earlier versions.
+\item Link every stored assertion to the original message so it can be verified.
+\item Fine-tune a small local model to extract assertions, combine them and answer with citations.
 \item Retrieve relevant information quickly within a limited context size.
-\item Evaluate the engine with repeatable tests on a public long-conversation
-benchmark, LoCoMo \cite{maharana2024locomo}.
+\item Evaluate the engine on a public long-conversation benchmark, LoCoMo \cite{maharana2024locomo}.
 \end{enumerate}
 
 \section{\uppercase{Challenges Faced}}
-Our early models did well on generated test data but struggled on real conversations
-(only 18 of 33 conversation segments passed the extraction checks) and mixed up quotes,
-sources and dates, so we revised the data, prompts and validation several times. The
-model also sometimes re-extracted an outdated value, repeated messages made duplicates,
-and one failed job could block the rest. The hardest bug to notice was that the deployed
-model silently cut off inputs longer than its limit, so now we check input length and split
-long conversations into smaller pieces.
+Our early models did well on generated data but passed only 18 of 33 real conversation
+segments. They mixed up quotes, sources and dates, so we revised the data, prompts and checks
+several times. The hardest bug was that the deployed model silently cut off long inputs. We now
+check the input length and split long conversations.
 
 \section{\uppercase{Organisation of the Report}}
-Chapter~\ref{ch:survey} reviews existing memory systems, Chapter~\ref{ch:design} the architecture and modules,
-Chapter~\ref{ch:impl} the tools and algorithms, and Chapter~\ref{ch:results} the data, fine-tuning, demo, benchmark
-results and the comparison with published memory systems.
+Chapter~\ref{ch:survey} reviews existing memory systems. Chapter~\ref{ch:design} describes the
+architecture and the modules with one running example. Chapter~\ref{ch:impl} explains how each
+module is built. Chapter~\ref{ch:results} covers training, a demo and the benchmark results.
+Chapter~\ref{ch:conclusion} gives the conclusion, limitations and future work.
+Appendix~\ref{app:schema} lists the database schema.

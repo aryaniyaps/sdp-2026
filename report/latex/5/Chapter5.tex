@@ -2,52 +2,34 @@
 
 \chapter{\uppercase{Results, Performance Analysis and Comparison}}
 \label{ch:results}
-This chapter covers the training data, the fine-tuned model and a live demo. After that we
-describe the benchmark we ran to see whether the memory engine helps an agent, compare our
-numbers with published memory systems and list what still needs work.
+This chapter covers the training data, the model, a live demo, the benchmark and a comparison
+with published systems.
 
 \section{\uppercase{Datasets}}
-Each training row is a short conversation plus a task (extract, consolidate or reflect), and
-the expected output is the memory for it, with every item tied to a source quote. In the
-Maya episode, for example, the user says ``I live in Chennai.'' and later ``Bengaluru is now
-my home city.'', and the expected output is the assertion ``Maya, home city, Bengaluru''
-with \code{correction:true} and that quote.
+Each training row is a short conversation plus a task (extract, consolidate or reflect) and the
+expected memory, with every item tied to a source quote. All data is synthetic. The teacher
+model GPT-5.6-sol wrote and labelled conversations in 16 domains, such as family, travel, work
+and software, and a second model cross-checked the labels. This gave 2,961 rows, split
+2,095 / 424 / 442. Many rows check that only what the user said is stored: if the assistant
+suggests violin and the user says they are learning watercolor, only watercolor is stored.
 
-At first the data had only coding conversations. We later widened it to 16 domains, such as
-family, food, travel, education, work and software. All of it is synthetic: the teacher model
-GPT-5.6-sol wrote and labelled the conversations, a second model cross-checked the labels,
-and we cleaned up the result. This gave 2,961 rows, split 2,095 / 424 / 442 for training,
-validation and testing. Software and technical projects has the most rows (240), and the
-other domains have about 110 to 140 each. Many rows check that the model stores only what
-the user said. If the assistant suggests ``You could learn violin this winter.'' and the user
-replies that they are learning watercolor painting, only the painting should be stored.
-
-Our first benchmark runs (Section~\ref{sec:iterations}) showed that this data asked for too few facts. Most
-episodes expected two or three claims, so the model learned to stop early. We then made a
-third set of 480 casual two-person conversations, and Claude Sonnet 5.5 labelled every fact
-in each one (5,284 claims). We mixed 600 older rows back in so the model would not forget
-the other tasks, which gave 1,719 training and 670 validation rows. None of this data uses
-LoCoMo text, so the benchmark stays unseen.
+Our first benchmark runs showed that most episodes expected only two or three claims, so the
+model learned to stop early. We added 480 casual two-person conversations in which Claude
+Sonnet 5.5 labelled every fact (5,284 claims), plus 600 older rows so other tasks were not
+forgotten: 1,719 training and 670 validation rows. None of the data uses LoCoMo text.
 
 \section{\uppercase{Fine-Tuning and Model Selection}}
-We started with Qwen3-1.7B. It did fine on synthetic examples, but only 18 of 33 real
-conversation windows passed validation, mostly because of wrong quotes, wrong speakers and
-invalid IDs. So we moved to Qwen3-4B-Instruct-2507 and trained it with QLoRA \cite{dettmers2023qlora} (NF4,
-rank 16, prompt masked, rows up to 4,096 tokens) in two stages, A and B. We merged the
-adapter, converted it to a Q8\_0 GGUF with llama.cpp, tested it live and imported it into
-Ollama as \code{mem-extractor:general-v1}.
-
-Stage C continued from Stage B on the new coverage set for one epoch. We raised the row limit
-to 6,144 tokens because the new rows are longer. Training took 2.9 hours on our laptop's
-8 GB RTX 4070 (peak 7.3 GB, validation loss 0.155), and we saved a checkpoint every 20 steps
-because an earlier attempt ran out of GPU memory near the end. Before comparing the two
-models we agreed on a rule: use \code{general-v2} if it scores at least as well as v1 on the two
-development conversations. It did, so we used v2 for the test.
+Qwen3-1.7B passed only 18 of 33 real conversation windows, with wrong quotes, speakers and
+IDs. We moved to Qwen3-4B-Instruct-2507 and trained it with QLoRA in Stages A and B
+(\code{general-v1}). Stage C continued for one epoch on the new data with rows up to 6,144
+tokens. It took 2.9 hours on the 8 GB RTX 4070 (peak 7.3 GB, validation loss 0.155). We fixed
+the rule in advance: use \code{general-v2} if it matches v1 on the two development
+conversations. It did, so v2 was used for the test.
 
 \section{\uppercase{Live Demonstration}}
-The demo follows the Maya example with different values: a certificate expiry date, a weekly
+The demo follows the Maya pattern with different details: a certificate expiry date, a weekly
 review time, a dashboard owner and a release-freeze time that changes later
-(Figures~\ref{fig:demo-a} and~\ref{fig:demo-b}).
+(Figure~\ref{fig:demo-a}).
 
 \begin{figure}[H]
 \centering
@@ -60,180 +42,104 @@ review time, a dashboard owner and a release-freeze time that changes later
 \centering
 \includegraphics[width=\textwidth]{figures/fig5_3_new_session.jpg}\\
 \small (b) Asking in a new session
-\end{minipage}
-\caption[Demo: recording details, then recalling them in a new session]{(a) The user gives three details, which
-are sent for memory processing. (b) A new session in another project asks for them without repeating them}
-\label{fig:demo-a}
-\end{figure}
-
-\begin{figure}[H]
-\centering
+\end{minipage}\\[6pt]
 \begin{minipage}[t]{0.49\textwidth}
 \centering
 \includegraphics[width=\textwidth]{figures/fig5_4_recall.jpg}\\
-\small (a) Recalled answer
+\small (c) Recalled answer
 \end{minipage}\hfill
 \begin{minipage}[t]{0.49\textwidth}
 \centering
 \includegraphics[width=\textwidth]{figures/fig5_5_graph.jpg}\\
-\small (b) Corrected assertion in the graph
+\small (d) Corrected assertion in the graph
 \end{minipage}
-\caption[Demo: recalled answer and the corrected assertion in the graph]{(a) The agent answers March 3, Tuesday
-at 11:00 and Kavya from memory. (b) The new release-freeze time (Friday 16:30) is linked to the old one (Thursday
-17:00)}
-\label{fig:demo-b}
+\caption[Live demo of recording, recall and a correction]{Live demo. (a) The user gives the
+details. (b, c) A new session in another project recalls them. (d) The new freeze time (Friday
+16:30) supersedes the old one (Thursday 17:00)}
+\label{fig:demo-a}
 \end{figure}
 
-In the new session the agent answers from the recalled assertions and says the information
-came from an earlier session. It also notices that the stored date has the year 2026 although
-the user never gave a year, which is one reason we show source quotes with every answer. In
-the graph, the Friday 16:30 freeze is linked to the old Thursday 17:00 value by
-\code{supersedes}, the same way Bengaluru replaces Chennai.
+The agent says the answer came from an earlier session. It also flags that the stored date has
+the year 2026, although the user never gave one, which is why quotes come with every answer.
 
 \section{\uppercase{Benchmark Setup}}
 \label{sec:setup}
-We used LoCoMo \cite{maharana2024locomo}, the benchmark that Mem0, Zep and A-Mem report on \cite{chhikara2025mem0}. It has
-ten long conversations between two people (272 sessions, about 16,000 tokens each) and
-1,540 questions with gold answers in four categories: single-hop, multi-hop, temporal and
-open-domain. Like Mem0, we left out the adversarial category because it has no gold answers.
-Each conversation goes into the engine session by session as its own memory bank. The same
-reader model then answers every question with the same prompt, and only the context it gets
-changes. With the memory engine it gets the engine's recall (assertions with quotes,
-inferences, graph neighbours and source text) up to 8,192 tokens. With plain retrieval, which
-is normal RAG, it gets keyword and vector search results over the raw text within the same
-budget. The recent window is the last 8,192 tokens of the conversation, which is what an agent
-keeps when its history overflows. We also tried the whole conversation as an upper reference,
-and the question alone with no memory. For the ablations we removed the source text, the
-graph or consolidation from the engine and ran them on a 300-question sample (75 per category).
+We used LoCoMo \cite{maharana2024locomo}, on which the Mem0 paper \cite{chhikara2025mem0}
+reports Mem0, Zep and A-Mem. It has ten long two-person conversations (272 sessions) and 1,540
+questions in four categories; like Mem0, we left out the adversarial category. Each
+conversation is ingested as its own memory bank. The reader, Claude Haiku 5.5 in the Pi agent
+with Mem0's answer prompt, gets one of five contexts:
+\begin{itemize}[itemsep=0pt]
+\item \textbf{Memory engine:} our recall, up to 8,192 tokens.
+\item \textbf{Plain retrieval:} keyword and vector search over raw text, same budget.
+\item \textbf{Recent window:} the last 8,192 tokens of the conversation.
+\item \textbf{Whole conversation} (upper reference) and \textbf{no memory}.
+\end{itemize}
+Ablations removed the source text, the graph or consolidation, on 300 questions (75 per
+category). Two blind judges grade answers with Mem0's rubric: TypeSafe Jev
+\cite{typesafe2026jev} (correct if $p \geq 0.5$) and GPT-4o-mini. We report paired bootstrap 95\%
+intervals \cite{efron1993bootstrap} and Cohen's kappa \cite{cohen1960kappa}. Conditions and pass
+marks were committed before the run, and we debugged only on two conversations. The full run
+(\code{benchmark/overnight.sh}) took 7 h 45 min, and a notebook recomputes every number from
+the saved records.
 
-The reader is Claude Haiku 5.5, run through the Pi agent with Mem0's answer prompt. Two judges
-grade each answer against the gold answer with Mem0's LoCoMo rubric, and neither of them
-knows which condition the answer came from. Our main judge is TypeSafe Jev \cite{typesafe2026jev}, which gives
-the probability that an answer is correct (we count $\geq 0.5$ as correct). The second judge is
-GPT-4o-mini, called the same way as in Mem0's code so that we can compare with their table.
-We report differences with paired bootstrap 95\% intervals \cite{efron1993bootstrap} and judge agreement with
-Cohen's kappa \cite{cohen1960kappa}.
-
-We wrote the conditions and pass marks into the repository before the test run and
-debugged only on two of the ten conversations (the dev split). The whole run is one command
-(\code{benchmark/overnight.sh}) and took 7 h 45 min on the laptop. Every model call is saved, and
-a Jupyter notebook (\code{benchmark/Benchmark\_Report.ipynb}) recomputes all the numbers below
-from the saved records.
-
-\section{\uppercase{Development Iterations}}
-\label{sec:iterations}
-The first runs on the dev conversations found several bugs, which we fixed and logged in
-\code{benchmark/iterations.json}. For example, ``yesterday'' was stored as the day it was said,
-consolidation prompts stopped fitting in the model after about a dozen sessions, and the
-review step threw away real corrections. The biggest problem was that recall made only of
-assertions scored 45.9\% against 79.8\% for plain retrieval, because the extractor missed many
-facts. Mixing source text into recall brought it to 82.8\% against 82.4\%, and Stage C raised
-assertions alone from 51.9\% to 63.1\%. The dev set has only 233 questions, so a change of a
-point or two there is just noise.
+Early dev runs found several bugs. For example, ``yesterday'' was stored as the day it was
+said, consolidation prompts grew too long and real corrections were thrown away. Each fix is
+logged in \code{iterations.json} in the \code{benchmark} folder. Recall of
+assertions alone scored 45.9\% against 79.8\% for plain retrieval because the extractor missed
+facts. Mixing in source text gave 82.8\% against 82.4\%.
 
 \section{\uppercase{Results}}
 \label{sec:results}
-Table~\ref{tab:bench-main} shows the main result. With the engine the reader got 83.1\% of the questions
-right. With no memory it got almost nothing (0.3\%), since the questions are about details
-only the conversation contains. Keeping just the last 8,192 tokens gave 43.0\%, because most
-answers are in older sessions. Plain retrieval gave 80.0\% and the whole conversation (about
-22,400 tokens) gave 89.0\%. So the engine closes most of the gap between plain retrieval and
-the whole conversation while sending 30\% of the tokens. It met all the pass marks we had set
-in advance.
+With the engine the reader got 83.1\% right (Table~\ref{tab:bench-main}). No memory gave 0.3\%,
+the recent window 43.0\%, plain retrieval 80.0\% and the whole conversation 89.0\%. The engine
+closes about a third of the gap to the whole conversation with 30\% of its tokens, and met every
+pass mark. The two judges agree on 96.7\% of answers (kappa 0.93). On the eight conversations we
+never debugged on, the engine scored 83.0\% against 79.4\%. Over three repeats the standard
+deviation was 0.5 points for the engine and 1.3 for plain retrieval.
 
 \input{5/tables/main}
-
-The engine is 3.1 points ahead of plain retrieval, with a 95\% interval of [1.2, 4.8], so the gain
-is small but real. It is 6.0 points behind the whole conversation. GPT-4o-mini gives almost the
-same numbers, and the two judges agree on 96.7\% of the answers (kappa 0.93). Because we
-debugged on conversations 26 and 30, we also checked the other eight on their own: 83.0\%
-for the engine, 79.4\% for plain retrieval and 88.9\% for the whole conversation. When we asked
-the same 300 questions three times, the engine's accuracy moved by only 0.5 points (standard
-deviation) and plain retrieval's by 1.3.
-
 \input{5/tables/categories}
 
-Most of the gain comes from multi-hop questions (Table~\ref{tab:bench-categories}), where the engine scored
-83.0\% against 74.5\%. For ``What subject have Caroline and Melanie both painted?'', plain
-retrieval led the reader to answer ``Nature''. The engine's recall had one short assertion per
-person (``Caroline painted a sunset scene \ldots'' and ``Melanie painted a sunset with a palm
-tree \ldots''), and the reader answered ``Sunsets''. An assertion sums up in one line what took
-several turns, so more facts fit in the budget. On temporal questions the two are level
-(80.1\% against 80.4\%), even though we expected the engine to help most there.
-Section~\ref{sec:properties} explains part of the reason.
+Most of the gain is on multi-hop questions, 83.0\% against 74.5\%
+(Table~\ref{tab:bench-categories}). For ``What subject have Caroline and Melanie both
+painted?'', plain retrieval led to ``Nature''. The engine recalled one short assertion per
+person, and the reader answered ``Sunsets''. One assertion sums up several turns, so more facts
+fit in the budget. Temporal questions were level (80.1\% against 80.4\%).
 
-The ablations (last three rows of Table~\ref{tab:bench-main}) show that assertions alone are not enough
-yet. Removing the source text costs 9.7 points because the extractor still misses facts.
-Removing the graph or consolidation made no difference we could measure. LoCoMo's questions
-are about two people and rarely need a chain of relations, so this benchmark can't really show
-what the graph is for.
+In the ablations, removing source text cost 9.7 points, because the extractor still misses
+facts. Removing the graph or consolidation made no measurable difference; LoCoMo rarely needs
+a chain of relations.
 
 \section{\uppercase{Performance Analysis}}
 \label{sec:performance}
-Checked against LoCoMo's evidence labels, the engine's context included the turn that answers
-the question for 84.4\% of questions, against 80.6\% for plain retrieval, because each assertion
-carries the quote of the turn it came from. All 99,971 source quotes the engine returned
-matched the original text exactly, so every answer can be traced back to what was said.
-
-The engine sends 6,790 tokens of context per question, while the whole conversation needs
-22,400. With the prompt and answer included, a question costs 14,900 tokens instead of
-35,300. LoCoMo's conversations still fit in Haiku's context window, so the reader takes about
-the same time either way (median 5.2 s with the engine and 5.5 s with the whole conversation).
-The engine's context stays under 8,192 tokens however long the history gets, while the whole
-conversation keeps growing. Recall itself takes 428 ms at the median and 584 ms at p95.
-
-Building memory is the slow part. The 272 sessions (5,882 turns) took 4.2 hours on the laptop,
-about 56 seconds per session, and almost all of that is extraction by the 4B model. No job
-failed for good. This happens in the background when a session is saved, so it doesn't slow
-down the agent's answers.
+The engine's context contained the answering turn for 84.4\% of questions, against 80.6\% for
+plain retrieval. All 99,971 returned quotes matched the source exactly. The engine sends 6,790
+context tokens per question against 22,400 for the whole conversation (14,900 against 35,300
+in total), and its context stays under 8,192 however long the history grows. Median answer
+time is 5.2 s against 5.5 s, and recall takes 428 ms (p95 584 ms). Building memory for 272
+sessions took 4.2 hours, about 56 s per session, almost all extraction. It runs in the
+background, so answers don't wait.
 
 \section{\uppercase{Property Tests}}
 \label{sec:properties}
-LoCoMo can't check things like whether an old value is kept after a correction, so we also
-wrote 40 scripted conversations that test the engine's stored state directly, without a judge.
-The engine refused to answer without evidence in all 6 cases and never stored an API key.
-After each of the 12 updates it returned the new value, and \code{as\_of} recall still returned
-the old one.
-
-These tests also caught a bug the LoCoMo judge could not see. None of the 12 relative dates
-(like ``yesterday'') were resolved in the test run. The new model writes the date into the
-sentence but often leaves the date field empty, and the store then filled it with the time the
-message was sent. We fixed this after the test run (commit \code{bd76df3}). When we re-ran the
-tests, all 10 events that were extracted had the right date. The LoCoMo numbers above are
-from before this fix. The other failures were facts the extractor never produced, the same
-coverage problem the ablation shows.
+LoCoMo can't check whether an old value survives a correction, so 40 scripted conversations
+test the stored state directly. The engine refused to answer without evidence in all 6 cases
+and never stored an API key. After all 12 updates it returned the new value, and \code{as\_of}
+recall returned the old one. The tests also found that none of 12 relative dates was resolved:
+the model wrote the date into the sentence but left the field empty, so the send time was used.
+After the fix (commit \code{bd76df3}) all 10 extracted events had the right date. The LoCoMo
+numbers are from before this fix.
 
 \section{\uppercase{Comparison with Existing Systems}}
 \label{sec:comparison}
-Table~\ref{tab:bench-published} puts our result next to the LoCoMo numbers from the Mem0 paper \cite{chhikara2025mem0},
-which also covers Zep \cite{rasmussen2025zep}, LangMem \cite{langchain2025langmem} and A-Mem \cite{xu2025amem}. The raw scores can't be
-compared directly. They used GPT-4o-mini as the reader and we used Claude Haiku 5.5, which is
-stronger and raises every condition (our whole-conversation score is 88.8\% and theirs is
-72.9\%). A fairer check is how far each system is from the whole-conversation score in its own
-study, shown in the last column. We are 5.6 points behind, Mem0 with a graph 4.5, Mem0 6.0
-and Zep 6.9. So we are in the same range as Mem0 and Zep, not ahead of them, and we use
-more context tokens to get there.
+Table~\ref{tab:bench-published} sets our result beside the Mem0 paper's
+\cite{chhikara2025mem0}, which also covers Zep \cite{rasmussen2025zep}, LangMem
+\cite{langchain2025langmem} and A-Mem \cite{xu2025amem}. They used GPT-4o-mini as the reader, so
+raw scores differ (our whole conversation scores 88.8\%, theirs 72.9\%). The fairer measure is the
+gap to the whole conversation in each study: 5.6 points for us, 4.5 for Mem0 with a graph, 6.0
+for Mem0 and 6.9 for Zep. We are in the same range, not ahead, and use more context tokens.
+Unlike Mem0 and A-Mem, we keep every version with dates and quotes, and everything runs on one
+laptop with a 4B model.
 
 \input{5/tables/published}
-
-Mem0 and A-Mem overwrite or delete a memory when it is updated, while our engine keeps
-every version with its dates and source quote. It also runs fully on one laptop with a 4B
-model, while the published systems call a hosted model for every memory operation.
-
-\section{\uppercase{Limitations and Future Work}}
-We built all five modules, and on LoCoMo the engine scored 83.1\% against 80.0\% for plain
-retrieval and 43.0\% for a recent window. It was 6.0 points below the whole conversation while
-using 30\% of the tokens. The work still has limits:
-\begin{itemize}[itemsep=0pt]
-\item We used one benchmark with ten conversations. LongMemEval was planned but not run, and
-we did not test on real coding sessions.
-\item Two model judges graded the answers, not people, and we used only one reader model.
-\item Plain retrieval used fewer tokens than the engine (4,473 against 6,790), so giving it more
-chunks might close some of the 3.1-point gap.
-\item The extractor still misses facts (assertions alone get 66.7\%), and the graph and
-consolidation made no measurable difference on LoCoMo.
-\end{itemize}
-Next we want to make extraction faster and more complete (M2), add access control and
-backups (M1), test updates and aliases on a benchmark made for them (M3), run LongMemEval
-and a coding benchmark (M4), and build a proper date test set with people checking the
-judges (M5).

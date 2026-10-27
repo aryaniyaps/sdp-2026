@@ -1,25 +1,26 @@
 \chapter*{\uppercase{ABSTRACT}}
 \addcontentsline{toc}{section}{\bfseries \uppercase{Abstract}}
-AI agents that don't have persistent memory forget instructions and project
-decisions once a session ends, and when an instruction changes they often keep using
-the old one. For this project we built a long-term memory engine in Rust for such agents.
-What it remembers carries over between sessions, can be corrected later, and can be
-traced back to the original messages.
+AI agents without persistent memory forget instructions and project decisions when a
+session ends. When an instruction changes, they often keep using the old one. For this
+project we built a long-term memory engine in Rust for such agents. What it stores
+carries over between sessions, can be corrected later and can be traced back to the
+original messages.
 
-The engine has five modules: source acquisition and processing, knowledge
-extraction and consolidation, temporal knowledge and graph management, hybrid
-retrieval and grounded reasoning, and model training and evaluation. Original messages
-are stored unchanged as source events. Assertions (typed statements about the user or
-project) are extracted along with the exact source quote they came from and stored as
-versions, so a correction replaces an old value without deleting it.
-Retrieval combines keyword, vector, time and graph search using Reciprocal Rank
-Fusion and returns each result with its source quotes. The extraction and answering is done by a small local
-Qwen3-4B model that we fine-tuned with QLoRA.
+The engine has five modules: source acquisition and processing, knowledge extraction
+and consolidation, temporal knowledge and graph management, hybrid retrieval and
+grounded reasoning, and model training and evaluation. Original messages are stored
+unchanged as source events. The engine extracts assertions (typed statements about the
+user or project) together with the exact quote they came from. Assertions are stored as
+versions, so a correction replaces an old value without deleting it. Retrieval combines
+keyword, vector, time and graph search with Reciprocal Rank Fusion. Each result comes
+back with its source quotes. A small local Qwen3-4B model, fine-tuned with QLoRA, does
+the extraction and answering.
 
-We tested the engine on LoCoMo, a public benchmark of ten long conversations (1,540 questions), using the
-same reader model for every setup and two model judges. With the engine the reader answered 83.1\% of the
-questions correctly, compared with 80.0\% for plain retrieval over the raw text, 43.0\% when keeping only the
-last 8,192 tokens, and 0.3\% with no memory. Giving the reader the whole conversation scored 89.0\%, but used more
-than three times as many tokens. All 99,971 source quotes returned by the engine matched the conversation
-exactly. Our own scripted tests showed that corrections keep their history and that the engine refuses to answer
-without evidence, and they also caught a date bug, which we fixed after the test.
+We tested the engine on LoCoMo, a public benchmark of ten long conversations (1,540
+questions). Every setup used the same reader model and two model judges. With the engine
+the reader answered 83.1\% of the questions correctly. Plain retrieval over the raw text
+scored 80.0\%, keeping only the last 8,192 tokens scored 43.0\% and no memory scored
+0.3\%. The whole conversation scored 89.0\% but used more than three times as many
+tokens. All 99,971 source quotes returned by the engine matched the conversation exactly.
+Our scripted tests showed that corrections keep their history and that the engine refuses
+to answer without evidence. They also caught a date bug, which we fixed after the test.

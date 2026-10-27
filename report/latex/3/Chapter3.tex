@@ -2,150 +2,252 @@
 
 \chapter{\uppercase{Design of Long Term Memory Engine for AI Agents}}
 \label{ch:design}
-This chapter describes the overall architecture and the five modules of the memory engine.
-Each module is explained in general first and then shown on the Maya example.
+This chapter describes the architecture and the five modules. For each module we show the data
+it creates for one running example.
+
+\section{\uppercase{The Maya Example}}
+\label{sec:maya}
+The example user, Maya, talks to the Pi agent in three sessions (Table~\ref{tab:maya-events}).
+Each message is an \emph{event}, E1 to E5. She gives her city and job (E1), later says she has
+moved (E3), and then asks a question that needs both (E5).
+
+\begin{table}[H]
+\caption{Events in the Maya example}
+\label{tab:maya-events}
+\centering
+\begin{reporttable}
+\begin{tabularx}{\textwidth}{|L{0.7cm}|L{1.4cm}|L{1.7cm}|L{1.9cm}|Y|}
+\hline
+\textbf{ID} & \textbf{Session} & \textbf{Role} & \textbf{Time (UTC)} & \textbf{Content} \\
+\hline
+E1 & S1 & user & 1 Oct, 04:30 & My name is Maya. I live in Chennai. I work as a software engineer at NovaTech, and I work remotely. \\
+\hline
+E2 & S1 & assistant & 1 Oct, 04:30 & Nice to meet you, Maya. \\
+\hline
+E3 & S2 & user & 10 Oct, 03:45 & I have moved to Bengaluru. Bengaluru is now my home city. \\
+\hline
+E4 & S2 & assistant & 10 Oct, 03:45 & Noted. You now live in Bengaluru. \\
+\hline
+E5 & S3 & user & 13 Oct, 06:00 & Where do I live now, where did I live before, and where do I work? \\
+\hline
+\end{tabularx}
+\end{reporttable}
+\end{table}
+
+An agent that only kept E1 would wrongly say Chennai. The engine should know that Bengaluru
+replaced Chennai on 10 October and still keep Chennai as her previous city. Real rows have
+UUIDs; we use short names such as E3 and R2.
 
 \section{\uppercase{Overall Architecture}}
-The memory engine is made of five modules:
-\begin{enumerate}
-  \item \textbf{M1 Source Acquisition and Processing} saves the raw conversation and queues the work.
-  \item \textbf{M2 Knowledge Extraction and Consolidation} turns the saved text into assertions and combines related ones into inferences.
-  \item \textbf{M3 Temporal Knowledge and Graph Management} stores the assertions with their history and copies them to the graph.
-  \item \textbf{M4 Hybrid Retrieval and Grounded Reasoning} finds the right memory for a question and fits it into the model's budget.
-  \item \textbf{M5 Model Training and Evaluation} produces the worker model that M2 and M4 use.
-\end{enumerate}
+Figure~\ref{fig:architecture} shows how the modules fit together. Pi's memory client saves
+every message and asks for recall before answering. The service is written in Rust.
+PostgreSQL with pgvector is the main store: events, chunks, assertions, quotes, vectors and the
+job queue. Ollama runs our fine-tuned worker model and a Qwen3 embedding model. Neo4j keeps a
+graph copy, and M4 checks every graph hit against PostgreSQL. M5 runs offline and never trains
+on live chats.
 
-Figure~\ref{fig:architecture} shows how they fit together. The client is the Pi coding agent. Its memory client
-saves every message through the memory service and asks for recall before answering. The
-service itself is a Rust application with API handlers and background workers. PostgreSQL
-with pgvector is the main store for M1 to M4 and holds the source events and chunks,
-entities, assertions, quotes, vectors and the job queue. Ollama runs our fine-tuned worker
-model and a Qwen3 embedding model. Neo4j keeps a graph copy of the assertions and
-entities, and M4 checks every graph hit against PostgreSQL again before using it. M5 runs
-offline, and we do \emph{not} use live chats as training data.
-
-\subsection{\uppercase{Tokio Workers}}
-Tokio is the asynchronous runtime of the Rust service. A Tokio
-worker is a background task started on that runtime (with \code{tokio::spawn}) inside the
-service process. It does not belong to any request: it repeatedly takes a job from the
-PostgreSQL queue, runs it and marks it done, or retries it later if it failed. Because Tokio
-tasks are light, several can run at once without blocking the API. The service starts a
-pool of inference workers (4 by default, set between 1 and 8) that handle the extract and
-consolidate jobs of M2, and one projection worker that handles the graph jobs of M3
-(project, rebuild and clear). A lease on the namespace stops two workers from processing the
-same namespace at the same time.
+Background work runs on Tokio workers so requests never wait. New events add a job to a queue
+table. Four inference workers run M2 jobs and one projection worker runs M3 graph jobs. A
+failed job is retried up to five times. A worker holds a 15-minute \emph{lease} (a temporary
+lock) on the user's namespace, so two workers never change the same memory at once.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=\textwidth,height=0.42\textheight,keepaspectratio]{figures/fig3_1_architecture.png}
+\includegraphics[width=\textwidth,height=0.36\textheight,keepaspectratio]{figures/fig3_1_architecture.png}
 \caption{Overall system architecture}
 \label{fig:architecture}
 \end{figure}
 
 \section{\uppercase{M1 Source Acquisition and Processing}}
-M1 saves the source events before anything else (Figure~\ref{fig:m1}). The client first writes
-each batch to a local spool, so nothing is lost if the service is down, and then sends it to
-\code{POST /api/v2/retain}. If the same key comes again with the same hash, the service just
-returns the existing IDs, so retries don't create duplicates. The episode, events, chunks and
-a pending extraction job are saved in one transaction, and each chunk gets a 1,024-dimensional
-vector. Saving happens \emph{before} extraction, and extraction runs later as a queued job, so a
-failed model call can't lose a conversation. Tokio workers lease a namespace for 15 minutes
-and try a job up to 5 times.
-
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.53\textwidth,height=0.8\textheight,keepaspectratio]{figures/fig3_2_module1.png}
+\includegraphics[width=\textwidth,height=0.4\textheight,keepaspectratio]{figures/fig3_2_module1.png}
 \caption{Module 1: Source Acquisition and Processing}
 \label{fig:m1}
 \end{figure}
 
-\begin{maya}
-The 10 October conversation comes in as a retain request with namespace \code{user:maya},
-session S2 and two events, E3 (her message) and E4 (the agent's reply). Pi writes the batch
-to the spool, sends it, and the service saves the episode, both events, their chunks and a
-pending extraction job.
+M1 saves the events before any model runs (Figure~\ref{fig:m1}). Pi writes each batch to a
+local spool file, then sends it to \code{POST /api/v2/retain} with an idempotency key,
+\code{external\_id}, so retries don't create duplicates. The events, their \emph{chunks}
+(searchable copies with a keyword index and a vector) and an extraction job are saved in one
+transaction. A failed model call later can't lose a conversation.
+
+\begin{maya}[Maya example: what M1 saves]
+On 10 October Pi sends session S2 (E3 and E4) as one batch:
+\begin{datablock}
+{ "namespace": "user:maya",
+  "session_id": "S2",
+  "external_id": "branch:S2:E4",
+  "events": [
+    { "role": "user",
+      "occurred_at": "2026-10-10T03:45:00Z",
+      "content": "I have moved to Bengaluru. Bengaluru is now
+                  my home city." },
+    { "role": "assistant",
+      "occurred_at": "2026-10-10T03:45:04Z",
+      "content": "Noted. You now live in Bengaluru." } ] }
+\end{datablock}
+\begin{center}
+\begin{minipage}{\linewidth}
+\centering
+\captionof{table}{Rows saved by M1 for session S2}
+\label{tab:m1-rows}
+\begin{reporttable}
+\begin{tabularx}{\linewidth}{|L{2.6cm}|Y|}
+\hline
+\textbf{Row} & \textbf{Main values} \\
+\hline
+episodes (EP2) & namespace \code{user:maya}, key \code{branch:S2:E4}, hash of the request \\
+\hline
+raw\_events (E3, E4) & role, content and time, exactly as sent \\
+\hline
+chunks (C3) & text of E3 \newline
+keywords \code{'bengaluru':5,6 'citi':11 'home':10 'move':3} \newline
+vector \code{[0.013, -0.042, 0.087, ...]} (1,024 numbers) \\
+\hline
+memory\_jobs & kind \code{extract}, key \code{extract:EP2}, status \code{pending}, 0 of 5 tries \\
+\hline
+\end{tabularx}
+\end{reporttable}
+\end{minipage}
+\end{center}
+The keywords are PostgreSQL's real word stems for E3 with their positions. The vector values
+are only examples.
 \end{maya}
 
 \section{\uppercase{M2 Knowledge Extraction and Consolidation}}
-M2 has two stages and both use our local model through Ollama (Figure~\ref{fig:m2}). In
-extraction, the prompt builder fits the new events and the relevant existing assertions into
-the model's input (Section~\ref{sec:alg-context}), and the model returns claims, each with an
-exact quote from the source. If the output breaks the schema or quotes text that isn't in the
-source, we ask again, up to two more times. Secrets are filtered out before the claim goes to
-M3. In consolidation, after M3 commits, the model can combine two or more active assertions
-about the same subject into one inference.
+\label{sec:m2-design}
+M2 has two stages, both run by our local model (Figure~\ref{fig:m2}). In \emph{extraction},
+the model reads the new events and related stored assertions and returns \emph{claims}, each
+with an exact quote. Bad output is retried up to two more times, and claims containing secrets
+are dropped. In \emph{consolidation}, the model combines two or more active assertions about
+one subject into an \emph{inference}.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.61\textwidth,height=0.8\textheight,keepaspectratio]{figures/fig3_3_module2.png}
+\includegraphics[width=\textwidth,height=0.4\textheight,keepaspectratio]{figures/fig3_3_module2.png}
 \caption{Module 2: Knowledge Extraction and Consolidation}
 \label{fig:m2}
 \end{figure}
 
-\begin{maya}
-``Maya / Chennai'' is shown next to E3, and the model returns home city Bengaluru, marked as
-a correction, with an exact quote. Later, Maya's three work assertions become the inference
-``Maya works remotely as a software engineer at NovaTech.''
+\begin{maya}[Maya example: what M2 extracts]
+The model sees Maya's stored assertions, such as R1 (home city Chennai), and the events E3
+and E4. It returns (some fields left out):
+\begin{datablock}
+{ "claims": [ {
+    "subject": { "name": "Maya", "entity_type": "person" },
+    "predicate": "home city",   "value": "Bengaluru",
+    "statement": "Maya's home city is Bengaluru.",
+    "cardinality": "single",    "kind": "fact",
+    "confidence": 0.95,         "correction": true,
+    "valid_from": "2026-10-10T03:45:00Z",
+    "source_indices": [0],
+    "quotes": ["Bengaluru is now my home city."] } ] }
+\end{datablock}
+The quote is an exact substring of E3, and \code{correction: true} marks a replaced value.
+Consolidation later combines her work assertions A1 to A3:
+\begin{datablock}
+{ "observations": [ {
+    "statement": "Maya works remotely as a software
+                  engineer at NovaTech.",
+    "confidence": 0.8,
+    "supports": ["A1", "A2", "A3"] } ] }
+\end{datablock}
 \end{maya}
 
 \section{\uppercase{M3 Temporal Knowledge and Graph Management}}
-M3 is the only module that writes assertions. It works inside one PostgreSQL transaction
-that holds a namespace lock (Figure~\ref{fig:m3}). First it finds the entity. If the same value
-is already stored, it is reinforced, and if the slot is empty, a new assertion is made. If a
-single-valued slot gets a different value, the old assertion is superseded when the claim is a
-reviewed correction with confidence of at least 0.8; otherwise both are marked contested. When
-an assertion changes we add a new version and keep the old value with its validity interval.
-The projection worker then copies the change to Neo4j \cite{neo4j2026http}. It checks revision
-numbers so an old revision can't overwrite a newer one.
+M3 is the only module that writes assertions, inside one locked transaction
+(Figure~\ref{fig:m3}). It finds the entity and compares the claim with the \emph{slot}
+(subject plus predicate). A repeated value gains a source; an empty slot gets a new assertion.
+A different value supersedes the old one only if the claim is a correction with confidence at
+least 0.8; otherwise both are marked contested. Old values are never deleted. The projection
+worker then copies the change to Neo4j \cite{neo4j2026http}, using revision numbers so an old
+change never overwrites a newer one.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.77\textwidth,height=0.8\textheight,keepaspectratio]{figures/fig3_4_module3.png}
+\includegraphics[width=\textwidth,height=0.4\textheight,keepaspectratio]{figures/fig3_4_module3.png}
 \caption{Module 3: Temporal Knowledge and Graph Management}
 \label{fig:m3}
 \end{figure}
 
-\begin{maya}
-M3 finds the entity Maya. R1 Chennai becomes valid from 1 to 10 October and superseded, and
-R2 Bengaluru is active from 10 October with the E3 quote.
+\begin{maya}[Maya example: how M3 stores the move]
+The slot \code{Maya::home city} holds R1 (Chennai). The new value differs, the claim is a
+correction and $0.95 \geq 0.8$, so R1 is superseded by R2 (Table~\ref{tab:m3-rows}).
+\begin{center}
+\begin{minipage}{\linewidth}
+\centering
+\captionof{table}{Maya's assertions after M3 processes E3}
+\label{tab:m3-rows}
+\begin{reporttable}
+\begin{tabularx}{\linewidth}{|L{0.6cm}|Y|L{1.6cm}|L{1.7cm}|L{1.2cm}|L{1.2cm}|}
+\hline
+\textbf{ID} & \textbf{Statement} & \textbf{Kind} & \textbf{Status} & \textbf{From} & \textbf{To} \\
+\hline
+R1 & Maya's home city is Chennai. & attribute & superseded & 1 Oct & 10 Oct \\
+\hline
+R2 & Maya's home city is Bengaluru. & attribute & active & 10 Oct & -- \\
+\hline
+A1 & Maya works at NovaTech. & attribute & active & 1 Oct & -- \\
+\hline
+A2 & Maya is a software engineer. & attribute & active & 1 Oct & -- \\
+\hline
+A3 & Maya works remotely. & attribute & active & 1 Oct & -- \\
+\hline
+I1 & Maya works remotely as a software engineer at NovaTech. & inference & active & 1 Oct & -- \\
+\hline
+\end{tabularx}
+\end{reporttable}
+\end{minipage}
+\end{center}
+Quotes and links are stored as:
+\begin{datablock}
+assertion_sources:  (R2, C3, "Bengaluru is now my home city.")
+assertion_edges:    (R2 -> R1, supersedes)
+                    (I1 -> A1, supports)
+                    (I1 -> A2, supports)
+                    (I1 -> A3, supports)
+\end{datablock}
+In Neo4j, R1 and R2 become \code{Assertion} nodes linked to a \code{KnowledgeEntity} node for Maya.
 \end{maya}
 
 \section{\uppercase{M4 Hybrid Retrieval and Grounded Reasoning}}
-M4 answers recall requests (Figure~\ref{fig:m4}). A request carries the namespace, a
-\code{top\_k}, a maximum distance and a token budget. The query goes to keyword search, vector
-search and, if there is a date window, time-based search. The top results are the starting
-points for a Neo4j expansion. All the lists are merged with Reciprocal Rank Fusion and packed
-into the budget along with their source quotes. There is also an optional reflect endpoint
-that writes an answer with citations.
+M4 answers recall requests (Figure~\ref{fig:m4}). The query runs keyword and vector search
+over assertions and chunks, plus date search if it names a time. The top hits seed a Neo4j
+expansion. Reciprocal Rank Fusion merges the lists, and the best results are packed into the
+token budget with their quotes. An optional reflect endpoint writes a cited answer.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.52\textwidth,height=0.8\textheight,keepaspectratio]{figures/fig3_5_module4.png}
+\includegraphics[width=\textwidth,height=0.4\textheight,keepaspectratio]{figures/fig3_5_module4.png}
 \caption{Module 4: Hybrid Retrieval and Grounded Reasoning}
 \label{fig:m4}
 \end{figure}
 
-\begin{maya}
-On 13 October Pi sends E5 for \code{user:maya} with \code{top\_k} 10, a maximum distance of
-0.45 and a budget of 2,048 tokens, and gets back the Bengaluru, Chennai and NovaTech
-memories with their quotes.
+\begin{maya}[Maya example: the recall request for E5]
+When Maya asks E5 on 13 October, Pi sends this request:
+\begin{datablock}
+{ "namespace": "user:maya",
+  "query": "Where do I live now, where did I live before,
+            and where do I work?",
+  "top_k": 10, "max_tokens": 2048,
+  "reference_date": "2026-10-13T06:00:00Z",
+  "temporal": true, "include_raw": true }
+\end{datablock}
+Recall returns R2, I1, A1 to A3 and the text of E1 and E3. Superseded R1 is left out, but
+the old city still reaches the agent through E1 (ranks in Section~\ref{sec:m4-impl}).
 \end{maya}
 
 \section{\uppercase{M5 Model Training and Evaluation}}
-M5 runs offline and produces the worker model that M2 and M4 use (Figure~\ref{fig:m5}). A
-generator makes short episodes across 16 domains and a teacher model labels them. We train
-the model on the checked labels with QLoRA, evaluate it and import it into Ollama (details in
-Chapter~\ref{ch:results}).
+M5 runs offline and produces the worker model (Figure~\ref{fig:m5}). A generator writes short
+episodes in 16 domains and a teacher model labels them. We train on the checked labels with
+QLoRA, evaluate, and import the model into Ollama (details in Chapter~\ref{ch:results}). Each
+training row pairs the same extraction prompt M2 builds with the expected claims, so the model
+learns, for example, to mark Maya's move as a correction.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.66\textwidth,height=0.8\textheight,keepaspectratio]{figures/fig3_6_module5.png}
+\includegraphics[width=\textwidth,height=0.4\textheight,keepaspectratio]{figures/fig3_6_module5.png}
 \caption{Module 5: Model Training and Evaluation}
 \label{fig:m5}
 \end{figure}
-
-\begin{maya}
-The fine-tuned model is what extracted Maya's correction in M2. In the end, when Maya asks E5,
-Pi answers ``You now live in Bengaluru, following your move on 10 October 2026. Before that,
-you lived in Chennai. You work remotely as a software engineer at NovaTech.''
-\end{maya}
