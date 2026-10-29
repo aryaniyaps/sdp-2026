@@ -42,3 +42,16 @@ memory\_jobs & id, kind, dedupe\_key (unique), payload, status (pending, running
 
 A partial unique index on \code{assertions (namespace, slot\_key)}, limited to rows where
 \code{cardinality = 'single'} and \code{status = 'active'}, keeps one current value per slot.
+
+\chapter{\uppercase{Prompts of the Local Model}}
+\label{app:prompts}
+This appendix gives the prompts that the fine-tuned worker model receives, exactly as they are
+stored in the repository. Text in double braces, such as \code{\{\{EVENTS\}\}}, is replaced with
+JSON at run time. The system prompt is sent with every call. The extract prompt is also the
+input of every training row (Section~\ref{sec:m5-impl}), so the model is trained on the text it is served.
+
+\newtcolorbox{promptbox}{breakable,colback=white,colframe=black,boxrule=0.4pt,
+  left=2mm,right=2mm,top=1mm,bottom=2mm,
+  fontupper=\ttfamily\scriptsize\raggedright\linespread{1}\selectfont\setlength{\parindent}{0pt}}
+
+\input{Appendix/prompt_text}
