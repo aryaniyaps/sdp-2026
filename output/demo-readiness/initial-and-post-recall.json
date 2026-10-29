@@ -1,0 +1,595 @@
+{
+  "namespace": "guide:live-ready-1791918973580",
+  "before": {
+    "assertions": [
+      {
+        "cardinality": "multiple",
+        "confidence": 0.97,
+        "entity_ids": [
+          "9a180099-23b2-404d-8be9-543bdd163d1b",
+          "ad99832c-c243-4323-ac40-67eeb61f194a",
+          "9a5e3ed3-f063-4558-ab6d-bde8643d2463"
+        ],
+        "episode_id": null,
+        "event_at": null,
+        "id": "ced0ee15-961e-4372-9232-6221a1a41daf",
+        "kind": "observation",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_value": "mira owns it; uses postgresql",
+        "predicate": "project_configuration_summary",
+        "recorded_at": "2026-10-13T19:17:12.218269+00:00",
+        "revision": 550,
+        "slot_key": "9a180099-23b2-404d-8be9-543bdd163d1b::project_configuration_summary",
+        "statement": "Project Orion is reported to be owned by Mira and use PostgreSQL.",
+        "status": "active",
+        "subject_id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "valid_from": "2026-10-13T19:16:42.95+00:00",
+        "valid_to": null,
+        "value": "Mira owns it; uses PostgreSQL"
+      },
+      {
+        "cardinality": "single",
+        "confidence": 0.98,
+        "entity_ids": [
+          "9a180099-23b2-404d-8be9-543bdd163d1b",
+          "ad99832c-c243-4323-ac40-67eeb61f194a"
+        ],
+        "episode_id": "a552cb7c-2b65-46ba-be30-87fd5ea732f2",
+        "event_at": null,
+        "id": "1d18167e-ebfd-4a51-8448-b31f2eb34f30",
+        "kind": "fact",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_value": "mira",
+        "predicate": "ownership",
+        "recorded_at": "2026-10-13T19:17:03.93519+00:00",
+        "revision": 549,
+        "slot_key": "9a180099-23b2-404d-8be9-543bdd163d1b::ownership",
+        "statement": "According to the user's report, Mira said she owns Project Orion.",
+        "status": "active",
+        "subject_id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "valid_from": "2026-10-13T19:16:42.95+00:00",
+        "valid_to": null,
+        "value": "Mira"
+      },
+      {
+        "cardinality": "single",
+        "confidence": 0.98,
+        "entity_ids": [
+          "9a180099-23b2-404d-8be9-543bdd163d1b",
+          "ad99832c-c243-4323-ac40-67eeb61f194a",
+          "9a5e3ed3-f063-4558-ab6d-bde8643d2463"
+        ],
+        "episode_id": "a552cb7c-2b65-46ba-be30-87fd5ea732f2",
+        "event_at": null,
+        "id": "fcf28521-5961-41bc-928c-8a18a2c9372f",
+        "kind": "fact",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_value": "postgresql",
+        "predicate": "database_backend",
+        "recorded_at": "2026-10-13T19:17:03.93519+00:00",
+        "revision": 547,
+        "slot_key": "9a180099-23b2-404d-8be9-543bdd163d1b::database_backend",
+        "statement": "Mira reported that Project Orion uses PostgreSQL as its database.",
+        "status": "active",
+        "subject_id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "valid_from": "2026-10-13T19:16:42.95+00:00",
+        "valid_to": null,
+        "value": "PostgreSQL"
+      }
+    ],
+    "edges": [
+      {
+        "created_at": "2026-10-13T19:17:12.218269+00:00",
+        "explanation": "Both claims describe Project Orion's ownership and database.",
+        "from_id": "ced0ee15-961e-4372-9232-6221a1a41daf",
+        "namespace": "guide:live-ready-1791918973580",
+        "relation": "supports",
+        "to_id": "1d18167e-ebfd-4a51-8448-b31f2eb34f30"
+      },
+      {
+        "created_at": "2026-10-13T19:17:12.218269+00:00",
+        "explanation": "Both claims describe Project Orion's ownership and database.",
+        "from_id": "ced0ee15-961e-4372-9232-6221a1a41daf",
+        "namespace": "guide:live-ready-1791918973580",
+        "relation": "supports",
+        "to_id": "fcf28521-5961-41bc-928c-8a18a2c9372f"
+      }
+    ],
+    "entities": [
+      {
+        "aliases": [],
+        "entity_type": "person",
+        "id": "ad99832c-c243-4323-ac40-67eeb61f194a",
+        "name": "Mira",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_name": "mira"
+      },
+      {
+        "aliases": [],
+        "entity_type": "technology",
+        "id": "9a5e3ed3-f063-4558-ab6d-bde8643d2463",
+        "name": "PostgreSQL",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_name": "postgresql"
+      },
+      {
+        "aliases": [],
+        "entity_type": "project",
+        "id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "name": "Project Orion",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_name": "project orion"
+      }
+    ],
+    "status": {
+      "embedding_gaps": {
+        "active_assertions": 0,
+        "source_chunks": 0
+      },
+      "jobs": [
+        {
+          "count": 3,
+          "kind": "consolidate",
+          "oldest": "2026-10-13T19:16:46.713247+00:00",
+          "status": "succeeded"
+        },
+        {
+          "count": 3,
+          "kind": "extract",
+          "oldest": "2026-10-13T19:16:42.971104+00:00",
+          "status": "succeeded"
+        },
+        {
+          "count": 3,
+          "kind": "project",
+          "oldest": "2026-10-13T19:17:03.93519+00:00",
+          "status": "succeeded"
+        }
+      ],
+      "last_projection_completed_at": "2026-10-13T19:17:12.434718Z",
+      "namespace": "guide:live-ready-1791918973580",
+      "outstanding_jobs": 0,
+      "ready": true,
+      "stale_observations": 0,
+      "worker_operations": [
+        {
+          "attempts": 3,
+          "failed_attempts": 0,
+          "mean_ms": 2436,
+          "operation": "worker_consolidate",
+          "total_ms": 7308
+        },
+        {
+          "attempts": 3,
+          "failed_attempts": 0,
+          "mean_ms": 7149.666666666667,
+          "operation": "worker_extract",
+          "total_ms": 21449
+        },
+        {
+          "attempts": 3,
+          "failed_attempts": 0,
+          "mean_ms": 75,
+          "operation": "worker_project",
+          "total_ms": 225
+        }
+      ]
+    }
+  },
+  "after": {
+    "assertions": [
+      {
+        "cardinality": "multiple",
+        "confidence": 0.97,
+        "entity_ids": [
+          "9a180099-23b2-404d-8be9-543bdd163d1b",
+          "ad99832c-c243-4323-ac40-67eeb61f194a",
+          "9a5e3ed3-f063-4558-ab6d-bde8643d2463"
+        ],
+        "episode_id": null,
+        "event_at": null,
+        "id": "ced0ee15-961e-4372-9232-6221a1a41daf",
+        "kind": "observation",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_value": "mira owns it; uses postgresql",
+        "predicate": "project_configuration_summary",
+        "recorded_at": "2026-10-13T19:17:12.218269+00:00",
+        "revision": 550,
+        "slot_key": "9a180099-23b2-404d-8be9-543bdd163d1b::project_configuration_summary",
+        "statement": "Project Orion is reported to be owned by Mira and use PostgreSQL.",
+        "status": "active",
+        "subject_id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "valid_from": "2026-10-13T19:16:42.95+00:00",
+        "valid_to": null,
+        "value": "Mira owns it; uses PostgreSQL"
+      },
+      {
+        "cardinality": "single",
+        "confidence": 0.98,
+        "entity_ids": [
+          "9a180099-23b2-404d-8be9-543bdd163d1b",
+          "ad99832c-c243-4323-ac40-67eeb61f194a"
+        ],
+        "episode_id": "a552cb7c-2b65-46ba-be30-87fd5ea732f2",
+        "event_at": null,
+        "id": "1d18167e-ebfd-4a51-8448-b31f2eb34f30",
+        "kind": "fact",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_value": "mira",
+        "predicate": "ownership",
+        "recorded_at": "2026-10-13T19:17:03.93519+00:00",
+        "revision": 549,
+        "slot_key": "9a180099-23b2-404d-8be9-543bdd163d1b::ownership",
+        "statement": "According to the user's report, Mira said she owns Project Orion.",
+        "status": "active",
+        "subject_id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "valid_from": "2026-10-13T19:16:42.95+00:00",
+        "valid_to": null,
+        "value": "Mira"
+      },
+      {
+        "cardinality": "single",
+        "confidence": 0.98,
+        "entity_ids": [
+          "9a180099-23b2-404d-8be9-543bdd163d1b",
+          "ad99832c-c243-4323-ac40-67eeb61f194a",
+          "9a5e3ed3-f063-4558-ab6d-bde8643d2463"
+        ],
+        "episode_id": "a552cb7c-2b65-46ba-be30-87fd5ea732f2",
+        "event_at": null,
+        "id": "fcf28521-5961-41bc-928c-8a18a2c9372f",
+        "kind": "fact",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_value": "postgresql",
+        "predicate": "database_backend",
+        "recorded_at": "2026-10-13T19:17:03.93519+00:00",
+        "revision": 547,
+        "slot_key": "9a180099-23b2-404d-8be9-543bdd163d1b::database_backend",
+        "statement": "Mira reported that Project Orion uses PostgreSQL as its database.",
+        "status": "active",
+        "subject_id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "valid_from": "2026-10-13T19:16:42.95+00:00",
+        "valid_to": null,
+        "value": "PostgreSQL"
+      }
+    ],
+    "edges": [
+      {
+        "created_at": "2026-10-13T19:17:12.218269+00:00",
+        "explanation": "Both claims describe Project Orion's ownership and database.",
+        "from_id": "ced0ee15-961e-4372-9232-6221a1a41daf",
+        "namespace": "guide:live-ready-1791918973580",
+        "relation": "supports",
+        "to_id": "1d18167e-ebfd-4a51-8448-b31f2eb34f30"
+      },
+      {
+        "created_at": "2026-10-13T19:17:12.218269+00:00",
+        "explanation": "Both claims describe Project Orion's ownership and database.",
+        "from_id": "ced0ee15-961e-4372-9232-6221a1a41daf",
+        "namespace": "guide:live-ready-1791918973580",
+        "relation": "supports",
+        "to_id": "fcf28521-5961-41bc-928c-8a18a2c9372f"
+      }
+    ],
+    "entities": [
+      {
+        "aliases": [],
+        "entity_type": "person",
+        "id": "ad99832c-c243-4323-ac40-67eeb61f194a",
+        "name": "Mira",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_name": "mira"
+      },
+      {
+        "aliases": [],
+        "entity_type": "technology",
+        "id": "9a5e3ed3-f063-4558-ab6d-bde8643d2463",
+        "name": "PostgreSQL",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_name": "postgresql"
+      },
+      {
+        "aliases": [],
+        "entity_type": "project",
+        "id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "name": "Project Orion",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_name": "project orion"
+      }
+    ],
+    "status": {
+      "embedding_gaps": {
+        "active_assertions": 0,
+        "source_chunks": 0
+      },
+      "jobs": [
+        {
+          "count": 4,
+          "kind": "consolidate",
+          "oldest": "2026-10-13T19:16:46.713247+00:00",
+          "status": "succeeded"
+        },
+        {
+          "count": 4,
+          "kind": "extract",
+          "oldest": "2026-10-13T19:16:42.971104+00:00",
+          "status": "succeeded"
+        },
+        {
+          "count": 3,
+          "kind": "project",
+          "oldest": "2026-10-13T19:17:03.93519+00:00",
+          "status": "succeeded"
+        }
+      ],
+      "last_projection_completed_at": "2026-10-13T19:17:12.434718Z",
+      "namespace": "guide:live-ready-1791918973580",
+      "outstanding_jobs": 0,
+      "ready": true,
+      "stale_observations": 0,
+      "worker_operations": [
+        {
+          "attempts": 4,
+          "failed_attempts": 0,
+          "mean_ms": 1828.5,
+          "operation": "worker_consolidate",
+          "total_ms": 7314
+        },
+        {
+          "attempts": 4,
+          "failed_attempts": 0,
+          "mean_ms": 6295.25,
+          "operation": "worker_extract",
+          "total_ms": 25181
+        },
+        {
+          "attempts": 3,
+          "failed_attempts": 0,
+          "mean_ms": 75,
+          "operation": "worker_project",
+          "total_ms": 225
+        }
+      ]
+    }
+  },
+  "corrected": {
+    "assertions": [
+      {
+        "cardinality": "single",
+        "confidence": 0.98,
+        "entity_ids": [
+          "9a180099-23b2-404d-8be9-543bdd163d1b",
+          "39225714-355e-47e5-9251-0ee57480e702",
+          "ad99832c-c243-4323-ac40-67eeb61f194a"
+        ],
+        "episode_id": "9b091219-0c2d-446e-aade-3b5d3dc1e6bb",
+        "event_at": null,
+        "id": "083e0e6a-9d45-433f-89ce-986add82ed87",
+        "kind": "fact",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_value": "sqlite",
+        "predicate": "database_backend",
+        "recorded_at": "2026-10-13T19:18:21.987956+00:00",
+        "revision": 556,
+        "slot_key": "9a180099-23b2-404d-8be9-543bdd163d1b::database_backend",
+        "statement": "Project Orion's database backend is SQLite.",
+        "status": "active",
+        "subject_id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "valid_from": "2026-10-13T19:18:13.645+00:00",
+        "valid_to": null,
+        "value": "SQLite"
+      },
+      {
+        "cardinality": "multiple",
+        "confidence": 0.97,
+        "entity_ids": [
+          "9a180099-23b2-404d-8be9-543bdd163d1b",
+          "ad99832c-c243-4323-ac40-67eeb61f194a",
+          "9a5e3ed3-f063-4558-ab6d-bde8643d2463"
+        ],
+        "episode_id": null,
+        "event_at": null,
+        "id": "ced0ee15-961e-4372-9232-6221a1a41daf",
+        "kind": "observation",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_value": "mira owns it; uses postgresql",
+        "predicate": "project_configuration_summary",
+        "recorded_at": "2026-10-13T19:17:12.218269+00:00",
+        "revision": 552,
+        "slot_key": "9a180099-23b2-404d-8be9-543bdd163d1b::project_configuration_summary",
+        "statement": "Project Orion is reported to be owned by Mira and use PostgreSQL.",
+        "status": "stale",
+        "subject_id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "valid_from": "2026-10-13T19:16:42.95+00:00",
+        "valid_to": null,
+        "value": "Mira owns it; uses PostgreSQL"
+      },
+      {
+        "cardinality": "single",
+        "confidence": 0.98,
+        "entity_ids": [
+          "9a180099-23b2-404d-8be9-543bdd163d1b",
+          "ad99832c-c243-4323-ac40-67eeb61f194a"
+        ],
+        "episode_id": "a552cb7c-2b65-46ba-be30-87fd5ea732f2",
+        "event_at": null,
+        "id": "1d18167e-ebfd-4a51-8448-b31f2eb34f30",
+        "kind": "fact",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_value": "mira",
+        "predicate": "ownership",
+        "recorded_at": "2026-10-13T19:17:03.93519+00:00",
+        "revision": 549,
+        "slot_key": "9a180099-23b2-404d-8be9-543bdd163d1b::ownership",
+        "statement": "According to the user's report, Mira said she owns Project Orion.",
+        "status": "active",
+        "subject_id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "valid_from": "2026-10-13T19:16:42.95+00:00",
+        "valid_to": null,
+        "value": "Mira"
+      },
+      {
+        "cardinality": "single",
+        "confidence": 0.98,
+        "entity_ids": [
+          "9a180099-23b2-404d-8be9-543bdd163d1b",
+          "ad99832c-c243-4323-ac40-67eeb61f194a",
+          "9a5e3ed3-f063-4558-ab6d-bde8643d2463"
+        ],
+        "episode_id": "a552cb7c-2b65-46ba-be30-87fd5ea732f2",
+        "event_at": null,
+        "id": "fcf28521-5961-41bc-928c-8a18a2c9372f",
+        "kind": "fact",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_value": "postgresql",
+        "predicate": "database_backend",
+        "recorded_at": "2026-10-13T19:17:03.93519+00:00",
+        "revision": 551,
+        "slot_key": "9a180099-23b2-404d-8be9-543bdd163d1b::database_backend",
+        "statement": "Mira reported that Project Orion uses PostgreSQL as its database.",
+        "status": "superseded",
+        "subject_id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "valid_from": "2026-10-13T19:16:42.95+00:00",
+        "valid_to": "2026-10-13T19:18:13.645+00:00",
+        "value": "PostgreSQL"
+      }
+    ],
+    "edges": [
+      {
+        "created_at": "2026-10-13T19:17:12.218269+00:00",
+        "explanation": "Both claims describe Project Orion's ownership and database.",
+        "from_id": "ced0ee15-961e-4372-9232-6221a1a41daf",
+        "namespace": "guide:live-ready-1791918973580",
+        "relation": "supports",
+        "to_id": "1d18167e-ebfd-4a51-8448-b31f2eb34f30"
+      },
+      {
+        "created_at": "2026-10-13T19:17:12.218269+00:00",
+        "explanation": "Both claims describe Project Orion's ownership and database.",
+        "from_id": "ced0ee15-961e-4372-9232-6221a1a41daf",
+        "namespace": "guide:live-ready-1791918973580",
+        "relation": "supports",
+        "to_id": "fcf28521-5961-41bc-928c-8a18a2c9372f"
+      },
+      {
+        "created_at": "2026-10-13T19:18:21.987956+00:00",
+        "explanation": "The user explicitly replaces PostgreSQL with SQLite.",
+        "from_id": "083e0e6a-9d45-433f-89ce-986add82ed87",
+        "namespace": "guide:live-ready-1791918973580",
+        "relation": "supersedes",
+        "to_id": "fcf28521-5961-41bc-928c-8a18a2c9372f"
+      },
+      {
+        "created_at": "2026-10-13T19:18:21.987956+00:00",
+        "explanation": "SQLite directly supersedes the earlier PostgreSQL claim.",
+        "from_id": "083e0e6a-9d45-433f-89ce-986add82ed87",
+        "namespace": "guide:live-ready-1791918973580",
+        "relation": "contradicts",
+        "to_id": "fcf28521-5961-41bc-928c-8a18a2c9372f"
+      }
+    ],
+    "entities": [
+      {
+        "aliases": [
+          "mira"
+        ],
+        "entity_type": "person",
+        "id": "ad99832c-c243-4323-ac40-67eeb61f194a",
+        "name": "Mira",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_name": "mira"
+      },
+      {
+        "aliases": [],
+        "entity_type": "technology",
+        "id": "9a5e3ed3-f063-4558-ab6d-bde8643d2463",
+        "name": "PostgreSQL",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_name": "postgresql"
+      },
+      {
+        "aliases": [
+          "project orion",
+          "project orion"
+        ],
+        "entity_type": "project",
+        "id": "9a180099-23b2-404d-8be9-543bdd163d1b",
+        "name": "Project Orion",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_name": "project orion"
+      },
+      {
+        "aliases": [],
+        "entity_type": "technology",
+        "id": "39225714-355e-47e5-9251-0ee57480e702",
+        "name": "SQLite",
+        "namespace": "guide:live-ready-1791918973580",
+        "normalized_name": "sqlite"
+      }
+    ],
+    "status": {
+      "embedding_gaps": {
+        "active_assertions": 0,
+        "source_chunks": 0
+      },
+      "jobs": [
+        {
+          "count": 6,
+          "kind": "consolidate",
+          "oldest": "2026-10-13T19:16:46.713247+00:00",
+          "status": "succeeded"
+        },
+        {
+          "count": 6,
+          "kind": "extract",
+          "oldest": "2026-10-13T19:16:42.971104+00:00",
+          "status": "succeeded"
+        },
+        {
+          "count": 7,
+          "kind": "project",
+          "oldest": "2026-10-13T19:17:03.93519+00:00",
+          "status": "succeeded"
+        }
+      ],
+      "last_projection_completed_at": "2026-10-13T19:18:32.179917Z",
+      "namespace": "guide:live-ready-1791918973580",
+      "outstanding_jobs": 0,
+      "ready": true,
+      "stale_observations": 1,
+      "worker_operations": [
+        {
+          "attempts": 6,
+          "failed_attempts": 0,
+          "mean_ms": 1338.5,
+          "operation": "worker_consolidate",
+          "total_ms": 8031
+        },
+        {
+          "attempts": 6,
+          "failed_attempts": 0,
+          "mean_ms": 7187.5,
+          "operation": "worker_extract",
+          "total_ms": 43125
+        },
+        {
+          "attempts": 7,
+          "failed_attempts": 0,
+          "mean_ms": 44.714285714285715,
+          "operation": "worker_project",
+          "total_ms": 313
+        }
+      ]
+    }
+  }
+}

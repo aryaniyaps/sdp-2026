@@ -1,0 +1,623 @@
+{
+  "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+  "port": 8080,
+  "retain": {
+    "created": true,
+    "episode_id": "665dd5b0-daef-4c51-bb40-5835f566fca0",
+    "job_id": "0561efa1-23a7-48ab-a5ce-21ff50f1d486"
+  },
+  "jobs": [
+    {
+      "attempts": 1,
+      "error": null,
+      "id": "830dfbf1-691f-4828-afc2-4a2be4e57750",
+      "kind": "project",
+      "lease_token": null,
+      "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+      "payload": {
+        "assertion_id": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01"
+      },
+      "result": {
+        "assertion_id": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "revision": 98
+      },
+      "status": "succeeded"
+    },
+    {
+      "attempts": 1,
+      "error": null,
+      "id": "eecc9590-846e-4f3b-ac85-f16a9970af95",
+      "kind": "project",
+      "lease_token": null,
+      "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+      "payload": {
+        "assertion_id": "fe7f3e05-4f2a-486f-b6cc-58882ebf0bdb"
+      },
+      "result": {
+        "assertion_id": "fe7f3e05-4f2a-486f-b6cc-58882ebf0bdb",
+        "revision": 97
+      },
+      "status": "succeeded"
+    },
+    {
+      "attempts": 1,
+      "error": null,
+      "id": "bf63a3f7-5d95-4796-9b68-11a6d0515db4",
+      "kind": "project",
+      "lease_token": null,
+      "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+      "payload": {
+        "assertion_id": "218c52da-42c4-4bd7-956e-59a740252b50"
+      },
+      "result": {
+        "assertion_id": "218c52da-42c4-4bd7-956e-59a740252b50",
+        "revision": 93
+      },
+      "status": "succeeded"
+    },
+    {
+      "attempts": 1,
+      "error": null,
+      "id": "e12de570-9049-4f75-bd40-433609837e90",
+      "kind": "project",
+      "lease_token": null,
+      "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+      "payload": {
+        "assertion_id": "26bf75fc-b8c3-48a8-9674-2286aaf27d27"
+      },
+      "result": {
+        "assertion_id": "26bf75fc-b8c3-48a8-9674-2286aaf27d27",
+        "revision": 95
+      },
+      "status": "succeeded"
+    },
+    {
+      "attempts": 1,
+      "error": null,
+      "id": "69c5b2fe-08b3-4054-aac8-b429f06f401e",
+      "kind": "consolidate",
+      "lease_token": null,
+      "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+      "payload": {
+        "episode_id": "665dd5b0-daef-4c51-bb40-5835f566fca0"
+      },
+      "result": {
+        "observation_ids": [
+          "f48ec64c-3eb1-4be7-ac8e-6018218b4f01"
+        ]
+      },
+      "status": "succeeded"
+    },
+    {
+      "attempts": 1,
+      "error": null,
+      "id": "0561efa1-23a7-48ab-a5ce-21ff50f1d486",
+      "kind": "extract",
+      "lease_token": null,
+      "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+      "payload": {
+        "episode_id": "665dd5b0-daef-4c51-bb40-5835f566fca0",
+        "existing_snapshot": []
+      },
+      "result": {
+        "decisions": [
+          {
+            "action": "created",
+            "assertion_id": "218c52da-42c4-4bd7-956e-59a740252b50",
+            "explanation": "The user directly states their name."
+          },
+          {
+            "action": "created",
+            "assertion_id": "26bf75fc-b8c3-48a8-9674-2286aaf27d27",
+            "explanation": "The user directly states their meal preference."
+          },
+          {
+            "action": "created",
+            "assertion_id": "fe7f3e05-4f2a-486f-b6cc-58882ebf0bdb",
+            "explanation": "The user directly states the restaurant constraint."
+          }
+        ],
+        "episode_id": "665dd5b0-daef-4c51-bb40-5835f566fca0"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "graph": {
+    "assertions": [
+      {
+        "cardinality": "multiple",
+        "confidence": 0.98,
+        "entity_ids": [
+          "de9253df-db61-4352-9686-2ba2d14ec572",
+          "d4d02bb8-be43-4a30-b23e-c10c1bb4cee2",
+          "2321c212-d3d4-4e70-b458-e8eaeda5c7fc",
+          "8aebf869-ff64-42fc-b350-c60acc7a8240"
+        ],
+        "episode_id": null,
+        "event_at": null,
+        "id": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "kind": "observation",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+        "normalized_value": "vegetarian meals; no meat at restaurants",
+        "predicate": "vegetarian_preference_summary",
+        "recorded_at": "2026-10-14T10:15:26.349036+00:00",
+        "revision": 98,
+        "slot_key": "de9253df-db61-4352-9686-2ba2d14ec572::vegetarian_preference_summary",
+        "statement": "Maya Sen prefers vegetarian meals and avoids meat at restaurants.",
+        "status": "active",
+        "subject_id": "de9253df-db61-4352-9686-2ba2d14ec572",
+        "valid_from": "2026-10-14T10:14:45.946224+00:00",
+        "valid_to": null,
+        "value": "Vegetarian meals; no meat at restaurants"
+      },
+      {
+        "cardinality": "single",
+        "confidence": 1,
+        "entity_ids": [
+          "de9253df-db61-4352-9686-2ba2d14ec572"
+        ],
+        "episode_id": "665dd5b0-daef-4c51-bb40-5835f566fca0",
+        "event_at": null,
+        "id": "218c52da-42c4-4bd7-956e-59a740252b50",
+        "kind": "profile",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+        "normalized_value": "maya sen",
+        "predicate": "identity",
+        "recorded_at": "2026-10-14T10:15:16.928369+00:00",
+        "revision": 93,
+        "slot_key": "de9253df-db61-4352-9686-2ba2d14ec572::identity",
+        "statement": "The user identifies as Maya Sen.",
+        "status": "active",
+        "subject_id": "de9253df-db61-4352-9686-2ba2d14ec572",
+        "valid_from": "2026-10-14T10:14:45.946224+00:00",
+        "valid_to": null,
+        "value": "Maya Sen"
+      },
+      {
+        "cardinality": "single",
+        "confidence": 1,
+        "entity_ids": [
+          "de9253df-db61-4352-9686-2ba2d14ec572",
+          "8aebf869-ff64-42fc-b350-c60acc7a8240"
+        ],
+        "episode_id": "665dd5b0-daef-4c51-bb40-5835f566fca0",
+        "event_at": null,
+        "id": "26bf75fc-b8c3-48a8-9674-2286aaf27d27",
+        "kind": "preference",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+        "normalized_value": "vegetarian meals",
+        "predicate": "meal_preference",
+        "recorded_at": "2026-10-14T10:15:16.928369+00:00",
+        "revision": 95,
+        "slot_key": "de9253df-db61-4352-9686-2ba2d14ec572::meal_preference",
+        "statement": "Maya Sen prefers vegetarian meals.",
+        "status": "active",
+        "subject_id": "de9253df-db61-4352-9686-2ba2d14ec572",
+        "valid_from": "2026-10-14T10:14:45.946224+00:00",
+        "valid_to": null,
+        "value": "vegetarian meals"
+      },
+      {
+        "cardinality": "single",
+        "confidence": 1,
+        "entity_ids": [
+          "de9253df-db61-4352-9686-2ba2d14ec572",
+          "d4d02bb8-be43-4a30-b23e-c10c1bb4cee2",
+          "2321c212-d3d4-4e70-b458-e8eaeda5c7fc"
+        ],
+        "episode_id": "665dd5b0-daef-4c51-bb40-5835f566fca0",
+        "event_at": null,
+        "id": "fe7f3e05-4f2a-486f-b6cc-58882ebf0bdb",
+        "kind": "preference",
+        "model": "ollama/mem-extractor:general-v1",
+        "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+        "normalized_value": "avoids meat at restaurants",
+        "predicate": "restaurant_meal_constraint",
+        "recorded_at": "2026-10-14T10:15:16.928369+00:00",
+        "revision": 97,
+        "slot_key": "de9253df-db61-4352-9686-2ba2d14ec572::restaurant_meal_constraint",
+        "statement": "When choosing restaurants, Maya Sen avoids meat.",
+        "status": "active",
+        "subject_id": "de9253df-db61-4352-9686-2ba2d14ec572",
+        "valid_from": "2026-10-14T10:14:45.946224+00:00",
+        "valid_to": null,
+        "value": "avoids meat at restaurants"
+      }
+    ],
+    "edges": [
+      {
+        "created_at": "2026-10-14T10:15:26.349036+00:00",
+        "explanation": "Both claims describe Maya Sen's vegetarian preference.",
+        "from_id": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+        "relation": "supports",
+        "to_id": "26bf75fc-b8c3-48a8-9674-2286aaf27d27"
+      },
+      {
+        "created_at": "2026-10-14T10:15:26.349036+00:00",
+        "explanation": "Both claims describe Maya Sen's vegetarian preference.",
+        "from_id": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+        "relation": "supports",
+        "to_id": "fe7f3e05-4f2a-486f-b6cc-58882ebf0bdb"
+      }
+    ],
+    "entities": [
+      {
+        "aliases": [],
+        "entity_type": "person",
+        "id": "de9253df-db61-4352-9686-2ba2d14ec572",
+        "name": "Maya Sen",
+        "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+        "normalized_name": "maya sen"
+      },
+      {
+        "aliases": [],
+        "entity_type": "project",
+        "id": "d4d02bb8-be43-4a30-b23e-c10c1bb4cee2",
+        "name": "meat",
+        "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+        "normalized_name": "meat"
+      },
+      {
+        "aliases": [],
+        "entity_type": "place",
+        "id": "2321c212-d3d4-4e70-b458-e8eaeda5c7fc",
+        "name": "restaurants",
+        "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+        "normalized_name": "restaurants"
+      },
+      {
+        "aliases": [],
+        "entity_type": "project",
+        "id": "8aebf869-ff64-42fc-b350-c60acc7a8240",
+        "name": "vegetarian meals",
+        "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+        "normalized_name": "vegetarian meals"
+      }
+    ],
+    "status": {
+      "embedding_gaps": {
+        "active_assertions": 0,
+        "source_chunks": 0
+      },
+      "jobs": [
+        {
+          "count": 1,
+          "kind": "consolidate",
+          "oldest": "2026-10-14T10:15:16.928369+00:00",
+          "status": "succeeded"
+        },
+        {
+          "count": 1,
+          "kind": "extract",
+          "oldest": "2026-10-14T10:14:45.948389+00:00",
+          "status": "succeeded"
+        },
+        {
+          "count": 4,
+          "kind": "project",
+          "oldest": "2026-10-14T10:15:16.928369+00:00",
+          "status": "succeeded"
+        }
+      ],
+      "last_projection_completed_at": "2026-10-14T10:15:26.757797Z",
+      "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+      "outstanding_jobs": 0,
+      "ready": true,
+      "stale_observations": 0,
+      "worker_operations": [
+        {
+          "attempts": 1,
+          "failed_attempts": 0,
+          "mean_ms": 9394.0,
+          "operation": "worker_consolidate",
+          "total_ms": 9394
+        },
+        {
+          "attempts": 1,
+          "failed_attempts": 0,
+          "mean_ms": 30689.0,
+          "operation": "worker_extract",
+          "total_ms": 30689
+        },
+        {
+          "attempts": 4,
+          "failed_attempts": 0,
+          "mean_ms": 77.0,
+          "operation": "worker_project",
+          "total_ms": 308
+        }
+      ]
+    }
+  },
+  "projection": {
+    "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+    "source": "neo4j",
+    "nodes": [
+      {
+        "id": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "kind": "assertion",
+        "name": "Maya Sen prefers vegetarian meals and avoids meat at restaur...",
+        "statement": "Maya Sen prefers vegetarian meals and avoids meat at restaurants.",
+        "status": "active",
+        "assertion_kind": "observation",
+        "entity_type": null,
+        "valid_from": "2026-10-14T10:14:45.946224Z",
+        "valid_to": null,
+        "revision": 98
+      },
+      {
+        "id": "fe7f3e05-4f2a-486f-b6cc-58882ebf0bdb",
+        "kind": "assertion",
+        "name": "When choosing restaurants, Maya Sen avoids meat.",
+        "statement": "When choosing restaurants, Maya Sen avoids meat.",
+        "status": "active",
+        "assertion_kind": "preference",
+        "entity_type": null,
+        "valid_from": "2026-10-14T10:14:45.946224Z",
+        "valid_to": null,
+        "revision": 97
+      },
+      {
+        "id": "26bf75fc-b8c3-48a8-9674-2286aaf27d27",
+        "kind": "assertion",
+        "name": "Maya Sen prefers vegetarian meals.",
+        "statement": "Maya Sen prefers vegetarian meals.",
+        "status": "active",
+        "assertion_kind": "preference",
+        "entity_type": null,
+        "valid_from": "2026-10-14T10:14:45.946224Z",
+        "valid_to": null,
+        "revision": 95
+      },
+      {
+        "id": "218c52da-42c4-4bd7-956e-59a740252b50",
+        "kind": "assertion",
+        "name": "The user identifies as Maya Sen.",
+        "statement": "The user identifies as Maya Sen.",
+        "status": "active",
+        "assertion_kind": "profile",
+        "entity_type": null,
+        "valid_from": "2026-10-14T10:14:45.946224Z",
+        "valid_to": null,
+        "revision": 93
+      },
+      {
+        "id": "de9253df-db61-4352-9686-2ba2d14ec572",
+        "kind": "entity",
+        "name": "Maya Sen",
+        "statement": null,
+        "status": null,
+        "assertion_kind": null,
+        "entity_type": "person",
+        "valid_from": null,
+        "valid_to": null,
+        "revision": null
+      },
+      {
+        "id": "d4d02bb8-be43-4a30-b23e-c10c1bb4cee2",
+        "kind": "entity",
+        "name": "meat",
+        "statement": null,
+        "status": null,
+        "assertion_kind": null,
+        "entity_type": "project",
+        "valid_from": null,
+        "valid_to": null,
+        "revision": null
+      },
+      {
+        "id": "2321c212-d3d4-4e70-b458-e8eaeda5c7fc",
+        "kind": "entity",
+        "name": "restaurants",
+        "statement": null,
+        "status": null,
+        "assertion_kind": null,
+        "entity_type": "place",
+        "valid_from": null,
+        "valid_to": null,
+        "revision": null
+      },
+      {
+        "id": "8aebf869-ff64-42fc-b350-c60acc7a8240",
+        "kind": "entity",
+        "name": "vegetarian meals",
+        "statement": null,
+        "status": null,
+        "assertion_kind": null,
+        "entity_type": "project",
+        "valid_from": null,
+        "valid_to": null,
+        "revision": null
+      }
+    ],
+    "relationships": [
+      {
+        "from": "218c52da-42c4-4bd7-956e-59a740252b50",
+        "to": "de9253df-db61-4352-9686-2ba2d14ec572",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "26bf75fc-b8c3-48a8-9674-2286aaf27d27",
+        "to": "8aebf869-ff64-42fc-b350-c60acc7a8240",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "26bf75fc-b8c3-48a8-9674-2286aaf27d27",
+        "to": "de9253df-db61-4352-9686-2ba2d14ec572",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "to": "2321c212-d3d4-4e70-b458-e8eaeda5c7fc",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "to": "26bf75fc-b8c3-48a8-9674-2286aaf27d27",
+        "type": "SUPPORTS",
+        "relation": "supports",
+        "explanation": "Both claims describe Maya Sen's vegetarian preference."
+      },
+      {
+        "from": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "to": "8aebf869-ff64-42fc-b350-c60acc7a8240",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "to": "d4d02bb8-be43-4a30-b23e-c10c1bb4cee2",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "to": "de9253df-db61-4352-9686-2ba2d14ec572",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+        "to": "fe7f3e05-4f2a-486f-b6cc-58882ebf0bdb",
+        "type": "SUPPORTS",
+        "relation": "supports",
+        "explanation": "Both claims describe Maya Sen's vegetarian preference."
+      },
+      {
+        "from": "fe7f3e05-4f2a-486f-b6cc-58882ebf0bdb",
+        "to": "2321c212-d3d4-4e70-b458-e8eaeda5c7fc",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "fe7f3e05-4f2a-486f-b6cc-58882ebf0bdb",
+        "to": "d4d02bb8-be43-4a30-b23e-c10c1bb4cee2",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "fe7f3e05-4f2a-486f-b6cc-58882ebf0bdb",
+        "to": "de9253df-db61-4352-9686-2ba2d14ec572",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      }
+    ],
+    "counts": {
+      "nodes": 8,
+      "relationships": 12
+    },
+    "truncated": false
+  },
+  "status": {
+    "embedding_gaps": {
+      "active_assertions": 0,
+      "source_chunks": 0
+    },
+    "jobs": [
+      {
+        "count": 1,
+        "kind": "consolidate",
+        "oldest": "2026-10-14T10:15:16.928369+00:00",
+        "status": "succeeded"
+      },
+      {
+        "count": 1,
+        "kind": "extract",
+        "oldest": "2026-10-14T10:14:45.948389+00:00",
+        "status": "succeeded"
+      },
+      {
+        "count": 4,
+        "kind": "project",
+        "oldest": "2026-10-14T10:15:16.928369+00:00",
+        "status": "succeeded"
+      }
+    ],
+    "last_projection_completed_at": "2026-10-14T10:15:26.757797Z",
+    "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+    "outstanding_jobs": 0,
+    "ready": true,
+    "stale_observations": 0,
+    "worker_operations": [
+      {
+        "attempts": 1,
+        "failed_attempts": 0,
+        "mean_ms": 9394.0,
+        "operation": "worker_consolidate",
+        "total_ms": 9394
+      },
+      {
+        "attempts": 1,
+        "failed_attempts": 0,
+        "mean_ms": 30689.0,
+        "operation": "worker_extract",
+        "total_ms": 30689
+      },
+      {
+        "attempts": 4,
+        "failed_attempts": 0,
+        "mean_ms": 77.0,
+        "operation": "worker_project",
+        "total_ms": 308
+      }
+    ]
+  },
+  "observations": [
+    {
+      "cardinality": "multiple",
+      "confidence": 0.98,
+      "entity_ids": [
+        "de9253df-db61-4352-9686-2ba2d14ec572",
+        "d4d02bb8-be43-4a30-b23e-c10c1bb4cee2",
+        "2321c212-d3d4-4e70-b458-e8eaeda5c7fc",
+        "8aebf869-ff64-42fc-b350-c60acc7a8240"
+      ],
+      "episode_id": null,
+      "event_at": null,
+      "id": "f48ec64c-3eb1-4be7-ac8e-6018218b4f01",
+      "kind": "observation",
+      "model": "ollama/mem-extractor:general-v1",
+      "namespace": "diagnostic:worker-recovery:1878fa03-d76b-4c2b-8231-dc044478f70d",
+      "normalized_value": "vegetarian meals; no meat at restaurants",
+      "predicate": "vegetarian_preference_summary",
+      "recorded_at": "2026-10-14T10:15:26.349036+00:00",
+      "revision": 98,
+      "slot_key": "de9253df-db61-4352-9686-2ba2d14ec572::vegetarian_preference_summary",
+      "statement": "Maya Sen prefers vegetarian meals and avoids meat at restaurants.",
+      "status": "active",
+      "subject_id": "de9253df-db61-4352-9686-2ba2d14ec572",
+      "valid_from": "2026-10-14T10:14:45.946224+00:00",
+      "valid_to": null,
+      "value": "Vegetarian meals; no meat at restaurants"
+    }
+  ],
+  "checks": {
+    "all_jobs_succeeded": true,
+    "all_three_worker_kinds": true,
+    "source_facts_extracted": true,
+    "observation_created": true,
+    "ready": true,
+    "embeddings_complete": true,
+    "assertions_projected": true
+  },
+  "passed": true
+}

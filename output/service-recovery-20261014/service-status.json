@@ -1,0 +1,80 @@
+{
+  "checked_at": "2026-10-14T10:15:28.069830+00:00",
+  "recovery": {
+    "retried_job": "7b5d0c97-c6c9-4cbe-98d7-b8b51d839b60",
+    "cause": "Old native extraction exhausted retries because a quote did not match its source verbatim. Current worker successfully processed it after an API retry.",
+    "browser_queue": "Was draining during inspection; no service restart was needed."
+  },
+  "services": {
+    "browser": {
+      "health": {
+        "database": true,
+        "embedder": true,
+        "degraded_mode": false,
+        "worker_model": "ollama/mem-extractor:general-v1",
+        "worker_num_ctx": 12288,
+        "worker_num_predict": 3072,
+        "worker_concurrency": 2,
+        "embedding_model": "qwen3-embedding-cpu"
+      },
+      "jobs": [
+        {
+          "kind": "clear_graph",
+          "count": 3,
+          "status": "succeeded"
+        },
+        {
+          "kind": "consolidate",
+          "count": 249,
+          "status": "succeeded"
+        },
+        {
+          "kind": "extract",
+          "count": 249,
+          "status": "succeeded"
+        },
+        {
+          "kind": "project",
+          "count": 404,
+          "status": "succeeded"
+        }
+      ]
+    },
+    "native": {
+      "health": {
+        "database": true,
+        "embedder": true,
+        "degraded_mode": false,
+        "worker_model": "ollama/mem-extractor:general-v1",
+        "worker_num_ctx": 12288,
+        "worker_num_predict": 3072,
+        "worker_concurrency": 2,
+        "embedding_model": "qwen3-embedding-cpu"
+      },
+      "jobs": [
+        {
+          "kind": "consolidate",
+          "count": 16,
+          "status": "succeeded"
+        },
+        {
+          "kind": "extract",
+          "count": 16,
+          "status": "succeeded"
+        },
+        {
+          "kind": "project",
+          "count": 66,
+          "status": "succeeded"
+        }
+      ]
+    }
+  },
+  "persistence": {
+    "docker": "enabled",
+    "ollama": "UnitFileState=enabled\nRestart=always",
+    "native": "UnitFileState=enabled\nRestart=on-failure",
+    "linger": "Linger=yes",
+    "browser_containers": "/sdp-memory-local-engine-1 restart=unless-stopped\n/sdp-memory-local-postgres-1 restart=unless-stopped\n/sdp-memory-local-neo4j-1 restart=unless-stopped\n/sdp-memory-local-term-1 restart=unless-stopped"
+  }
+}

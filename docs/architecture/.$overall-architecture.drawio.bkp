@@ -1,0 +1,256 @@
+<mxfile host="Electron">
+  <diagram id="memory-engine-overall" name="Overall architecture">
+    <mxGraphModel dx="3535" dy="2250" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2730" pageHeight="1900" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=36;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=1;align=left;" value="Overall System Architecture" vertex="1">
+          <mxGeometry height="50" width="2580" x="40" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="engine" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#F7F9FC;strokeColor=#AEBCCC;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;dashed=1;dashPattern=6 4;" value="" vertex="1">
+          <mxGeometry height="420" width="2240" x="445" y="205" as="geometry" />
+        </mxCell>
+        <mxCell id="engine-title" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=19;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=1;align=left;" value="Memory service used by Pi coding agent: API handlers + asynchronous workers" vertex="1">
+          <mxGeometry height="32" width="2280" x="470" y="218" as="geometry" />
+        </mxCell>
+        <mxCell id="client" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#F1F5FA;strokeColor=#CAD4DF;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=19;align=left;verticalAlign=top;spacing=16;shape=document;size=0.08;spacingBottom=25;" value="&lt;b&gt;Pi coding agent&lt;/b&gt;&lt;br&gt;Memory client&lt;br&gt;&lt;br&gt;Talks to the user.&lt;br&gt;&lt;br&gt;Saves messages.&lt;br&gt;Recalls memory." vertex="1">
+          <mxGeometry height="235" width="210" x="40" y="285" as="geometry" />
+        </mxCell>
+        <mxCell id="m1" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;" value="" vertex="1">
+          <mxGeometry height="280" width="370" x="475" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="m1-title" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#2463A6;fontStyle=1;align=left;" value="(M1)&amp;nbsp; Evidence Acquisition&lt;br&gt;&amp;amp; Processing" vertex="1">
+          <mxGeometry height="62" width="320" x="510" y="298" as="geometry" />
+        </mxCell>
+        <mxCell id="m1-body" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=0;align=left;" value="Save episode, events and source chunks&lt;br&gt;One full-message chunk per event&lt;br&gt;Queue extraction; leases and retries" vertex="1">
+          <mxGeometry height="100" width="330" x="495" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="m1-out" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#EDF4FE;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=16;spacing=10;fontStyle=1;" value="Evidence saved; assertions come later" vertex="1">
+          <mxGeometry height="43" width="340" x="490" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7953AC;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;" value="" vertex="1">
+          <mxGeometry height="280" width="370" x="1075" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="m2-title" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#7953AC;fontStyle=1;align=left;" value="(M2)&amp;nbsp; Knowledge Extraction&lt;br&gt;&amp;amp; Consolidation" vertex="1">
+          <mxGeometry height="62" width="320" x="1110" y="298" as="geometry" />
+        </mxCell>
+        <mxCell id="m2-body" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=0;align=left;" value="Extract claims + entity descriptions&lt;br&gt;Validate quotes; review; embed claims&lt;br&gt;Consolidate supported observations" vertex="1">
+          <mxGeometry height="100" width="330" x="1095" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="m2-out" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#F4EFFA;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=16;spacing=10;fontStyle=1;" value="Candidate fact: Maya home city = Bengaluru" vertex="1">
+          <mxGeometry height="43" width="340" x="1090" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="m3" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;" value="" vertex="1">
+          <mxGeometry height="280" width="370" x="1675" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="m3-title" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#167F83;fontStyle=1;align=left;" value="(M3)&amp;nbsp; Temporal Knowledge&lt;br&gt;&amp;amp; Graph Management" vertex="1">
+          <mxGeometry height="62" width="320" x="1710" y="298" as="geometry" />
+        </mxCell>
+        <mxCell id="m3-body" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=0;align=left;" value="Create/reuse entities; persist assertions&lt;br&gt;Link sources, mentions and corrections&lt;br&gt;Queue projection; invalidate stale support" vertex="1">
+          <mxGeometry height="100" width="330" x="1695" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="m3-out" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#EAF7F5;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=16;spacing=10;fontStyle=1;" value="Bengaluru active; Chennai superseded" vertex="1">
+          <mxGeometry height="43" width="340" x="1690" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="m4" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#26754B;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;" value="" vertex="1">
+          <mxGeometry height="280" width="370" x="2275" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="m4-title" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#26754B;fontStyle=1;align=left;" value="(M4) Hybrid Retrieval&lt;br&gt;&amp;amp; Grounded Reasoning" vertex="1">
+          <mxGeometry height="62" width="320" x="2310" y="298" as="geometry" />
+        </mxCell>
+        <mxCell id="m4-body" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=0;align=left;" value="Use current prompt; text + vector search&lt;br&gt;Filter relevance; expand graph; rank hits&lt;br&gt;Pack evidence into a memory context" vertex="1">
+          <mxGeometry height="100" width="330" x="2295" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="m4-out" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#EEF7EF;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=16;spacing=10;fontStyle=1;" value="Evidence: statement, dates, sources" vertex="1">
+          <mxGeometry height="43" width="340" x="2290" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="retain" edge="1" parent="1" source="client" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="m1" value="save chat">
+          <mxGeometry relative="1" x="-0.0021" as="geometry">
+            <Array as="points">
+              <mxPoint x="250" y="420" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="queue" edge="1" parent="1" source="m1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;dashed=1;dashPattern=6 4;" target="m2" value="jobs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="claims" edge="1" parent="1" source="m2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="m3" value="apply">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="read" edge="1" parent="1" source="m4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#26754B;fontColor=#26754B;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;startArrow=block;startFill=1;" target="m3" value="read">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="query" edge="1" parent="1" source="client" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#26754B;fontColor=#26754B;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="m4" value="&lt;b&gt;Recall request from Pi&lt;/b&gt;&lt;br&gt;Namespace + E5: “What do you remember about where I live, my previous city, and my work?”">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="145" y="175" />
+              <mxPoint x="2460" y="175" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="feedback" edge="1" parent="1" source="m3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="m2" value="&lt;b&gt;Stored assertions supplied to the model&lt;/b&gt;&lt;br&gt;Before E3: Maya’s home city = Chennai">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1767.5" y="595" />
+              <mxPoint x="1352.5" y="595" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pg" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#EDF4FE;strokeColor=#2463A6;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=16;verticalAlign=middle;align=center;spacingTop=20;" value="&lt;b&gt;PostgreSQL + pgvector&lt;/b&gt;&lt;br&gt;Evidence + assertions&lt;br&gt;Entities, sources and vectors&lt;br&gt;Jobs, validity and traces" vertex="1">
+          <mxGeometry height="140" width="350" x="500" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="pg-users" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#516379;fontStyle=0;align=center;" value="Shared by M1, M2, M3 and M4" vertex="1">
+          <mxGeometry height="28" width="350" x="505" y="858" as="geometry" />
+        </mxCell>
+        <mxCell id="persist" edge="1" parent="1" source="m1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="pg" value="persist evidence + jobs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="knowledge-write" edge="1" parent="1" source="m3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=0.1;exitY=1;exitDx=0;exitDy=0;entryX=0.9;entryY=0;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="pg" value="transactional knowledge updates">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1712" y="655" />
+              <mxPoint x="815" y="655" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ollama" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#F4EFFA;strokeColor=#7953AC;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=20;align=left;verticalAlign=top;spacing=16;verticalAlign=middle;align=center;" value="&lt;b&gt;Ollama model serving&lt;/b&gt;&lt;br&gt;Generation: local memory worker&lt;br&gt;Embeddings: Qwen3 embedding" vertex="1">
+          <mxGeometry height="140" width="340" x="1100" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="model-users" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#516379;fontStyle=0;align=center;" value="Generation: M2; vectors: M1 / M2 / M4" vertex="1">
+          <mxGeometry height="28" width="340" x="1100" y="858" as="geometry" />
+        </mxCell>
+        <mxCell id="inference" edge="1" parent="1" source="m2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;startArrow=block;startFill=1;" target="ollama" value="model calls">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="neo" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#EAF7F5;strokeColor=#167F83;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=16;verticalAlign=middle;align=center;spacingTop=20;" value="&lt;b&gt;Neo4j&lt;/b&gt;&lt;br&gt;Assertion nodes&lt;br&gt;KnowledgeEntity nodes&lt;br&gt;MENTIONS / SUPPORTS" vertex="1">
+          <mxGeometry height="140" width="330" x="1690" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="neo-users" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#516379;fontStyle=0;align=center;" value="M4 validates graph hits in PostgreSQL" vertex="1">
+          <mxGeometry height="28" width="330" x="1690" y="858" as="geometry" />
+        </mxCell>
+        <mxCell id="project" edge="1" parent="1" source="m3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;dashed=1;dashPattern=6 4;" target="neo" value="assertion-ID jobs → graph snapshot">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="result" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#EEF7EF;strokeColor=#26754B;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=19;align=left;verticalAlign=top;spacing=16;shape=document;size=0.1;" value="&lt;b&gt;Pi coding agent (same client)&lt;/b&gt;&lt;br&gt;Relevant facts + source quotes.&lt;br&gt;Maya’s residence and work.&lt;br&gt;Pi uses evidence to answer." vertex="1">
+          <mxGeometry height="140" width="370" x="2275" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="return" edge="1" parent="1" source="m4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#26754B;fontColor=#26754B;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="result" value="&lt;b&gt;Packed evidence context&lt;/b&gt;&lt;br&gt;Assertion ID, statement, kind, status, dates&lt;br&gt;Source quote + session + speaker + time">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="training" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFBF2;strokeColor=#A16B17;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;dashed=1;dashPattern=6 4;" value="" vertex="1">
+          <mxGeometry height="200" width="2645" x="40" y="955" as="geometry" />
+        </mxCell>
+        <mxCell id="m5-title" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=24;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#A16B17;fontStyle=1;align=left;" value="(M5) Model Training, Evaluation &amp; Deployment | Offline pipeline — live conversations are not automatically training data" vertex="1">
+          <mxGeometry height="33" width="2480" x="65" y="973" as="geometry" />
+        </mxCell>
+        <mxCell id="data" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9AB74;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=20;align=left;verticalAlign=top;spacing=16;align=center;verticalAlign=middle;" value="Curated training data&lt;br&gt;+ teacher labels" vertex="1">
+          <mxGeometry height="90" width="330" x="70" y="1030" as="geometry" />
+        </mxCell>
+        <mxCell id="tune" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9AB74;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=20;align=left;verticalAlign=top;spacing=16;align=center;verticalAlign=middle;" value="Fine-tune the&lt;br&gt;local worker model" vertex="1">
+          <mxGeometry height="90" width="330" x="625" y="1030" as="geometry" />
+        </mxCell>
+        <mxCell id="eval" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9AB74;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=20;align=left;verticalAlign=top;spacing=16;align=center;verticalAlign=middle;" value="Held-out model&lt;br&gt;evaluation" vertex="1">
+          <mxGeometry height="90" width="330" x="1180" y="1030" as="geometry" />
+        </mxCell>
+        <mxCell id="export" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9AB74;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=20;align=left;verticalAlign=top;spacing=16;align=center;verticalAlign=middle;" value="Merge adapter&lt;br&gt;+ export GGUF" vertex="1">
+          <mxGeometry height="90" width="330" x="1735" y="1030" as="geometry" />
+        </mxCell>
+        <mxCell id="release" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9AB74;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=20;align=left;verticalAlign=top;spacing=16;align=center;verticalAlign=middle;" value="Install in Ollama&lt;br&gt;+ live engine checks" vertex="1">
+          <mxGeometry height="90" width="330" x="2300" y="1030" as="geometry" />
+        </mxCell>
+        <mxCell id="train-data" edge="1" parent="1" source="data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#A16B17;fontColor=#A16B17;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="tune" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="train-tune" edge="1" parent="1" source="tune" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#A16B17;fontColor=#A16B17;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="eval" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="train-eval" edge="1" parent="1" source="eval" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#A16B17;fontColor=#A16B17;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="export" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="train-export" edge="1" parent="1" source="export" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#A16B17;fontColor=#A16B17;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="release" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="deployment" edge="1" parent="1" source="release" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#A16B17;fontColor=#A16B17;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;dashed=1;dashPattern=6 4;" target="ollama" value="Released worker weights: extraction, consolidation + reflection (embedding model is separate)">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2465" y="920" />
+              <mxPoint x="1270" y="920" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="walk-title" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=29;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=1;align=left;" value="Example Walkthrough" vertex="1">
+          <mxGeometry height="40" width="2620" x="40" y="1200" as="geometry" />
+        </mxCell>
+        <mxCell id="w0" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#516379;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;" value="" vertex="1">
+          <mxGeometry height="510" width="500" x="40" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="w0-head" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#516379;strokeColor=#516379;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=17;align=left;verticalAlign=top;spacing=16;fontColor=#FFFFFF;fontStyle=1;spacing=13;" value="INPUT: Conversations 1 and 2" vertex="1">
+          <mxGeometry height="48" width="500" x="40" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="w0-txt" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=17;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=0;align=left;" value="&lt;b&gt;1 October&lt;/b&gt;&lt;br&gt;&lt;b&gt;User E1:&lt;/b&gt; “My name is Maya. I live in Chennai. I work as a software engineer at NovaTech, and I work remotely.”&lt;br&gt;&lt;b&gt;Assistant E2:&lt;/b&gt; “Hi Maya! What would you like help with today?”&lt;br&gt;&lt;br&gt;&lt;b&gt;10 October&lt;/b&gt;&lt;br&gt;&lt;b&gt;User E3:&lt;/b&gt; “I moved from Chennai to Bengaluru today. Bengaluru is now my home city. I still work remotely as a software engineer at NovaTech.”&lt;br&gt;&lt;b&gt;Assistant E4:&lt;/b&gt; “Understood, Maya. Your home city has changed to Bengaluru, while your job and remote working arrangement remain the same.”" vertex="1">
+          <mxGeometry height="435" width="468" x="56" y="1373" as="geometry" />
+        </mxCell>
+        <mxCell id="w1" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;" value="" vertex="1">
+          <mxGeometry height="510" width="375" x="665" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="w1-head" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#2463A6;strokeColor=#2463A6;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=17;align=left;verticalAlign=top;spacing=16;fontColor=#FFFFFF;fontStyle=1;spacing=13;" value="M1: Save the conversation" vertex="1">
+          <mxGeometry height="48" width="375" x="665" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="w1-txt" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=17;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=0;align=left;" value="Save messages with roles, dates, session and namespace.&lt;br&gt;&lt;br&gt;Batch → episode&lt;br&gt;Message → event + full-text chunk&lt;br&gt;Chunk C3 → event E3&lt;br&gt;&lt;br&gt;Queue extraction by episode ID.&lt;br&gt;&lt;br&gt;&lt;b&gt;E3 is the move evidence;&lt;/b&gt;&lt;br&gt;E4 repeats it." vertex="1">
+          <mxGeometry height="435" width="343" x="681" y="1373" as="geometry" />
+        </mxCell>
+        <mxCell id="w2" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7953AC;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;" value="" vertex="1">
+          <mxGeometry height="510" width="375" x="1200" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="w2-head" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#7953AC;strokeColor=#7953AC;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=17;align=left;verticalAlign=top;spacing=16;fontColor=#FFFFFF;fontStyle=1;spacing=13;" value="M2: Extract a candidate claim" vertex="1">
+          <mxGeometry height="48" width="375" x="1200" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="w2-txt" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=17;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=0;align=left;" value="&lt;b&gt;Claims about Maya&lt;/b&gt;&lt;br&gt;Home city: Chennai → Bengaluru&lt;br&gt;Employer: NovaTech&lt;br&gt;Role: software engineer&lt;br&gt;Work mode: remote&lt;br&gt;&lt;br&gt;&lt;b&gt;E3 quote&lt;/b&gt;&lt;br&gt;“Bengaluru is now my home city.”&lt;br&gt;&lt;br&gt;Optional observation from 2+ supports:&lt;br&gt;“Maya works remotely as a software engineer at NovaTech.”" vertex="1">
+          <mxGeometry height="435" width="343" x="1216" y="1373" as="geometry" />
+        </mxCell>
+        <mxCell id="w3" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;" value="" vertex="1">
+          <mxGeometry height="510" width="410" x="1735" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="w3-head" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#167F83;strokeColor=#167F83;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=17;align=left;verticalAlign=top;spacing=16;fontColor=#FFFFFF;fontStyle=1;spacing=13;" value="M3: Persist entities + assertions" vertex="1">
+          <mxGeometry height="48" width="410" x="1735" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="w3-txt" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=17;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=0;align=left;" value="&lt;b&gt;Maya entity → linked assertions&lt;/b&gt;&lt;br&gt;Bengaluru: active from 10 Oct&lt;br&gt;Chennai: superseded; history kept&lt;br&gt;New residence → supersedes → old&lt;br&gt;&lt;br&gt;Work facts gain supporting evidence.&lt;br&gt;Assertions → source chunks + quotes&lt;br&gt;Update graph projection.&lt;br&gt;&lt;br&gt;Assumes a reviewed correction in the same single-valued slot, confidence ≥ 0.8." vertex="1">
+          <mxGeometry height="435" width="378" x="1751" y="1373" as="geometry" />
+        </mxCell>
+        <mxCell id="w4" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#26754B;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=18;align=left;verticalAlign=top;spacing=16;" value="" vertex="1">
+          <mxGeometry height="510" width="390" x="2300" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="w4-head" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#26754B;strokeColor=#26754B;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=17;align=left;verticalAlign=top;spacing=16;fontColor=#FFFFFF;fontStyle=1;spacing=13;" value="M4: Retrieve → Pi answers" vertex="1">
+          <mxGeometry height="48" width="390" x="2300" y="1310" as="geometry" />
+        </mxCell>
+        <mxCell id="w4-txt" parent="1" style="rounded=1;arcSize=12;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;strokeWidth=1.5;fontFamily=Helvetica;fontColor=#182D45;fontSize=17;align=left;verticalAlign=top;spacing=16;spacing=0;fontColor=#182D45;fontStyle=0;align=left;" value="&lt;b&gt;User E5 · 13 October&lt;/b&gt;&lt;br&gt;“What do you remember about where I live, my previous city, and my work?”&lt;br&gt;&lt;br&gt;&lt;b&gt;Expected answer from evidence&lt;/b&gt;&lt;br&gt;“You now live in Bengaluru, following your move on 10 October 2026. Before that, you lived in Chennai. You work remotely as a software engineer at NovaTech. [E1, E3]”&lt;div&gt;&lt;br/&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="435" width="358" x="2316" y="1373" as="geometry" />
+        </mxCell>
+        <mxCell id="walk-w0" edge="1" parent="1" source="w0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#516379;fontColor=#516379;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.32;exitDx=0;exitDy=0;entryX=0;entryY=0.32;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="w1" value="E1–E4&lt;br&gt;roles + dates">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="walk-w1" edge="1" parent="1" source="w1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#516379;fontColor=#516379;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.32;exitDx=0;exitDy=0;entryX=0;entryY=0.32;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="w2" value="Episode IDs&lt;br&gt;→ source chunks">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="walk-w2" edge="1" parent="1" source="w2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#516379;fontColor=#516379;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.32;exitDx=0;exitDy=0;entryX=0;entryY=0.32;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="w3" value="Claims + entities&lt;br&gt;+ exact quotes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="walk-w3" edge="1" parent="1" source="w3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#516379;fontColor=#516379;fontFamily=Helvetica;fontSize=15;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.32;exitDx=0;exitDy=0;entryX=0;entryY=0.32;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=8;" target="w4" value="Residence + work&lt;br&gt;+ history + sources">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="handoff-conversation" parent="1" style="rounded=1;arcSize=8;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=1;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=10;" value="&lt;b&gt;Conversation batch&lt;/b&gt;&lt;br&gt;Namespace + session&lt;br&gt;User + Pi messages&lt;br&gt;Each has: role, text, time&lt;br&gt;Exact text shown below" vertex="1">
+          <mxGeometry height="140" width="195" x="265" y="265" as="geometry" />
+        </mxCell>
+        <mxCell id="handoff-job" parent="1" style="rounded=1;arcSize=8;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=1;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=10;" value="&lt;b&gt;Extraction job&lt;/b&gt;&lt;br&gt;kind: extract&lt;br&gt;payload: episode ID&lt;br&gt;Loads ordered evidence&lt;br&gt;from PostgreSQL" vertex="1">
+          <mxGeometry height="140" width="200" x="860" y="265" as="geometry" />
+        </mxCell>
+        <mxCell id="handoff-claim" parent="1" style="rounded=1;arcSize=8;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7953AC;strokeWidth=1;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=10;" value="&lt;b&gt;Validated claim&lt;/b&gt;&lt;br&gt;Maya (person)&lt;br&gt;home city: Bengaluru&lt;br&gt;kind: fact; single&lt;br&gt;correction: true&lt;br&gt;E3 quote + source" vertex="1">
+          <mxGeometry height="140" width="200" x="1460" y="265" as="geometry" />
+        </mxCell>
+        <mxCell id="handoff-facts" parent="1" style="rounded=1;arcSize=8;absoluteArcSize=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#26754B;strokeWidth=1;fontFamily=Helvetica;fontColor=#182D45;fontSize=16;align=left;verticalAlign=top;spacing=10;" value="&lt;b&gt;Eligible assertions&lt;/b&gt;&lt;br&gt;Maya: Bengaluru&lt;br&gt;kind: fact; active&lt;br&gt;Work + source quotes&lt;br&gt;History: temporal lookup" vertex="1">
+          <mxGeometry height="150" width="200" x="2060" y="260" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

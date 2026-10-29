@@ -1,0 +1,227 @@
+<mxfile host="Electron">
+  <diagram id="module3-temporal" name="Module 3 - Temporal Knowledge and Graph">
+    <mxGraphModel dx="3288" dy="2093" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3300" pageHeight="2160" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=38;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#182D45;" value="&lt;b&gt;Module 3 · Temporal Knowledge &amp;amp; Graph Management&lt;/b&gt;" vertex="1">
+          <mxGeometry height="60" width="3210" x="40" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="tx" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F5FAFA;strokeColor=#B9C8D7;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;dashed=1;" value="" vertex="1">
+          <mxGeometry height="1230" width="3220" x="40" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="tx-label" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=25;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#167F83;" value="&lt;b&gt;POSTGRESQL TRANSACTION · SQLx · namespace lock + live job lease&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="3160" x="65" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="claim" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=21;align=center;verticalAlign=middle;spacing=12;shape=document;size=0.12;" value="&lt;b&gt;Module 2 claims&lt;/b&gt;&lt;br&gt;Maya / home city / Bengaluru&lt;br&gt;correction:true · confidence:0.95" vertex="1">
+          <mxGeometry height="150" width="330" x="80" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="guard" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Apply guard&lt;/b&gt;&lt;br&gt;Revalidate · check lease" vertex="1">
+          <mxGeometry height="130" width="320" x="640" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="entity" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Entity resolver&lt;/b&gt;&lt;br&gt;Exact key → unique alias → new" vertex="1">
+          <mxGeometry height="130" width="350" x="1200" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="slot" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=rhombus;" value="&lt;b&gt;Existing value?&lt;/b&gt;&lt;br&gt;subject + predicate" vertex="1">
+          <mxGeometry height="190" width="340" x="1800" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="reinforce" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Reinforce&lt;/b&gt;&lt;br&gt;Reuse assertion ID" vertex="1">
+          <mxGeometry height="115" width="350" x="2370" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="create" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Create&lt;/b&gt;&lt;br&gt;New active assertion" vertex="1">
+          <mxGeometry height="115" width="350" x="2370" y="455" as="geometry" />
+        </mxCell>
+        <mxCell id="claim-in" edge="1" parent="1" source="claim" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="guard" value="claims + quotes&lt;br&gt;+ optional vectors">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="identity" edge="1" parent="1" source="guard" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="entity" value="Maya · person&lt;br&gt;namespace: user:maya">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="slot-key" edge="1" parent="1" source="entity" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="slot" value="entity ID + home city">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="same" edge="1" parent="1" source="slot" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.25;entryX=0;entryY=0.5;" target="reinforce" value="Same value">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="new" edge="1" parent="1" source="slot" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.75;entryX=0;entryY=0.5;" target="create" value="No prior value / non-single">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="correction" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=rhombus;" value="&lt;b&gt;Reviewed correction&lt;br&gt;≥ 0.8?&lt;/b&gt;" vertex="1">
+          <mxGeometry height="195" width="340" x="1800" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="different" edge="1" parent="1" source="slot" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="correction" value="Different value · single slot&lt;br&gt;Chennai → Bengaluru">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="supersede" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Supersede&lt;/b&gt;&lt;br&gt;R1 Chennai → superseded&lt;br&gt;R2 Bengaluru → active" vertex="1">
+          <mxGeometry height="140" width="350" x="2370" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="contest" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Contest&lt;/b&gt;&lt;br&gt;Old + new → contested" vertex="1">
+          <mxGeometry height="115" width="350" x="2370" y="1000" as="geometry" />
+        </mxCell>
+        <mxCell id="yes" edge="1" parent="1" source="correction" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.4;entryX=0;entryY=0.5;" target="supersede" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="no" edge="1" parent="1" source="correction" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0;entryY=0.5;" target="contest" value="No">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1970" y="1058" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pg" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=cylinder;size=0.12;" value="&lt;b&gt;Authoritative store&lt;/b&gt;&lt;br&gt;entities&lt;br&gt;assertions + vectors&lt;br&gt;assertion_sources&lt;br&gt;assertion_entities&lt;br&gt;assertion_edges" vertex="1">
+          <mxGeometry height="270" width="300" x="2890" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="reinforced" edge="1" parent="1" source="reinforce" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.3;entryY=0;" target="pg" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2800" y="328" />
+              <mxPoint x="2980" y="328" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="created" edge="1" parent="1" source="create" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.65;entryY=0;" target="pg" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3085" y="513" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="changed" edge="1" parent="1" source="supersede" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="pg" value="R2 → supersedes → R1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="contested" edge="1" parent="1" source="contest" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.5;entryY=1;" target="pg" value="contradicts">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3040" y="1058" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="obs" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=21;align=center;verticalAlign=middle;spacing=12;shape=document;size=0.12;" value="&lt;b&gt;Module 2 observation&lt;/b&gt;&lt;br&gt;“Maya works remotely as a software engineer at NovaTech.”&lt;br&gt;supports: W1, W2, W3" vertex="1">
+          <mxGeometry height="180" width="330" x="80" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="supports" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=rhombus;" value="&lt;b&gt;Supports still valid?&lt;/b&gt;&lt;br&gt;2+ active IDs&lt;br&gt;grounded subject" vertex="1">
+          <mxGeometry height="200" width="350" x="650" y="780" as="geometry" />
+        </mxCell>
+        <mxCell id="obs-write" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Observation writer&lt;/b&gt;&lt;br&gt;Reuse or insert&lt;br&gt;Copy evidence + entity links" vertex="1">
+          <mxGeometry height="130" width="340" x="1210" y="815" as="geometry" />
+        </mxCell>
+        <mxCell id="obs-in" edge="1" parent="1" source="obs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="supports" value="apply_consolidation&lt;br&gt;lock + lease check">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="supports-yes" edge="1" parent="1" source="supports" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="obs-write" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="abort" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#516379;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=21;align=center;verticalAlign=middle;spacing=12;rounded=1;arcSize=50;" value="&lt;b&gt;Rollback / retry&lt;/b&gt;" vertex="1">
+          <mxGeometry height="80" width="280" x="680" y="1080" as="geometry" />
+        </mxCell>
+        <mxCell id="supports-no" edge="1" parent="1" source="supports" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#516379;fontColor=#516379;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="abort" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="obs-record" edge="1" parent="1" source="obs-write" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.8;entryY=1;" target="pg" value="&lt;b&gt;O1 · kind: observation&lt;/b&gt;&lt;br&gt;O1 → supports → W1 / W2 / W3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1380" y="1220" />
+              <mxPoint x="3130" y="1220" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="timeline" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#167F83;" value="&lt;b&gt;Residence validity&lt;/b&gt;&lt;br&gt;R1 Chennai: [1 Oct, 10 Oct) · superseded&lt;br&gt;R2 Bengaluru: [10 Oct, …) · active&lt;br&gt;recorded_at is retained separately.&lt;br&gt;R2 → C3 + E3 quote · R2 → Maya / extracted mentions." vertex="1">
+          <mxGeometry height="215" width="1420" x="80" y="535" as="geometry" />
+        </mxCell>
+        <mxCell id="commit" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#167F83;" value="COMMIT · assertion changes + evidence links + jobs + job completion" vertex="1">
+          <mxGeometry height="55" width="1400" x="1680" y="1300" as="geometry" />
+        </mxCell>
+        <mxCell id="invalidate" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Dependency invalidator&lt;/b&gt;&lt;br&gt;Dependent observations → stale" vertex="1">
+          <mxGeometry height="130" width="380" x="80" y="1190" as="geometry" />
+        </mxCell>
+        <mxCell id="invalidate-path" edge="1" parent="1" source="pg" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.2;exitY=1;entryX=0.5;entryY=0;" target="invalidate" value="Changed support / retraction">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2950" y="1170" />
+              <mxPoint x="270" y="1170" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="queue" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;" value="&lt;b&gt;memory_jobs&lt;/b&gt;&lt;br&gt;project: {assertion_id: R2}&lt;br&gt;consolidate: {episode_id: P2}" vertex="1">
+          <mxGeometry height="170" width="400" x="740" y="1200" as="geometry" />
+        </mxCell>
+        <mxCell id="q0" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#EAF7F5;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;" value="" vertex="1">
+          <mxGeometry height="20" width="30" x="760" y="1215" as="geometry" />
+        </mxCell>
+        <mxCell id="q1" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#EAF7F5;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;" value="" vertex="1">
+          <mxGeometry height="20" width="30" x="805" y="1215" as="geometry" />
+        </mxCell>
+        <mxCell id="q2" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#EAF7F5;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;" value="" vertex="1">
+          <mxGeometry height="20" width="30" x="850" y="1215" as="geometry" />
+        </mxCell>
+        <mxCell id="stale-project" edge="1" parent="1" source="invalidate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="queue" value="queue affected IDs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="queue-new" edge="1" parent="1" source="pg" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.75;entryX=0.8;entryY=1;" target="queue" value="Committed job records">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3230" y="813" />
+              <mxPoint x="3230" y="1400" />
+              <mxPoint x="1060" y="1400" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="projection" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Projection worker&lt;/b&gt;&lt;br&gt;Load one MVCC snapshot&lt;br&gt;Revision-guarded upsert" vertex="1">
+          <mxGeometry height="130" width="410" x="1490" y="1510" as="geometry" />
+        </mxCell>
+        <mxCell id="project-job" edge="1" parent="1" source="queue" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0;entryY=0.5;" target="projection" value="project R2 → snapshot&lt;br&gt;properties + entities + relations + revision">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="940" y="1575" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m2" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Module 2&lt;/b&gt;&lt;br&gt;Consolidation" vertex="1">
+          <mxGeometry height="110" width="360" x="740" y="1760" as="geometry" />
+        </mxCell>
+        <mxCell id="consolidate-job" edge="1" parent="1" source="queue" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.1;exitY=1;entryX=0.1;entryY=0;" target="m2" value="consolidate P2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="neo" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F4EFFA;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=24;align=center;verticalAlign=middle;spacing=12;shape=cylinder;size=0.12;" value="&lt;b&gt;Neo4j projection&lt;/b&gt;&lt;br&gt;Assertion&lt;br&gt;KnowledgeEntity&lt;br&gt;MENTIONS · SUPPORTS" vertex="1">
+          <mxGeometry height="210" width="480" x="2320" y="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="cypher" edge="1" parent="1" source="projection" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="neo" value="Cypher / HTTP&lt;br&gt;reject older revisions">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F4EFFA;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=21;align=center;verticalAlign=middle;spacing=12;ellipse;" value="&lt;b&gt;R2&lt;/b&gt;&lt;br&gt;Bengaluru · active" vertex="1">
+          <mxGeometry height="100" width="260" x="1430" y="1840" as="geometry" />
+        </mxCell>
+        <mxCell id="maya" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#EAF7F5;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=21;align=center;verticalAlign=middle;spacing=12;ellipse;" value="&lt;b&gt;Maya&lt;/b&gt;&lt;br&gt;KnowledgeEntity" vertex="1">
+          <mxGeometry height="100" width="270" x="1960" y="1770" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F4EFFA;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=21;align=center;verticalAlign=middle;spacing=12;ellipse;" value="&lt;b&gt;R1&lt;/b&gt;&lt;br&gt;Chennai · superseded" vertex="1">
+          <mxGeometry height="100" width="270" x="1960" y="1980" as="geometry" />
+        </mxCell>
+        <mxCell id="mentions" edge="1" parent="1" source="r2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.3;entryX=0;entryY=0.5;" target="maya" value="MENTIONS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="supersedes-edge" edge="1" parent="1" source="r2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.8;entryX=0;entryY=0.5;" target="r1" value="SUPPORTS&lt;br&gt;relation: supersedes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="graph-detail" edge="1" parent="1" source="neo" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.2;exitY=1;entryX=0.5;entryY=0;dashed=1;" target="r2" value="Projected relationships">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2416" y="1730" />
+              <mxPoint x="1560" y="1730" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m4" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Module 4&lt;/b&gt;&lt;br&gt;Recall + graph expansion" vertex="1">
+          <mxGeometry height="115" width="320" x="2870" y="1860" as="geometry" />
+        </mxCell>
+        <mxCell id="recall" edge="1" parent="1" source="neo" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" target="m4" value="graph candidates">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3030" y="1575" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

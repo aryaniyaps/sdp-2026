@@ -1,0 +1,21 @@
+1. I spoke with Arjun at Infosys Labs in Bengaluru today about Project Garuda. He told me that Project Garuda uses PostgreSQL as its database and that he is the project owner.
+
+2. I also spoke with Rohan at Infosys Labs about Project Garuda. Rohan told me that Project Garuda uses MySQL as its database.
+
+3. Arjun told me that Project Garuda's database is MySQL.
+
+4. Correction: Project Garuda's database is SQLite, not PostgreSQL or MySQL. Arjun checked the final deployment configuration and confirmed SQLite. Both earlier database reports are superseded.
+
+5. Project Garuda's final review is on 12 November 2026 at Infosys Labs, Bengaluru. Rohan is responsible for the Neo4j-based reporting module, and our team uses Rust for the backend.
+
+6. Update: the final review moved from 12 November to 19 November 2026 because of Diwali holidays. Everything else about it is unchanged.
+
+7. For Project Garuda, always run cargo test before pushing to the college GitHub repo, and use pnpm for the frontend, not npm.
+
+8. Karthik told me that the Project Garuda team meets every Friday at 5 PM in the college seminar hall to discuss progress.
+
+9. Who owns Project Garuda, which database does it use now, and what happened to the earlier database reports? Answer from memory and cite the evidence.
+
+10. When is the Project Garuda final review, and what are the team's rules before pushing code?
+
+11. When and where does the Project Garuda team meet every week?

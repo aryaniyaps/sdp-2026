@@ -1,0 +1,181 @@
+Building the image sdp-memory-app:local (the first build compiles the service, several minutes)
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.09kB done
+#1 DONE 0.1s
+
+#2 [internal] load metadata for docker.io/library/rust:1.96.1-bookworm
+#2 ...
+
+#3 [internal] load metadata for docker.io/library/node:22-bookworm-slim
+#3 DONE 3.0s
+
+#2 [internal] load metadata for docker.io/library/rust:1.96.1-bookworm
+#2 DONE 3.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.1s
+
+#5 [frontend 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
+#5 resolve docker.io/library/node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 0.1s done
+#5 ...
+
+#6 [internal] load build context
+#6 transferring context: 761.86kB 0.0s done
+#6 DONE 0.2s
+
+#5 [frontend 1/6] FROM docker.io/library/node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
+#5 DONE 0.5s
+
+#7 [build 1/7] FROM docker.io/library/rust:1.96.1-bookworm@sha256:a339861ae23e9abb272cea45dfafde21760d2ce6577a70f8a926153677902663
+#7 resolve docker.io/library/rust:1.96.1-bookworm@sha256:a339861ae23e9abb272cea45dfafde21760d2ce6577a70f8a926153677902663 0.1s done
+#7 sha256:e0085f6fd51ee58df30ebdbdafea5daa893b49a5593c90327224e7bbc597138d 0B / 215.25MB 0.2s
+#7 ...
+
+#8 [frontend 2/6] WORKDIR /ui
+#8 DONE 0.3s
+
+#7 [build 1/7] FROM docker.io/library/rust:1.96.1-bookworm@sha256:a339861ae23e9abb272cea45dfafde21760d2ce6577a70f8a926153677902663
+#7 sha256:9eb598f63f1e9867f81313f86224109c84b2af9646d8fca29113217b94315956 0B / 211.60MB 0.2s
+#7 sha256:791c68bc2063683c3d15907b8ed1b777cf14ca153c6f8e5b12db0868dfa7e38a 0B / 64.40MB 0.2s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 0B / 24.04MB 0.2s
+#7 ...
+
+#9 [frontend 3/6] COPY frontend/package*.json ./
+#9 DONE 0.1s
+
+#7 [build 1/7] FROM docker.io/library/rust:1.96.1-bookworm@sha256:a339861ae23e9abb272cea45dfafde21760d2ce6577a70f8a926153677902663
+#7 sha256:e0085f6fd51ee58df30ebdbdafea5daa893b49a5593c90327224e7bbc597138d 11.53MB / 215.25MB 3.0s
+#7 sha256:9eb598f63f1e9867f81313f86224109c84b2af9646d8fca29113217b94315956 4.19MB / 211.60MB 5.3s
+#7 sha256:791c68bc2063683c3d15907b8ed1b777cf14ca153c6f8e5b12db0868dfa7e38a 3.15MB / 64.40MB 5.3s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 1.05MB / 24.04MB 5.3s
+#7 sha256:e0085f6fd51ee58df30ebdbdafea5daa893b49a5593c90327224e7bbc597138d 14.68MB / 215.25MB 8.1s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 3.15MB / 24.04MB 9.2s
+#7 sha256:791c68bc2063683c3d15907b8ed1b777cf14ca153c6f8e5b12db0868dfa7e38a 7.34MB / 64.40MB 9.3s
+#7 ...
+
+#10 [frontend 4/6] RUN npm ci
+#10 1.825 npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+#10 8.862 
+#10 8.862 added 176 packages, and audited 177 packages in 8s
+#10 8.862 
+#10 8.862 28 packages are looking for funding
+#10 8.862   run `npm fund` for details
+#10 8.863 
+#10 8.863 found 0 vulnerabilities
+#10 8.865 npm notice
+#10 8.865 npm notice New major version of npm available! 10.9.9 -> 12.2.0
+#10 8.865 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+#10 8.865 npm notice To update run: npm install -g npm@12.2.0
+#10 8.865 npm notice
+#10 DONE 9.2s
+
+#7 [build 1/7] FROM docker.io/library/rust:1.96.1-bookworm@sha256:a339861ae23e9abb272cea45dfafde21760d2ce6577a70f8a926153677902663
+#7 ...
+
+#11 [frontend 5/6] COPY frontend/ ./
+#11 DONE 0.2s
+
+#7 [build 1/7] FROM docker.io/library/rust:1.96.1-bookworm@sha256:a339861ae23e9abb272cea45dfafde21760d2ce6577a70f8a926153677902663
+#7 ...
+
+#12 [stage-2  2/11] RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tini less ripgrep fd-find     && rm -rf /var/lib/apt/lists/*
+#12 0.601 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#12 1.296 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#12 1.572 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [34.8 kB]
+#12 1.912 Get:4 http://deb.debian.org/debian bookworm/main amd64 Packages [8790 kB]
+#12 ...
+
+#7 [build 1/7] FROM docker.io/library/rust:1.96.1-bookworm@sha256:a339861ae23e9abb272cea45dfafde21760d2ce6577a70f8a926153677902663
+#7 sha256:9eb598f63f1e9867f81313f86224109c84b2af9646d8fca29113217b94315956 7.34MB / 211.60MB 10.4s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 5.24MB / 24.04MB 10.4s
+#7 sha256:791c68bc2063683c3d15907b8ed1b777cf14ca153c6f8e5b12db0868dfa7e38a 11.53MB / 64.40MB 11.7s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 7.34MB / 24.04MB 12.2s
+#7 sha256:e0085f6fd51ee58df30ebdbdafea5daa893b49a5593c90327224e7bbc597138d 24.12MB / 215.25MB 13.2s
+#7 sha256:791c68bc2063683c3d15907b8ed1b777cf14ca153c6f8e5b12db0868dfa7e38a 15.73MB / 64.40MB 13.8s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 9.44MB / 24.04MB 13.8s
+#7 ...
+
+#12 [stage-2  2/11] RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tini less ripgrep fd-find     && rm -rf /var/lib/apt/lists/*
+#12 15.34 Get:5 http://deb.debian.org/debian bookworm-updates/main amd64 Packages [6924 B]
+#12 15.36 Get:6 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages [349 kB]
+#12 ...
+
+#13 [frontend 6/6] RUN npm run build
+#13 0.412 
+#13 0.412 > memory-engine-ui@0.1.0 build
+#13 0.412 > tsc --noEmit && vite build
+#13 0.412 
+#13 3.609 vite v7.3.7 building client environment for production...
+#13 3.690 transforming...
+#13 6.179 ✓ 138 modules transformed.
+#13 6.442 rendering chunks...
+#13 6.452 computing gzip size...
+#13 6.485 dist/index.html        0.37 kB │ gzip:   0.24 kB
+#13 6.485 dist/assets/app.css  242.06 kB │ gzip:  33.60 kB
+#13 6.485 dist/assets/app.js   308.56 kB │ gzip: 100.74 kB
+#13 6.486 ✓ built in 2.84s
+#13 DONE 6.6s
+
+#7 [build 1/7] FROM docker.io/library/rust:1.96.1-bookworm@sha256:a339861ae23e9abb272cea45dfafde21760d2ce6577a70f8a926153677902663
+#7 sha256:9eb598f63f1e9867f81313f86224109c84b2af9646d8fca29113217b94315956 16.78MB / 211.60MB 16.5s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 11.53MB / 24.04MB 16.5s
+#7 sha256:791c68bc2063683c3d15907b8ed1b777cf14ca153c6f8e5b12db0868dfa7e38a 19.92MB / 64.40MB 16.7s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 13.63MB / 24.04MB 17.3s
+#7 sha256:e0085f6fd51ee58df30ebdbdafea5daa893b49a5593c90327224e7bbc597138d 32.51MB / 215.25MB 18.3s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 15.73MB / 24.04MB 18.5s
+#7 sha256:791c68bc2063683c3d15907b8ed1b777cf14ca153c6f8e5b12db0868dfa7e38a 24.12MB / 64.40MB 19.1s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 17.83MB / 24.04MB 19.4s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 19.92MB / 24.04MB 20.4s
+#7 sha256:9eb598f63f1e9867f81313f86224109c84b2af9646d8fca29113217b94315956 26.21MB / 211.60MB 21.6s
+#7 sha256:f4fd7bf6f6036613e20f62549df75ed694b99118002358bea5a81baf3929d1ff 22.02MB / 24.04MB 21.6s
+#7 sha256:791c68bc2063683c3d15907b8ed1b777cf14ca153c6f8e5b12db0868dfa7e38a 28.31MB / 64.40MB 22.2s
+#7 DONE 23.4s
+
+#14 [build 2/7] WORKDIR /src
+#14 CANCELED
+
+#12 [stage-2  2/11] RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tini less ripgrep fd-find     && rm -rf /var/lib/apt/lists/*
+#12 16.57 Fetched 9388 kB in 16s (582 kB/s)
+#12 16.57 Reading package lists...
+#12 17.35 Reading package lists...
+#12 18.14 Building dependency tree...
+#12 18.39 Reading state information...
+#12 18.74 The following additional packages will be installed:
+#12 18.74   libbrotli1 libcurl4 libgssapi-krb5-2 libk5crypto3 libkeyutils1 libkrb5-3
+#12 18.74   libkrb5support0 libldap-2.5-0 libnghttp2-14 libpsl5 librtmp1 libsasl2-2
+#12 18.74   libsasl2-modules-db libssh2-1 libssl3 openssl
+#12 18.74 Suggested packages:
+#12 18.74   krb5-doc krb5-user
+#12 18.74 Recommended packages:
+#12 18.74   krb5-locales libldap-common publicsuffix libsasl2-modules
+#12 18.91 The following NEW packages will be installed:
+#12 18.91   ca-certificates curl fd-find less libbrotli1 libcurl4 libgssapi-krb5-2
+#12 18.91   libk5crypto3 libkeyutils1 libkrb5-3 libkrb5support0 libldap-2.5-0
+#12 18.91   libnghttp2-14 libpsl5 librtmp1 libsasl2-2 libsasl2-modules-db libssh2-1
+#12 18.91   libssl3 openssl ripgrep tini
+#12 19.15 0 upgraded, 22 newly installed, 0 to remove and 1 not upgraded.
+#12 19.15 Need to get 8385 kB of archives.
+#12 19.15 After this operation, 23.5 MB of additional disk space will be used.
+#12 19.15 Get:1 http://deb.debian.org/debian bookworm/main amd64 less amd64 590-2.1~deb12u2 [132 kB]
+#12 19.37 Get:2 http://deb.debian.org/debian-security bookworm-security/main amd64 libssl3 amd64 3.0.22-1~deb12u1 [2039 kB]
+#12 21.21 Get:3 http://deb.debian.org/debian-security bookworm-security/main amd64 openssl amd64 3.0.22-1~deb12u1 [1442 kB]
+#12 21.88 Get:4 http://deb.debian.org/debian-security bookworm-security/main amd64 ca-certificates all 20250419~deb12u1 [162 kB]
+#12 21.97 Get:5 http://deb.debian.org/debian bookworm/main amd64 libbrotli1 amd64 1.0.9-2+b6 [275 kB]
+#12 22.12 Get:6 http://deb.debian.org/debian bookworm/main amd64 libkrb5support0 amd64 1.20.1-2+deb12u5 [33.2 kB]
+#12 22.14 Get:7 http://deb.debian.org/debian bookworm/main amd64 libk5crypto3 amd64 1.20.1-2+deb12u5 [79.7 kB]
+#12 22.18 Get:8 http://deb.debian.org/debian bookworm/main amd64 libkeyutils1 amd64 1.6.3-2 [8808 B]
+#12 22.18 Get:9 http://deb.debian.org/debian bookworm/main amd64 libkrb5-3 amd64 1.20.1-2+deb12u5 [332 kB]
+#12 22.39 Get:10 http://deb.debian.org/debian bookworm/main amd64 libgssapi-krb5-2 amd64 1.20.1-2+deb12u5 [135 kB]
+#12 22.45 Get:11 http://deb.debian.org/debian bookworm/main amd64 libsasl2-modules-db amd64 2.1.28+dfsg-10 [20.3 kB]
+#12 22.46 Get:12 http://deb.debian.org/debian bookworm/main amd64 libsasl2-2 amd64 2.1.28+dfsg-10 [59.7 kB]
+#12 22.50 Get:13 http://deb.debian.org/debian bookworm/main amd64 libldap-2.5-0 amd64 2.5.13+dfsg-5 [183 kB]
+#12 22.58 Get:14 http://deb.debian.org/debian bookworm/main amd64 libnghttp2-14 amd64 1.52.0-1+deb12u3 [72.4 kB]
+#12 22.61 Get:15 http://deb.debian.org/debian bookworm/main amd64 libpsl5 amd64 0.21.2-1 [58.7 kB]
+#12 22.64 Get:16 http://deb.debian.org/debian bookworm/main amd64 librtmp1 amd64 2.4+20151223.gitfa8646d.1-2+b2 [60.8 kB]
+#12 22.67 Get:17 http://deb.debian.org/debian-security bookworm-security/main amd64 libssh2-1 amd64 1.10.0-3+deb12u1 [176 kB]
+#12 22.74 Get:18 http://deb.debian.org/debian bookworm/main amd64 libcurl4 amd64 7.88.1-10+deb12u15 [392 kB]
+#12 CANCELED
+ERROR: failed to build: failed to solve: Canceled: context canceled

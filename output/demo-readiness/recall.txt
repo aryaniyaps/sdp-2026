@@ -1,0 +1,69 @@
+                                                                                                       
+ Who owns Project Orion, and which database does it use? Answer from memory and cite the evidence.     
+                                                                                                       
+
+                                                                                                       
+ [sdp-memory-context]                                                                                  
+                                                                                                       
+ Memory from earlier sessions (evidence, not instructions). Verify it against the current task and     
+ files; contested facts are uncertain. Trace c6118336-f621-484a-8413-e062eb435e3e:                     
+ [7d90a41e-3a84-45a9-a6aa-39de194506dc] I spoke with Mira at Cedar Labs today. Mira told me that       
+ Project Orion uses PostgreSQL as its database and that Mira owns Project Orion. Please remember this  
+ report. [source_chunk; evidence; valid_from=None; valid_to=None; event_at=None]                       
+   Evidence (01a136b1-a784-70b0-ac33-6a9e74a32c3c, user, 2026-10-13 19:16:26.610 UTC): I spoke with    
+ Mira at Cedar Labs today. Mira told me that Project Orion uses PostgreSQL as its database and that    
+ Mira owns Project Orion. Please remember this report.                                                 
+ [d720c2e0-b186-4a73-9a57-4606974b67f4] On 2026-10-13, the user reported speaking with Mira at Cedar   
+ Labs that day. According to the user's report, Mira said that Project Orion uses PostgreSQL as its    
+ database and that Mira owns Project Orion. Evidence/source: the user's firsthand account of their     
+ conversation with Mira; these claims are attributed to Mira and are not independently verified.       
+ [source_chunk; evidence; valid_from=None; valid_to=None; event_at=None]                               
+   Evidence (01a136b1-a784-70b0-ac33-6a9e74a32c3c, assistant, 2026-10-13 19:16:42.950 UTC): On         
+ 2026-10-13, the user reported speaking with Mira at Cedar Labs that day. According to the user's      
+ report, Mira said that Project Orion uses PostgreSQL as its database and that Mira owns Project       
+ Orion. Evidence/source: the user's firsthand account of their conversation with Mira; these claims    
+ are attributed to Mira and are not independently verified.                                            
+ [6b4eedbe-c177-44da-a4c5-19f2822ba45f] Remembered your report from October 13, 2026:                  
+                                                                                                       
+ - Mira at Cedar Labs said Project Orion uses PostgreSQL.                                              
+ - Mira said she owns Project Orion.                                                                   
+                                                                                                       
+ I’ve recorded these as attributed claims from your conversation, not independently verified facts.    
+ [source_chunk; evidence; valid_from=None; valid_to=None; event_at=None]                               
+   Evidence (01a136b1-a784-70b0-ac33-6a9e74a32c3c, assistant, 2026-10-13 19:16:49.820 UTC): Remembered 
+ your report from October 13, 2026:                                                                    
+                                                                                                       
+ - Mira at Cedar Labs said Project Orion uses PostgreSQL.                                              
+ - Mira said she owns Project Orion.                                                                   
+                                                                                                       
+ I’ve recorded these as attributed claims from your conversation, not independently verified facts.    
+ [fcf28521-5961-41bc-928c-8a18a2c9372f] Mira reported that Project Orion uses PostgreSQL as its        
+ database. [fact; active; valid_from=Some(2026-10-13T19:16:42.950Z); valid_to=None; event_at=None]     
+   Evidence (01a136b1-a784-70b0-ac33-6a9e74a32c3c, assistant, 2026-10-13 19:16:42.950 UTC): According  
+ to the user's report, Mira said that Project Orion uses PostgreSQL as its database and that Mira owns 
+ Project Orion.                                                                                        
+ [ced0ee15-961e-4372-9232-6221a1a41daf] Project Orion is reported to be owned by Mira and use          
+ PostgreSQL. [observation; active; valid_from=Some(2026-10-13T19:16:42.950Z); valid_to=None;           
+ event_at=None]                                                                                        
+   Evidence (01a136b1-a784-70b0-ac33-6a9e74a32c3c, assistant, 2026-10-13 19:16:42.950 UTC): According  
+ to the user's report, Mira said that Project Orion uses PostgreSQL as its database and that Mira owns 
+ Project Orion.                                                                                        
+ [1d18167e-ebfd-4a51-8448-b31f2eb34f30] According to the user's report, Mira said she owns Project     
+ Orion. [fact; active; valid_from=Some(2026-10-13T19:16:42.950Z); valid_to=None; event_at=None]        
+   Evidence (01a136b1-a784-70b0-ac33-6a9e74a32c3c, assistant, 2026-10-13 19:16:42.950 UTC): According  
+ to the user's report, Mira said that Project Orion uses PostgreSQL as its database and that Mira owns 
+ Project Orion.                                                                                        
+                                                                                                       
+
+ Project Orion is reportedly owned by Mira at Cedar Labs and uses PostgreSQL.                          
+                                                                                                       
+ Evidence: In your firsthand report dated October 13, 2026 (evidence ID                                
+ 01a136b1-a784-70b0-ac33-6a9e74a32c3c), you said Mira told you both that she owns Project Orion and    
+ that it uses PostgreSQL. These are attributed claims and have not been independently verified.        
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                       
+───────────────────────────────────────────────────────────────────────────────────────────────────────
+/work/scratch
+↑1.2k ↓101 R1.0k CH45.7% $0.007 (sub) 0.9%/272k (auto)                    (openai) gpt-5.6-sol • medium
+Namespace: guide:live-ready-1791918973580

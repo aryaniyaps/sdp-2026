@@ -1,0 +1,23 @@
+   Compiling memory-engine v0.1.0 (/home/aryan/orca/sdp-2026)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.05s
+     Running tests/ollama_context.rs (target/debug/deps/ollama_context-2ba8ef95759d5cad)
+
+running 15 tests
+test live_prompt_beyond_the_context_is_rejected_by_the_service_code_path ... ok
+test live_prompt_of_about_nine_thousand_tokens_is_not_cut_to_4096 ... ok
+test live_shrunk_extract_prompt_fits_the_real_context ... ok
+test answer_cut_at_the_output_cap_is_rejected ... ok
+test prompt_evaluated_up_to_the_context_is_rejected ... ok
+test every_generate_call_carries_context_and_output_cap ... ok
+test reflection_sends_exact_evidence_ids_as_a_citation_enum ... ok
+test extraction_decodes_paired_sources_but_returns_the_canonical_contract ... ok
+test prompt_that_cannot_fit_fails_before_any_request ... ok
+test truncated_answer_is_not_cached_and_a_normal_one_is ... ok
+test cache_is_keyed_on_the_context_size ... ok
+test refused_repair_prompt_forgets_the_invalid_reply_it_followed ... ok
+test worker_shrinks_the_snapshot_for_a_local_model_and_leaves_hosted_alone ... ok
+test a_long_session_is_read_in_windows_and_claims_keep_episode_indices ... ok
+test healthz_reports_the_local_model_and_its_context ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+

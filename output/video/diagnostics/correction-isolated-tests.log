@@ -1,0 +1,37 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running tests/evidence_graph.rs (target/debug/deps/evidence_graph-601f4e28c0f852e6)
+
+running 30 tests
+test clearing_the_graph_removes_one_namespace_completely_and_leaves_the_others ... ok
+test dashboard_projects_persist_and_session_namespace_changes_are_isolated_and_versioned ... ok
+test evidence_lifecycle_and_projection ... ok
+test expired_leases_recover_and_old_tokens_cannot_complete_work ... ok
+test explicit_correction_resolves_an_existing_contested_value ... ok
+test forgotten_model_replies_are_asked_again_and_kept_ones_replay ... ok
+test frontend_assets_are_served_and_retired_routes_are_gone ... ok
+test graph_view_keeps_the_newest_unextracted_memories_when_cited_ones_fill_the_limit ... ok
+test graph_view_namespace_with_nothing_returns_empty_lists ... ok
+test graph_view_rejects_bad_requests_and_reports_unavailable_dependencies ... ok
+test graph_view_serves_the_neo4j_projection_and_the_source_text_of_a_namespace ... ok
+test graph_view_tells_a_failed_extraction_from_a_waiting_one ... ok
+test include_raw_keeps_recent_source_text_in_an_interpreted_namespace ... ok
+test max_distance_also_gates_source_text_that_requests_without_include_raw_search ... ok
+test max_distance_drops_facts_that_only_the_graph_reached_when_they_are_far ... ok
+test max_distance_drops_far_facts_from_the_semantic_channel ... ok
+test max_distance_drops_far_retained_text_and_keeps_text_without_a_vector ... ok
+test max_distance_keeps_exact_word_matches_on_facts_however_far_their_vector_is ... ok
+test max_distance_leaves_an_empty_context_when_nothing_is_close_enough ... ok
+test max_distance_outside_zero_to_two_is_a_400_with_a_message ... ok
+test max_distance_removes_candidates_without_reordering_the_rest ... ok
+test max_distance_without_a_query_vector_leaves_out_what_it_cannot_measure_and_says_so ... ok
+test metrics_report_durable_operations_instead_of_unused_counters ... ok
+test namespace_status_counts_embedding_gaps_and_pending_evidence ... ok
+test parallel_claims_serialize_a_bank_and_preserve_history_order ... ok
+test recall_states_the_cutoff_it_used_and_keeps_the_exact_number_it_was_given ... ok
+test recall_without_max_distance_returns_the_candidates_it_always_did ... ok
+test requests_without_include_raw_keep_all_words_semantics_when_nothing_matched ... ok
+test retroactive_correction_closes_old_belief_without_negative_interval ... ok
+test unprocessed_evidence_is_recalled_before_extraction_and_failures_are_reported ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.04s
+

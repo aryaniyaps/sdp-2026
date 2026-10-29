@@ -1,0 +1,155 @@
+   Compiling memory-engine v0.1.0 (/home/aryan/orca/sdp-2026)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.46s
+     Running unittests src/lib.rs (target/debug/deps/memory_engine-3f98f6a40a955fbc)
+
+running 71 tests
+test graph::tests::assertion_names_are_short_single_lines ... ok
+test knowledge::timestamp_tests::date_only_and_offset_sources_preserve_a_defined_utc_time ... ok
+test knowledge::claim_validation_tests::entity_kind_and_relation_errors_name_the_value_and_the_allowed_ones ... ok
+test knowledge::claim_validation_tests::a_quote_that_is_not_verbatim_is_named_with_its_event ... ok
+test knowledge::claim_validation_tests::a_quote_found_in_another_event_names_that_event ... ok
+test knowledge::claim_validation_tests::two_quotes_from_one_event_need_a_repeated_index ... ok
+test graph::tests::projection_rows_with_unexpected_types_are_errors ... ok
+test model::structured::tests::source_pairs_convert_without_repairing_or_losing_evidence ... ok
+test model::structured::quote_compaction_tests::every_quote_candidate_survives_in_the_uncompacted_source ... ok
+test model::tests::answer_cut_at_the_output_cap_is_rejected ... ok
+test model::tests::invalid_limits_fail_loudly ... ok
+test knowledge::claim_validation_tests::long_text_in_a_validation_message_is_clipped ... ok
+test model::structured::reflection_tests::empty_reflection_evidence_requires_abstention_and_empty_citations ... ok
+test model::tests::limits_default_when_unset ... ok
+test model::structured::tests::source_schema_uses_visible_events_and_preserves_property_order ... ok
+test model::structured::reflection_tests::reflection_citations_are_only_retrieved_ids_and_question_markers_are_data ... ok
+test graph::tests::memory_graph_statement_builds_expected_entities ... ok
+test model::tests::local_cache_identity_includes_context ... ok
+test knowledge::claim_validation_tests::an_index_outside_the_events_and_an_empty_quote_are_reported ... ok
+test model::tests::options_carry_context_and_output_cap ... ok
+test model::tests::preflight_names_estimate_context_and_variable ... ok
+test model::tests::response_without_counters_is_rejected ... ok
+test model::tests::token_estimate_rounds_up_and_counts_characters ... ok
+test model::tests::truncated_prompt_response_is_rejected ... ok
+test model::structured::tests::review_schema_counts_claims_without_parsing_markers_inside_quotes ... ok
+test temporal::tests::as_of_gives_the_state_at_the_end_of_that_day ... ok
+test temporal::tests::months_years_and_dates ... ok
+test temporal::tests::counted_units_ago_use_the_period_that_holds_that_date ... ok
+test temporal::tests::ordinary_questions_get_no_window ... ok
+test temporal::tests::the_matched_words_are_reported ... ok
+test temporal::tests::relative_days_weeks_months_and_years ... ok
+test model::tests::limits_accept_valid_values ... ok
+test worker::prompts::tests::a_value_that_looks_like_a_placeholder_changes_nothing ... ok
+test graph::tests::node_budget_keeps_entities_when_the_limit_cuts ... ok
+test worker::prompts::tests::json_keys_and_roles_around_the_content_are_not_mentions ... ok
+test worker::prompts::tests::mention_strength_ranks_subject_and_value_over_subject_over_value ... ok
+test v2::recall::tests::natural_questions_become_any_word_queries ... ok
+test worker::prompts::tests::multi_word_texts_must_match_next_to_each_other ... ok
+test model::wire_budget_tests::extraction_estimate_matches_the_preflight_wire_prompt ... ok
+test worker::prompts::tests::prompt_is_the_template_with_both_lists_filled_in ... ok
+test worker::prompts::tests::an_unknown_placeholder_is_a_loud_error - should panic ... ok
+test worker::extraction::repair_tests::small_invalid_answer_remains_available_for_repair ... ok
+test worker::extraction::repair_tests::recalled_answers_are_not_independent_sources_but_new_evidence_is ... ok
+test worker::secrets::tests::catches_credentials ... ok
+test worker::review::tests::missing_reviews_and_wrong_indices_fail_but_invented_mentions_are_discarded ... ok
+test worker::review::tests::conflicting_report_loses_correction_and_gains_grounded_entity ... ok
+test worker::consolidation::prompt_tests::consolidate_prompt_matches_the_fixture_shared_with_the_training_code ... ok
+test worker::review::tests::explicit_correction_requires_quoted_change_and_cannot_be_invented ... ok
+test worker::secrets::tests::keeps_ordinary_facts ... ok
+test worker::window::tests::a_quote_from_the_shown_part_is_still_in_the_full_content ... ok
+test worker::prompts::tests::prompt_matches_the_fixture_shared_with_the_training_code ... ok
+test v2::reflect::prompt_tests::reflect_prompt_matches_the_fixture_shared_with_the_training_code ... ok
+test worker::window::tests::compact_event_has_second_resolution_time_and_sorted_keys ... ok
+test worker::window::tests::short_content_is_untouched ... ok
+test worker::window::tests::small_sessions_are_one_window_and_empty_ones_none ... ok
+test worker::window::tests::metadata_keeps_tool_facts_and_drops_identifiers_and_bodies ... ok
+test worker::prompts::tests::snapshot_that_fits_is_left_alone ... ok
+test worker::window::tests::long_content_keeps_head_and_tail_and_names_the_gap ... ok
+test worker::window::tests::missing_or_odd_metadata_gives_an_empty_object ... ok
+test worker::window::tests::multibyte_content_is_cut_on_characters ... ok
+test worker::prompts::tests::short_values_that_are_whole_words_rank_below_a_subject_and_value_hit ... ok
+test worker::window::tests::one_oversized_event_gets_its_own_window ... ok
+test worker::extraction::repair_tests::oversized_invalid_answer_keeps_all_evidence_and_fits_on_wire ... ok
+test worker::prompts::tests::short_values_inside_ordinary_words_do_not_crowd_out_the_corrected_fact ... ok
+test worker::prompts::tests::small_context_drops_snapshot_but_keeps_source_prompt_within_wire_budget ... ok
+test worker::prompts::tests::oversized_snapshot_is_shrunk_to_the_budget_and_counts_drops ... ok
+test worker::window::tests::compaction_and_windows_match_the_fixture_shared_with_the_training_code ... ok
+test worker::prompts::tests::facts_mentioned_in_the_batch_survive_so_corrections_still_resolve ... ok
+test worker::window::tests::windows_cover_every_event_once_and_in_order ... ok
+test worker::prompts::tests::shrink_is_deterministic ... ok
+test worker::prompts::tests::events_that_alone_exceed_the_budget_leave_no_facts ... ok
+
+test result: ok. 71 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/main.rs (target/debug/deps/memory_engine-b675700c6ab9cac9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/evidence_graph.rs (target/debug/deps/evidence_graph-601f4e28c0f852e6)
+
+running 30 tests
+test clearing_the_graph_removes_one_namespace_completely_and_leaves_the_others ... ok
+test max_distance_drops_facts_that_only_the_graph_reached_when_they_are_far ... ok
+test graph_view_serves_the_neo4j_projection_and_the_source_text_of_a_namespace ... ok
+test graph_view_namespace_with_nothing_returns_empty_lists ... ok
+test frontend_assets_are_served_and_retired_routes_are_gone ... ok
+test metrics_report_durable_operations_instead_of_unused_counters ... ok
+test expired_leases_recover_and_old_tokens_cannot_complete_work ... ok
+test forgotten_model_replies_are_asked_again_and_kept_ones_replay ... ok
+test include_raw_keeps_recent_source_text_in_an_interpreted_namespace ... ok
+test max_distance_outside_zero_to_two_is_a_400_with_a_message ... ok
+test dashboard_projects_persist_and_session_namespace_changes_are_isolated_and_versioned ... ok
+test graph_view_rejects_bad_requests_and_reports_unavailable_dependencies ... ok
+test parallel_claims_serialize_a_bank_and_preserve_history_order ... ok
+test namespace_status_counts_embedding_gaps_and_pending_evidence ... ok
+test graph_view_tells_a_failed_extraction_from_a_waiting_one ... ok
+test requests_without_include_raw_keep_all_words_semantics_when_nothing_matched ... ok
+test unprocessed_evidence_is_recalled_before_extraction_and_failures_are_reported ... ok
+test retroactive_correction_closes_old_belief_without_negative_interval ... ok
+test explicit_correction_resolves_an_existing_contested_value ... ok
+test max_distance_drops_far_facts_from_the_semantic_channel ... ok
+test max_distance_drops_far_retained_text_and_keeps_text_without_a_vector ... ok
+test max_distance_leaves_an_empty_context_when_nothing_is_close_enough ... ok
+test evidence_lifecycle_and_projection ... ok
+test max_distance_keeps_exact_word_matches_on_facts_however_far_their_vector_is ... ok
+test recall_states_the_cutoff_it_used_and_keeps_the_exact_number_it_was_given ... ok
+test max_distance_without_a_query_vector_leaves_out_what_it_cannot_measure_and_says_so ... ok
+test max_distance_removes_candidates_without_reordering_the_rest ... ok
+test graph_view_keeps_the_newest_unextracted_memories_when_cited_ones_fill_the_limit ... ok
+test max_distance_also_gates_source_text_that_requests_without_include_raw_search ... ok
+test recall_without_max_distance_returns_the_candidates_it_always_did ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+
+     Running tests/ollama_context.rs (target/debug/deps/ollama_context-2ba8ef95759d5cad)
+
+running 15 tests
+test live_prompt_beyond_the_context_is_rejected_by_the_service_code_path ... ok
+test live_prompt_of_about_nine_thousand_tokens_is_not_cut_to_4096 ... ok
+test answer_cut_at_the_output_cap_is_rejected ... ok
+test every_generate_call_carries_context_and_output_cap ... ok
+test extraction_decodes_paired_sources_but_returns_the_canonical_contract ... ok
+test live_shrunk_extract_prompt_fits_the_real_context ... ok
+test reflection_sends_exact_evidence_ids_as_a_citation_enum ... ok
+test prompt_evaluated_up_to_the_context_is_rejected ... ok
+test prompt_that_cannot_fit_fails_before_any_request ... ok
+test truncated_answer_is_not_cached_and_a_normal_one_is ... ok
+test cache_is_keyed_on_the_context_size ... ok
+test refused_repair_prompt_forgets_the_invalid_reply_it_followed ... ok
+test a_long_session_is_read_in_windows_and_claims_keep_episode_indices ... FAILED
+test worker_shrinks_the_snapshot_for_a_local_model_and_leaves_hosted_alone ... ok
+test healthz_reports_the_local_model_and_its_context ... ok
+
+failures:
+
+---- a_long_session_is_read_in_windows_and_claims_keep_episode_indices stdout ----
+
+thread 'a_long_session_is_read_in_windows_and_claims_keep_episode_indices' (1006457) panicked at tests/ollama_context.rs:691:56:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_long_session_is_read_in_windows_and_claims_keep_episode_indices
+
+test result: FAILED. 14 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+
+error: test failed, to rerun pass `--test ollama_context`

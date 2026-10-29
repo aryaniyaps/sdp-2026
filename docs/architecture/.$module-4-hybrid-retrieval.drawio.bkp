@@ -1,0 +1,180 @@
+<mxfile host="Electron">
+  <diagram id="module4-retrieval" name="Module 4 - Hybrid Retrieval">
+    <mxGraphModel dx="3214" dy="2045" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3200" pageHeight="1940" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=38;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#182D45;" value="&lt;b&gt;Module 4 · Hybrid Retrieval &amp;amp; Grounded Reasoning&lt;/b&gt;" vertex="1">
+          <mxGeometry height="60" width="3100" x="40" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="zone" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F7FAFD;strokeColor=#B9C8D7;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;dashed=1;" value="" vertex="1">
+          <mxGeometry height="1100" width="3120" x="40" y="165" as="geometry" />
+        </mxCell>
+        <mxCell id="zone-title" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=25;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#2463A6;" value="&lt;b&gt;RECALL · POST /api/v2/recall&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="3050" x="65" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="query" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#516379;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=document;size=0.12;" value="&lt;b&gt;Pi · E5 / 13 October&lt;/b&gt;&lt;br&gt;“What do you remember about where I live, my previous city, and my work?”" vertex="1">
+          <mxGeometry height="185" width="420" x="80" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="request" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Request + time filters&lt;/b&gt;&lt;br&gt;namespace · bounds · as_of&lt;br&gt;Optional rules / model planner" vertex="1">
+          <mxGeometry height="140" width="380" x="740" y="355" as="geometry" />
+        </mxCell>
+        <mxCell id="request-in" edge="1" parent="1" source="query" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="request" value="user:maya&lt;br&gt;query: E5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pi-settings" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#516379;" value="&lt;b&gt;Pi automatic recall&lt;/b&gt;&lt;br&gt;temporal:false · include_raw:true · max_distance:0.45&lt;br&gt;top_k:10 · max_tokens:2,048" vertex="1">
+          <mxGeometry height="105" width="1040" x="80" y="560" as="geometry" />
+        </mxCell>
+        <mxCell id="lexical" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Lexical search&lt;/b&gt;&lt;br&gt;PostgreSQL full-text" vertex="1">
+          <mxGeometry height="115" width="390" x="1430" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="semantic" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Semantic search&lt;/b&gt;&lt;br&gt;qwen3-embedding-cpu&lt;br&gt;pgvector · 1,024-d cosine" vertex="1">
+          <mxGeometry height="140" width="390" x="1430" y="560" as="geometry" />
+        </mxCell>
+        <mxCell id="temporal" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Temporal candidates&lt;/b&gt;&lt;br&gt;as_of / from / to" vertex="1">
+          <mxGeometry height="115" width="390" x="1430" y="835" as="geometry" />
+        </mxCell>
+        <mxCell id="lex" edge="1" parent="1" source="request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.2;entryX=0;entryY=0.5;" target="lexical" value="query text">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sem" edge="1" parent="1" source="request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.6;entryX=0;entryY=0.5;" target="semantic" value="query → vector">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="temp" edge="1" parent="1" source="request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.9;exitY=1;entryX=0;entryY=0.5;" target="temporal" value="if temporal enabled&lt;br&gt;+ time bounds">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1082" y="892" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pg" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=cylinder;size=0.12;" value="&lt;b&gt;PostgreSQL + pgvector&lt;/b&gt;&lt;br&gt;assertions · sources · chunks&lt;br&gt;namespace + status + time filters" vertex="1">
+          <mxGeometry height="170" width="430" x="2070" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="lex-db" edge="1" parent="1" source="pg" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.3;entryX=1;entryY=0.5;" target="lexical" value="ranked IDs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sem-db" edge="1" parent="1" source="pg" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.8;entryX=1;entryY=0.5;" target="semantic" value="nearest IDs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="fuse" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Rank fusion&lt;/b&gt;&lt;br&gt;RRF: Σ 1/(60 + rank)&lt;br&gt;Deduplicate IDs" vertex="1">
+          <mxGeometry height="150" width="350" x="2730" y="630" as="geometry" />
+        </mxCell>
+        <mxCell id="lex-rank" edge="1" parent="1" source="lexical" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.9;entryX=0.3;entryY=0;" target="fuse" value="lexical ranks">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1920" y="414" />
+              <mxPoint x="1920" y="520" />
+              <mxPoint x="2835" y="520" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sem-rank" edge="1" parent="1" source="semantic" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="fuse" value="semantic ranks">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="temp-rank" edge="1" parent="1" source="temporal" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.85;" target="fuse" value="temporal ranks">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1910" y="892" />
+              <mxPoint x="1910" y="1025" />
+              <mxPoint x="2570" y="1025" />
+              <mxPoint x="2570" y="757" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="raw" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Source-text retrieval&lt;/b&gt;&lt;br&gt;Lexical + vector&lt;br&gt;include_raw / fallback" vertex="1">
+          <mxGeometry height="140" width="420" x="80" y="820" as="geometry" />
+        </mxCell>
+        <mxCell id="raw-req" edge="1" parent="1" source="request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.1;exitY=1;entryX=0.5;entryY=0;" target="raw" value="Original E1 / E3 evidence">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="778" y="730" />
+              <mxPoint x="290" y="730" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="raw-rank" edge="1" parent="1" source="raw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=1;entryY=0.8;" target="fuse" value="source ranks · E1 / E3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="290" y="1190" />
+              <mxPoint x="3120" y="1190" />
+              <mxPoint x="3120" y="750" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="graph" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=cylinder;size=0.12;" value="&lt;b&gt;Neo4j expansion&lt;/b&gt;&lt;br&gt;Lexical / semantic / entity seeds&lt;br&gt;MENTIONS + SUPPORTS" vertex="1">
+          <mxGeometry height="155" width="430" x="2070" y="835" as="geometry" />
+        </mxCell>
+        <mxCell id="graph-seeds" edge="1" parent="1" source="semantic" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="graph" value="top lexical + semantic IDs&lt;br&gt;+ query entity matches">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1625" y="760" />
+              <mxPoint x="2285" y="760" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gate" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=rhombus;" value="&lt;b&gt;Eligible graph hit?&lt;/b&gt;&lt;br&gt;PostgreSQL recheck&lt;br&gt;status · time · distance" vertex="1">
+          <mxGeometry height="190" width="400" x="2700" y="950" as="geometry" />
+        </mxCell>
+        <mxCell id="neighbors" edge="1" parent="1" source="graph" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="gate" value="IDs + graph paths">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="gate-yes" edge="1" parent="1" source="gate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="fuse" value="Yes · graph ranks">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="gate-no" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=20;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#516379;" value="No → discard" vertex="1">
+          <mxGeometry height="40" width="470" x="2580" y="1160" as="geometry" />
+        </mxCell>
+        <mxCell id="pack" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Evidence packer&lt;/b&gt;&lt;br&gt;top_k + token budget&lt;br&gt;Up to 3 quotes / hit" vertex="1">
+          <mxGeometry height="135" width="350" x="2730" y="1380" as="geometry" />
+        </mxCell>
+        <mxCell id="ranked" edge="1" parent="1" source="fuse" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.2;entryX=1;entryY=0.5;" target="pack" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="3170" y="660" />
+              <mxPoint x="3170" y="1447" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ranked-label" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=21;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#2463A6;" value="Ranked hits + sources" vertex="1">
+          <mxGeometry height="50" width="410" x="2730" y="1300" as="geometry" />
+        </mxCell>
+        <mxCell id="context" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=document;size=0.12;" value="&lt;b&gt;Cited context&lt;/b&gt;&lt;br&gt;[R2] Maya lives in Bengaluru&lt;br&gt;fact · active · from 10 Oct&lt;br&gt;Evidence: E3 user quote" vertex="1">
+          <mxGeometry height="170" width="430" x="2070" y="1380" as="geometry" />
+        </mxCell>
+        <mxCell id="pack-out" edge="1" parent="1" source="pack" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" target="context" value="IDs · dates · quotes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pi" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Pi context injection&lt;/b&gt;&lt;br&gt;Nonempty + same namespace&lt;br&gt;Evidence, not instructions" vertex="1">
+          <mxGeometry height="130" width="350" x="1450" y="1385" as="geometry" />
+        </mxCell>
+        <mxCell id="pi-context" edge="1" parent="1" source="context" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.35;entryX=1;entryY=0.5;" target="pi" value="sdp-memory-context">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pi-answer" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#516379;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=document;size=0.12;" value="&lt;b&gt;Pi answers the user&lt;/b&gt;&lt;br&gt;Uses relevant recalled evidence&lt;br&gt;with the current conversation" vertex="1">
+          <mxGeometry height="150" width="390" x="790" y="1380" as="geometry" />
+        </mxCell>
+        <mxCell id="answer" edge="1" parent="1" source="pi" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" target="pi-answer" value="Relevant memory">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="reflect" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F4EFFA;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Optional reflection&lt;/b&gt;&lt;br&gt;mem-extractor:general-v1&lt;br&gt;POST /api/v2/reflect" vertex="1">
+          <mxGeometry height="125" width="430" x="2070" y="1740" as="geometry" />
+        </mxCell>
+        <mxCell id="reflect-in" edge="1" parent="1" source="context" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;dashed=1;" target="reflect" value="Explicit reflect request&lt;br&gt;uses recall evidence">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="citation" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=rhombus;" value="&lt;b&gt;Valid citations?&lt;/b&gt;&lt;br&gt;IDs belong to recall hits" vertex="1">
+          <mxGeometry height="200" width="390" x="1430" y="1700" as="geometry" />
+        </mxCell>
+        <mxCell id="generated" edge="1" parent="1" source="reflect" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" target="citation" value="answer + citation IDs&lt;br&gt;+ insufficient_evidence">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="grounded" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=document;size=0.12;" value="&lt;b&gt;Grounded answer&lt;/b&gt;&lt;br&gt;“Maya lives in Bengaluru.” [R2]" vertex="1">
+          <mxGeometry height="125" width="390" x="790" y="1740" as="geometry" />
+        </mxCell>
+        <mxCell id="valid" edge="1" parent="1" source="citation" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" target="grounded" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

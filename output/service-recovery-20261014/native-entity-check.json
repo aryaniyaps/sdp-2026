@@ -1,0 +1,1938 @@
+{
+  "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+  "steps": {
+    "initial": {
+      "text": "Project Orion's database is PostgreSQL.",
+      "retain": {
+        "created": true,
+        "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7",
+        "job_id": "e6694dcc-31f8-475b-857b-0afb4e8f32c5"
+      },
+      "jobs": [
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "07efad74-996c-4d3a-b892-eb71c00a0e7a",
+          "kind": "consolidate",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7"
+          },
+          "result": {
+            "observation_ids": [],
+            "reason": "fewer than two active facts"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "d3cd4d9d-fb8d-4161-afa3-e40e30e43fb4",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 79
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "e6694dcc-31f8-475b-857b-0afb4e8f32c5",
+          "kind": "extract",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7",
+            "existing_snapshot": []
+          },
+          "result": {
+            "decisions": [
+              {
+                "action": "created",
+                "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+                "explanation": "The user directly states the project's database backend."
+              }
+            ],
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "graph": {
+        "assertions": [
+          {
+            "cardinality": "single",
+            "confidence": 0.99,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "8c14ffe8-dad8-4e4b-87ed-b2a50ca43ac8"
+            ],
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7",
+            "event_at": null,
+            "id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "kind": "fact",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "postgresql",
+            "predicate": "database_backend",
+            "recorded_at": "2026-10-14T10:14:06.383678+00:00",
+            "revision": 79,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::database_backend",
+            "statement": "Project Orion uses PostgreSQL as its database backend.",
+            "status": "active",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:13:52.312686+00:00",
+            "valid_to": null,
+            "value": "PostgreSQL"
+          }
+        ],
+        "edges": [],
+        "entities": [
+          {
+            "aliases": [],
+            "entity_type": "technology",
+            "id": "8c14ffe8-dad8-4e4b-87ed-b2a50ca43ac8",
+            "name": "PostgreSQL",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "postgresql"
+          },
+          {
+            "aliases": [],
+            "entity_type": "project",
+            "id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "name": "Project Orion",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "project orion"
+          }
+        ],
+        "status": {
+          "embedding_gaps": {
+            "active_assertions": 0,
+            "source_chunks": 0
+          },
+          "jobs": [
+            {
+              "count": 1,
+              "kind": "consolidate",
+              "oldest": "2026-10-14T10:14:06.383678+00:00",
+              "status": "succeeded"
+            },
+            {
+              "count": 1,
+              "kind": "extract",
+              "oldest": "2026-10-14T10:13:52.31414+00:00",
+              "status": "succeeded"
+            },
+            {
+              "count": 1,
+              "kind": "project",
+              "oldest": "2026-10-14T10:14:06.383678+00:00",
+              "status": "succeeded"
+            }
+          ],
+          "last_projection_completed_at": "2026-10-14T10:14:09.316772Z",
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "outstanding_jobs": 0,
+          "ready": true,
+          "stale_observations": 0,
+          "worker_operations": [
+            {
+              "attempts": 1,
+              "failed_attempts": 0,
+              "mean_ms": 4.0,
+              "operation": "worker_consolidate",
+              "total_ms": 4
+            },
+            {
+              "attempts": 1,
+              "failed_attempts": 0,
+              "mean_ms": 13685.0,
+              "operation": "worker_extract",
+              "total_ms": 13685
+            },
+            {
+              "attempts": 1,
+              "failed_attempts": 0,
+              "mean_ms": 2699.0,
+              "operation": "worker_project",
+              "total_ms": 2699
+            }
+          ]
+        }
+      }
+    },
+    "conflict": {
+      "text": "Project Orion's database is MySQL.",
+      "retain": {
+        "created": true,
+        "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85",
+        "job_id": "672e8f0c-1036-4bac-a831-e67952cafc5d"
+      },
+      "jobs": [
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "91928e13-4999-4cfb-9615-9ac3ca4a93bf",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66"
+          },
+          "result": {
+            "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "revision": 84
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "e6cd2147-4a5a-4021-b0a0-094f38c55cc6",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 82
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "0e7500c8-883c-4f3b-88f4-eef225e514f8",
+          "kind": "consolidate",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85"
+          },
+          "result": {
+            "observation_ids": [],
+            "reason": "fewer than two active facts"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "4442f465-be9b-4f99-9b32-74978e54202f",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 82
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "672e8f0c-1036-4bac-a831-e67952cafc5d",
+          "kind": "extract",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85",
+            "existing_snapshot": [
+              {
+                "cardinality": "single",
+                "id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+                "predicate": "database_backend",
+                "subject": "Project Orion",
+                "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+                "valid_from": "2026-10-14T10:13:52.312686+00:00",
+                "value": "PostgreSQL"
+              }
+            ]
+          },
+          "result": {
+            "decisions": [
+              {
+                "action": "contradicted",
+                "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+                "explanation": "Conflicting report; source does not confirm replacement."
+              }
+            ],
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "07efad74-996c-4d3a-b892-eb71c00a0e7a",
+          "kind": "consolidate",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7"
+          },
+          "result": {
+            "observation_ids": [],
+            "reason": "fewer than two active facts"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "d3cd4d9d-fb8d-4161-afa3-e40e30e43fb4",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 79
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "e6694dcc-31f8-475b-857b-0afb4e8f32c5",
+          "kind": "extract",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7",
+            "existing_snapshot": []
+          },
+          "result": {
+            "decisions": [
+              {
+                "action": "created",
+                "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+                "explanation": "The user directly states the project's database backend."
+              }
+            ],
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "graph": {
+        "assertions": [
+          {
+            "cardinality": "single",
+            "confidence": 0.98,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "aca8882c-22af-4c3f-9070-feb803af0178"
+            ],
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85",
+            "event_at": null,
+            "id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "kind": "fact",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "mysql",
+            "predicate": "database_backend",
+            "recorded_at": "2026-10-14T10:14:25.532364+00:00",
+            "revision": 84,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::database_backend",
+            "statement": "The user reported that Project Orion uses MySQL as its database backend.",
+            "status": "contested",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:14:10.39762+00:00",
+            "valid_to": null,
+            "value": "MySQL"
+          },
+          {
+            "cardinality": "single",
+            "confidence": 0.99,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "8c14ffe8-dad8-4e4b-87ed-b2a50ca43ac8"
+            ],
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7",
+            "event_at": null,
+            "id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "kind": "fact",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "postgresql",
+            "predicate": "database_backend",
+            "recorded_at": "2026-10-14T10:14:06.383678+00:00",
+            "revision": 82,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::database_backend",
+            "statement": "Project Orion uses PostgreSQL as its database backend.",
+            "status": "contested",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:13:52.312686+00:00",
+            "valid_to": null,
+            "value": "PostgreSQL"
+          }
+        ],
+        "edges": [
+          {
+            "created_at": "2026-10-14T10:14:25.532364+00:00",
+            "explanation": "Conflicting report; source does not confirm replacement.",
+            "from_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "contradicts",
+            "to_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          }
+        ],
+        "entities": [
+          {
+            "aliases": [],
+            "entity_type": "technology",
+            "id": "aca8882c-22af-4c3f-9070-feb803af0178",
+            "name": "MySQL",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "mysql"
+          },
+          {
+            "aliases": [],
+            "entity_type": "technology",
+            "id": "8c14ffe8-dad8-4e4b-87ed-b2a50ca43ac8",
+            "name": "PostgreSQL",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "postgresql"
+          },
+          {
+            "aliases": [
+              "project orion"
+            ],
+            "entity_type": "project",
+            "id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "name": "Project Orion",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "project orion"
+          }
+        ],
+        "status": {
+          "embedding_gaps": {
+            "active_assertions": 0,
+            "source_chunks": 0
+          },
+          "jobs": [
+            {
+              "count": 2,
+              "kind": "consolidate",
+              "oldest": "2026-10-14T10:14:06.383678+00:00",
+              "status": "succeeded"
+            },
+            {
+              "count": 2,
+              "kind": "extract",
+              "oldest": "2026-10-14T10:13:52.31414+00:00",
+              "status": "succeeded"
+            },
+            {
+              "count": 4,
+              "kind": "project",
+              "oldest": "2026-10-14T10:14:06.383678+00:00",
+              "status": "succeeded"
+            }
+          ],
+          "last_projection_completed_at": "2026-10-14T10:14:26.495030Z",
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "outstanding_jobs": 0,
+          "ready": true,
+          "stale_observations": 0,
+          "worker_operations": [
+            {
+              "attempts": 2,
+              "failed_attempts": 0,
+              "mean_ms": 4.5,
+              "operation": "worker_consolidate",
+              "total_ms": 9
+            },
+            {
+              "attempts": 2,
+              "failed_attempts": 0,
+              "mean_ms": 14391.0,
+              "operation": "worker_extract",
+              "total_ms": 28782
+            },
+            {
+              "attempts": 4,
+              "failed_attempts": 0,
+              "mean_ms": 803.0,
+              "operation": "worker_project",
+              "total_ms": 3212
+            }
+          ]
+        }
+      }
+    },
+    "correction": {
+      "text": "Correction: Project Orion's database is SQLite, not PostgreSQL or MySQL.",
+      "retain": {
+        "created": true,
+        "episode_id": "c9ce9ffa-b2d1-4568-9f42-80081091ede0",
+        "job_id": "a20414e3-3c9b-45f3-be14-aa8f01b38f8e"
+      },
+      "jobs": [
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "bbf3ee31-17a5-4250-ac7f-e2ca60802d68",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5"
+          },
+          "result": {
+            "assertion_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+            "revision": 88
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "bc1de0fd-babf-4c7c-b21f-516246919769",
+          "kind": "consolidate",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "c9ce9ffa-b2d1-4568-9f42-80081091ede0"
+          },
+          "result": {
+            "observation_ids": [],
+            "reason": "fewer than two active facts"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "8ab1e53b-e954-48c5-bcd9-62ce654d6cea",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 85
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "96f1b05d-a5a7-4a3b-8a04-2f5d5d73a00a",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66"
+          },
+          "result": {
+            "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "revision": 86
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "a20414e3-3c9b-45f3-be14-aa8f01b38f8e",
+          "kind": "extract",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "c9ce9ffa-b2d1-4568-9f42-80081091ede0",
+            "existing_snapshot": [
+              {
+                "cardinality": "single",
+                "id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+                "predicate": "database_backend",
+                "subject": "Project Orion",
+                "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+                "valid_from": "2026-10-14T10:14:10.39762+00:00",
+                "value": "MySQL"
+              },
+              {
+                "cardinality": "single",
+                "id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+                "predicate": "database_backend",
+                "subject": "Project Orion",
+                "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+                "valid_from": "2026-10-14T10:13:52.312686+00:00",
+                "value": "PostgreSQL"
+              }
+            ]
+          },
+          "result": {
+            "decisions": [
+              {
+                "action": "superseded",
+                "assertion_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+                "explanation": "User explicitly replaced PostgreSQL and MySQL with SQLite."
+              }
+            ],
+            "episode_id": "c9ce9ffa-b2d1-4568-9f42-80081091ede0"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "0e7500c8-883c-4f3b-88f4-eef225e514f8",
+          "kind": "consolidate",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85"
+          },
+          "result": {
+            "observation_ids": [],
+            "reason": "fewer than two active facts"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "91928e13-4999-4cfb-9615-9ac3ca4a93bf",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66"
+          },
+          "result": {
+            "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "revision": 84
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "4442f465-be9b-4f99-9b32-74978e54202f",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 82
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "e6cd2147-4a5a-4021-b0a0-094f38c55cc6",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 82
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "672e8f0c-1036-4bac-a831-e67952cafc5d",
+          "kind": "extract",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85",
+            "existing_snapshot": [
+              {
+                "cardinality": "single",
+                "id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+                "predicate": "database_backend",
+                "subject": "Project Orion",
+                "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+                "valid_from": "2026-10-14T10:13:52.312686+00:00",
+                "value": "PostgreSQL"
+              }
+            ]
+          },
+          "result": {
+            "decisions": [
+              {
+                "action": "contradicted",
+                "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+                "explanation": "Conflicting report; source does not confirm replacement."
+              }
+            ],
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "d3cd4d9d-fb8d-4161-afa3-e40e30e43fb4",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 79
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "07efad74-996c-4d3a-b892-eb71c00a0e7a",
+          "kind": "consolidate",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7"
+          },
+          "result": {
+            "observation_ids": [],
+            "reason": "fewer than two active facts"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "e6694dcc-31f8-475b-857b-0afb4e8f32c5",
+          "kind": "extract",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7",
+            "existing_snapshot": []
+          },
+          "result": {
+            "decisions": [
+              {
+                "action": "created",
+                "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+                "explanation": "The user directly states the project's database backend."
+              }
+            ],
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "graph": {
+        "assertions": [
+          {
+            "cardinality": "single",
+            "confidence": 0.98,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "6de96142-34fe-485e-b573-0680e7835b77"
+            ],
+            "episode_id": "c9ce9ffa-b2d1-4568-9f42-80081091ede0",
+            "event_at": null,
+            "id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+            "kind": "fact",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "sqlite",
+            "predicate": "database_backend",
+            "recorded_at": "2026-10-14T10:14:38.498932+00:00",
+            "revision": 88,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::database_backend",
+            "statement": "The user corrected Project Orion's database backend to SQLite.",
+            "status": "active",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:14:28.466945+00:00",
+            "valid_to": null,
+            "value": "SQLite"
+          },
+          {
+            "cardinality": "single",
+            "confidence": 0.98,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "aca8882c-22af-4c3f-9070-feb803af0178"
+            ],
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85",
+            "event_at": null,
+            "id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "kind": "fact",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "mysql",
+            "predicate": "database_backend",
+            "recorded_at": "2026-10-14T10:14:25.532364+00:00",
+            "revision": 86,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::database_backend",
+            "statement": "The user reported that Project Orion uses MySQL as its database backend.",
+            "status": "superseded",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:14:10.39762+00:00",
+            "valid_to": "2026-10-14T10:14:28.466945+00:00",
+            "value": "MySQL"
+          },
+          {
+            "cardinality": "single",
+            "confidence": 0.99,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "8c14ffe8-dad8-4e4b-87ed-b2a50ca43ac8"
+            ],
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7",
+            "event_at": null,
+            "id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "kind": "fact",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "postgresql",
+            "predicate": "database_backend",
+            "recorded_at": "2026-10-14T10:14:06.383678+00:00",
+            "revision": 85,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::database_backend",
+            "statement": "Project Orion uses PostgreSQL as its database backend.",
+            "status": "superseded",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:13:52.312686+00:00",
+            "valid_to": "2026-10-14T10:14:28.466945+00:00",
+            "value": "PostgreSQL"
+          }
+        ],
+        "edges": [
+          {
+            "created_at": "2026-10-14T10:14:38.498932+00:00",
+            "explanation": "SQLite replaces the existing PostgreSQL value.",
+            "from_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "contradicts",
+            "to_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          {
+            "created_at": "2026-10-14T10:14:38.498932+00:00",
+            "explanation": "User explicitly replaced PostgreSQL and MySQL with SQLite.",
+            "from_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "supersedes",
+            "to_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          {
+            "created_at": "2026-10-14T10:14:38.498932+00:00",
+            "explanation": "User explicitly replaced PostgreSQL and MySQL with SQLite.",
+            "from_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "supersedes",
+            "to_id": "f330dec0-ff59-429b-88f3-30a1828c8e66"
+          },
+          {
+            "created_at": "2026-10-14T10:14:25.532364+00:00",
+            "explanation": "Conflicting report; source does not confirm replacement.",
+            "from_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "contradicts",
+            "to_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          }
+        ],
+        "entities": [
+          {
+            "aliases": [],
+            "entity_type": "technology",
+            "id": "aca8882c-22af-4c3f-9070-feb803af0178",
+            "name": "MySQL",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "mysql"
+          },
+          {
+            "aliases": [],
+            "entity_type": "technology",
+            "id": "8c14ffe8-dad8-4e4b-87ed-b2a50ca43ac8",
+            "name": "PostgreSQL",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "postgresql"
+          },
+          {
+            "aliases": [
+              "project orion",
+              "project orion"
+            ],
+            "entity_type": "project",
+            "id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "name": "Project Orion",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "project orion"
+          },
+          {
+            "aliases": [],
+            "entity_type": "technology",
+            "id": "6de96142-34fe-485e-b573-0680e7835b77",
+            "name": "SQLite",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "sqlite"
+          }
+        ],
+        "status": {
+          "embedding_gaps": {
+            "active_assertions": 0,
+            "source_chunks": 0
+          },
+          "jobs": [
+            {
+              "count": 3,
+              "kind": "consolidate",
+              "oldest": "2026-10-14T10:14:06.383678+00:00",
+              "status": "succeeded"
+            },
+            {
+              "count": 3,
+              "kind": "extract",
+              "oldest": "2026-10-14T10:13:52.31414+00:00",
+              "status": "succeeded"
+            },
+            {
+              "count": 7,
+              "kind": "project",
+              "oldest": "2026-10-14T10:14:06.383678+00:00",
+              "status": "succeeded"
+            }
+          ],
+          "last_projection_completed_at": "2026-10-14T10:14:39.685266Z",
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "outstanding_jobs": 0,
+          "ready": true,
+          "stale_observations": 0,
+          "worker_operations": [
+            {
+              "attempts": 3,
+              "failed_attempts": 0,
+              "mean_ms": 3.333333333333333,
+              "operation": "worker_consolidate",
+              "total_ms": 10
+            },
+            {
+              "attempts": 3,
+              "failed_attempts": 0,
+              "mean_ms": 12895.0,
+              "operation": "worker_extract",
+              "total_ms": 38685
+            },
+            {
+              "attempts": 7,
+              "failed_attempts": 0,
+              "mean_ms": 610.7142857142857,
+              "operation": "worker_project",
+              "total_ms": 4275
+            }
+          ]
+        }
+      }
+    },
+    "entities": {
+      "text": "Mira owns Project Orion at Cedar Labs.",
+      "retain": {
+        "created": true,
+        "episode_id": "820c27c4-4c55-4cd0-9781-aac7dd1148b9",
+        "job_id": "b2900e85-1568-45cc-9f82-57ee39440a30"
+      },
+      "jobs": [
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "b5da78dd-5c18-4796-98f5-3b79832d256b",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21"
+          },
+          "result": {
+            "assertion_id": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+            "revision": 91
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "cc2c8188-42f6-4477-a147-074317729d65",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "398c2f3f-4477-477f-b0f3-786aa5638a8c"
+          },
+          "result": {
+            "assertion_id": "398c2f3f-4477-477f-b0f3-786aa5638a8c",
+            "revision": 90
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "310116c4-07d7-4f1b-b9de-3f0853f1e9c1",
+          "kind": "consolidate",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "820c27c4-4c55-4cd0-9781-aac7dd1148b9"
+          },
+          "result": {
+            "observation_ids": [
+              "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21"
+            ]
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "b2900e85-1568-45cc-9f82-57ee39440a30",
+          "kind": "extract",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "820c27c4-4c55-4cd0-9781-aac7dd1148b9",
+            "existing_snapshot": [
+              {
+                "cardinality": "single",
+                "id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+                "predicate": "database_backend",
+                "subject": "Project Orion",
+                "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+                "valid_from": "2026-10-14T10:14:28.466945+00:00",
+                "value": "SQLite"
+              }
+            ]
+          },
+          "result": {
+            "decisions": [
+              {
+                "action": "created",
+                "assertion_id": "398c2f3f-4477-477f-b0f3-786aa5638a8c",
+                "explanation": "The user directly states Mira's ownership."
+              }
+            ],
+            "episode_id": "820c27c4-4c55-4cd0-9781-aac7dd1148b9"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "bc1de0fd-babf-4c7c-b21f-516246919769",
+          "kind": "consolidate",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "c9ce9ffa-b2d1-4568-9f42-80081091ede0"
+          },
+          "result": {
+            "observation_ids": [],
+            "reason": "fewer than two active facts"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "96f1b05d-a5a7-4a3b-8a04-2f5d5d73a00a",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66"
+          },
+          "result": {
+            "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "revision": 86
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "bbf3ee31-17a5-4250-ac7f-e2ca60802d68",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5"
+          },
+          "result": {
+            "assertion_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+            "revision": 88
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "8ab1e53b-e954-48c5-bcd9-62ce654d6cea",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 85
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "a20414e3-3c9b-45f3-be14-aa8f01b38f8e",
+          "kind": "extract",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "c9ce9ffa-b2d1-4568-9f42-80081091ede0",
+            "existing_snapshot": [
+              {
+                "cardinality": "single",
+                "id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+                "predicate": "database_backend",
+                "subject": "Project Orion",
+                "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+                "valid_from": "2026-10-14T10:14:10.39762+00:00",
+                "value": "MySQL"
+              },
+              {
+                "cardinality": "single",
+                "id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+                "predicate": "database_backend",
+                "subject": "Project Orion",
+                "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+                "valid_from": "2026-10-14T10:13:52.312686+00:00",
+                "value": "PostgreSQL"
+              }
+            ]
+          },
+          "result": {
+            "decisions": [
+              {
+                "action": "superseded",
+                "assertion_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+                "explanation": "User explicitly replaced PostgreSQL and MySQL with SQLite."
+              }
+            ],
+            "episode_id": "c9ce9ffa-b2d1-4568-9f42-80081091ede0"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "0e7500c8-883c-4f3b-88f4-eef225e514f8",
+          "kind": "consolidate",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85"
+          },
+          "result": {
+            "observation_ids": [],
+            "reason": "fewer than two active facts"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "91928e13-4999-4cfb-9615-9ac3ca4a93bf",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66"
+          },
+          "result": {
+            "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "revision": 84
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "e6cd2147-4a5a-4021-b0a0-094f38c55cc6",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 82
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "4442f465-be9b-4f99-9b32-74978e54202f",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 82
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "672e8f0c-1036-4bac-a831-e67952cafc5d",
+          "kind": "extract",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85",
+            "existing_snapshot": [
+              {
+                "cardinality": "single",
+                "id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+                "predicate": "database_backend",
+                "subject": "Project Orion",
+                "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+                "valid_from": "2026-10-14T10:13:52.312686+00:00",
+                "value": "PostgreSQL"
+              }
+            ]
+          },
+          "result": {
+            "decisions": [
+              {
+                "action": "contradicted",
+                "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+                "explanation": "Conflicting report; source does not confirm replacement."
+              }
+            ],
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "d3cd4d9d-fb8d-4161-afa3-e40e30e43fb4",
+          "kind": "project",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          "result": {
+            "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "revision": 79
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "07efad74-996c-4d3a-b892-eb71c00a0e7a",
+          "kind": "consolidate",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7"
+          },
+          "result": {
+            "observation_ids": [],
+            "reason": "fewer than two active facts"
+          },
+          "status": "succeeded"
+        },
+        {
+          "attempts": 1,
+          "error": null,
+          "id": "e6694dcc-31f8-475b-857b-0afb4e8f32c5",
+          "kind": "extract",
+          "lease_token": null,
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "payload": {
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7",
+            "existing_snapshot": []
+          },
+          "result": {
+            "decisions": [
+              {
+                "action": "created",
+                "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+                "explanation": "The user directly states the project's database backend."
+              }
+            ],
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7"
+          },
+          "status": "succeeded"
+        }
+      ],
+      "graph": {
+        "assertions": [
+          {
+            "cardinality": "multiple",
+            "confidence": 0.98,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "5cd0520b-8339-49c8-9ddb-a9c2ac5e5835",
+              "8ce8940d-c52a-4109-9773-2c785e6840d9",
+              "6de96142-34fe-485e-b573-0680e7835b77"
+            ],
+            "episode_id": null,
+            "event_at": null,
+            "id": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+            "kind": "observation",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "mira; sqlite backend correction",
+            "predicate": "project_owner_and_backend_change",
+            "recorded_at": "2026-10-14T10:15:08.40888+00:00",
+            "revision": 91,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::project_owner_and_backend_change",
+            "statement": "Mira owns Project Orion and corrected its database backend.",
+            "status": "active",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:14:40.527833+00:00",
+            "valid_to": null,
+            "value": "Mira; SQLite backend correction"
+          },
+          {
+            "cardinality": "single",
+            "confidence": 0.98,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "5cd0520b-8339-49c8-9ddb-a9c2ac5e5835",
+              "8ce8940d-c52a-4109-9773-2c785e6840d9"
+            ],
+            "episode_id": "820c27c4-4c55-4cd0-9781-aac7dd1148b9",
+            "event_at": null,
+            "id": "398c2f3f-4477-477f-b0f3-786aa5638a8c",
+            "kind": "profile",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "mira",
+            "predicate": "ownership",
+            "recorded_at": "2026-10-14T10:14:46.886373+00:00",
+            "revision": 90,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::ownership",
+            "statement": "Mira owns Project Orion.",
+            "status": "active",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:14:40.527833+00:00",
+            "valid_to": null,
+            "value": "Mira"
+          },
+          {
+            "cardinality": "single",
+            "confidence": 0.98,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "6de96142-34fe-485e-b573-0680e7835b77"
+            ],
+            "episode_id": "c9ce9ffa-b2d1-4568-9f42-80081091ede0",
+            "event_at": null,
+            "id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+            "kind": "fact",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "sqlite",
+            "predicate": "database_backend",
+            "recorded_at": "2026-10-14T10:14:38.498932+00:00",
+            "revision": 88,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::database_backend",
+            "statement": "The user corrected Project Orion's database backend to SQLite.",
+            "status": "active",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:14:28.466945+00:00",
+            "valid_to": null,
+            "value": "SQLite"
+          },
+          {
+            "cardinality": "single",
+            "confidence": 0.98,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "aca8882c-22af-4c3f-9070-feb803af0178"
+            ],
+            "episode_id": "da6eb2b9-4993-4485-83e4-9a6c25382a85",
+            "event_at": null,
+            "id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "kind": "fact",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "mysql",
+            "predicate": "database_backend",
+            "recorded_at": "2026-10-14T10:14:25.532364+00:00",
+            "revision": 86,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::database_backend",
+            "statement": "The user reported that Project Orion uses MySQL as its database backend.",
+            "status": "superseded",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:14:10.39762+00:00",
+            "valid_to": "2026-10-14T10:14:28.466945+00:00",
+            "value": "MySQL"
+          },
+          {
+            "cardinality": "single",
+            "confidence": 0.99,
+            "entity_ids": [
+              "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+              "8c14ffe8-dad8-4e4b-87ed-b2a50ca43ac8"
+            ],
+            "episode_id": "4ff101dd-ed37-4fe6-9623-d8dcb56836b7",
+            "event_at": null,
+            "id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+            "kind": "fact",
+            "model": "ollama/mem-extractor:general-v1",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_value": "postgresql",
+            "predicate": "database_backend",
+            "recorded_at": "2026-10-14T10:14:06.383678+00:00",
+            "revision": 85,
+            "slot_key": "b8732a01-89f2-41a6-9727-64bfe2be13f1::database_backend",
+            "statement": "Project Orion uses PostgreSQL as its database backend.",
+            "status": "superseded",
+            "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "valid_from": "2026-10-14T10:13:52.312686+00:00",
+            "valid_to": "2026-10-14T10:14:28.466945+00:00",
+            "value": "PostgreSQL"
+          }
+        ],
+        "edges": [
+          {
+            "created_at": "2026-10-14T10:14:38.498932+00:00",
+            "explanation": "SQLite replaces the existing PostgreSQL value.",
+            "from_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "contradicts",
+            "to_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          {
+            "created_at": "2026-10-14T10:14:38.498932+00:00",
+            "explanation": "User explicitly replaced PostgreSQL and MySQL with SQLite.",
+            "from_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "supersedes",
+            "to_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          },
+          {
+            "created_at": "2026-10-14T10:14:38.498932+00:00",
+            "explanation": "User explicitly replaced PostgreSQL and MySQL with SQLite.",
+            "from_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "supersedes",
+            "to_id": "f330dec0-ff59-429b-88f3-30a1828c8e66"
+          },
+          {
+            "created_at": "2026-10-14T10:15:08.40888+00:00",
+            "explanation": "Both claims describe Mira's ownership and the backend correction.",
+            "from_id": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "supports",
+            "to_id": "398c2f3f-4477-477f-b0f3-786aa5638a8c"
+          },
+          {
+            "created_at": "2026-10-14T10:15:08.40888+00:00",
+            "explanation": "Both claims describe Mira's ownership and the backend correction.",
+            "from_id": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "supports",
+            "to_id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5"
+          },
+          {
+            "created_at": "2026-10-14T10:14:25.532364+00:00",
+            "explanation": "Conflicting report; source does not confirm replacement.",
+            "from_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "relation": "contradicts",
+            "to_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6"
+          }
+        ],
+        "entities": [
+          {
+            "aliases": [],
+            "entity_type": "organization",
+            "id": "8ce8940d-c52a-4109-9773-2c785e6840d9",
+            "name": "Cedar Labs",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "cedar labs"
+          },
+          {
+            "aliases": [],
+            "entity_type": "person",
+            "id": "5cd0520b-8339-49c8-9ddb-a9c2ac5e5835",
+            "name": "Mira",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "mira"
+          },
+          {
+            "aliases": [],
+            "entity_type": "technology",
+            "id": "aca8882c-22af-4c3f-9070-feb803af0178",
+            "name": "MySQL",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "mysql"
+          },
+          {
+            "aliases": [],
+            "entity_type": "technology",
+            "id": "8c14ffe8-dad8-4e4b-87ed-b2a50ca43ac8",
+            "name": "PostgreSQL",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "postgresql"
+          },
+          {
+            "aliases": [
+              "project orion",
+              "project orion",
+              "orion"
+            ],
+            "entity_type": "project",
+            "id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+            "name": "Project Orion",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "project orion"
+          },
+          {
+            "aliases": [],
+            "entity_type": "technology",
+            "id": "6de96142-34fe-485e-b573-0680e7835b77",
+            "name": "SQLite",
+            "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+            "normalized_name": "sqlite"
+          }
+        ],
+        "status": {
+          "embedding_gaps": {
+            "active_assertions": 0,
+            "source_chunks": 0
+          },
+          "jobs": [
+            {
+              "count": 4,
+              "kind": "consolidate",
+              "oldest": "2026-10-14T10:14:06.383678+00:00",
+              "status": "succeeded"
+            },
+            {
+              "count": 4,
+              "kind": "extract",
+              "oldest": "2026-10-14T10:13:52.31414+00:00",
+              "status": "succeeded"
+            },
+            {
+              "count": 9,
+              "kind": "project",
+              "oldest": "2026-10-14T10:14:06.383678+00:00",
+              "status": "succeeded"
+            }
+          ],
+          "last_projection_completed_at": "2026-10-14T10:15:08.759623Z",
+          "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+          "outstanding_jobs": 0,
+          "ready": true,
+          "stale_observations": 0,
+          "worker_operations": [
+            {
+              "attempts": 4,
+              "failed_attempts": 0,
+              "mean_ms": 5380.25,
+              "operation": "worker_consolidate",
+              "total_ms": 21521
+            },
+            {
+              "attempts": 4,
+              "failed_attempts": 0,
+              "mean_ms": 11258.75,
+              "operation": "worker_extract",
+              "total_ms": 45035
+            },
+            {
+              "attempts": 9,
+              "failed_attempts": 0,
+              "mean_ms": 510.3333333333333,
+              "operation": "worker_project",
+              "total_ms": 4593
+            }
+          ]
+        }
+      }
+    }
+  },
+  "checks": {
+    "initial_fact_active": true,
+    "database_entity_extracted": true,
+    "both_conflicting_values_contested": true,
+    "subject_identity_preserved": true,
+    "contradiction_edge": true,
+    "explicit_correction_active": true,
+    "both_old_values_superseded": true,
+    "supersession_edges": true,
+    "person_project_organization_entities": true,
+    "correction_quotes_grounded": true,
+    "neo4j_matches_history": true
+  },
+  "health": {
+    "database": true,
+    "embedder": true,
+    "degraded_mode": false,
+    "worker_model": "ollama/mem-extractor:general-v1",
+    "worker_num_ctx": 12288,
+    "worker_num_predict": 3072,
+    "worker_concurrency": 2,
+    "embedding_model": "qwen3-embedding-cpu"
+  },
+  "correction_detail": {
+    "id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+    "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+    "subject_id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+    "subject": "Project Orion",
+    "predicate": "database_backend",
+    "value": "SQLite",
+    "statement": "The user corrected Project Orion's database backend to SQLite.",
+    "kind": "fact",
+    "status": "active",
+    "cardinality": "single",
+    "valid_from": "2026-10-14T10:14:28.466945Z",
+    "valid_to": null,
+    "event_at": null,
+    "recorded_at": "2026-10-14T10:14:38.498932Z",
+    "confidence": 0.98,
+    "sources": [
+      {
+        "chunk_id": "a9f96e99-876a-43d6-abd9-e553a112e1cf",
+        "quote": "Correction: Project Orion's database is SQLite, not PostgreSQL or MySQL.",
+        "role": "user",
+        "session_id": "entity-conflict-check",
+        "occurred_at": "2026-10-14T10:14:28.466945Z",
+        "metadata": null
+      }
+    ],
+    "relations": [
+      {
+        "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+        "relation": "contradicts",
+        "explanation": "SQLite replaces the existing PostgreSQL value."
+      },
+      {
+        "assertion_id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+        "relation": "supersedes",
+        "explanation": "User explicitly replaced PostgreSQL and MySQL with SQLite."
+      },
+      {
+        "assertion_id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+        "relation": "supersedes",
+        "explanation": "User explicitly replaced PostgreSQL and MySQL with SQLite."
+      }
+    ]
+  },
+  "projection": {
+    "namespace": "diagnostic:entity-conflict:1f4c7eef-d6f2-4a04-8ae4-b95d800eaabe",
+    "source": "neo4j",
+    "nodes": [
+      {
+        "id": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+        "kind": "assertion",
+        "name": "Mira owns Project Orion and corrected its database backend.",
+        "statement": "Mira owns Project Orion and corrected its database backend.",
+        "status": "active",
+        "assertion_kind": "observation",
+        "entity_type": null,
+        "valid_from": "2026-10-14T10:14:40.527833Z",
+        "valid_to": null,
+        "revision": 91
+      },
+      {
+        "id": "398c2f3f-4477-477f-b0f3-786aa5638a8c",
+        "kind": "assertion",
+        "name": "Mira owns Project Orion.",
+        "statement": "Mira owns Project Orion.",
+        "status": "active",
+        "assertion_kind": "profile",
+        "entity_type": null,
+        "valid_from": "2026-10-14T10:14:40.527833Z",
+        "valid_to": null,
+        "revision": 90
+      },
+      {
+        "id": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+        "kind": "assertion",
+        "name": "The user corrected Project Orion's database backend to SQLit...",
+        "statement": "The user corrected Project Orion's database backend to SQLite.",
+        "status": "active",
+        "assertion_kind": "fact",
+        "entity_type": null,
+        "valid_from": "2026-10-14T10:14:28.466945Z",
+        "valid_to": null,
+        "revision": 88
+      },
+      {
+        "id": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+        "kind": "assertion",
+        "name": "The user reported that Project Orion uses MySQL as its datab...",
+        "statement": "The user reported that Project Orion uses MySQL as its database backend.",
+        "status": "superseded",
+        "assertion_kind": "fact",
+        "entity_type": null,
+        "valid_from": "2026-10-14T10:14:10.397620Z",
+        "valid_to": "2026-10-14T10:14:28.466945Z",
+        "revision": 86
+      },
+      {
+        "id": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+        "kind": "assertion",
+        "name": "Project Orion uses PostgreSQL as its database backend.",
+        "statement": "Project Orion uses PostgreSQL as its database backend.",
+        "status": "superseded",
+        "assertion_kind": "fact",
+        "entity_type": null,
+        "valid_from": "2026-10-14T10:13:52.312686Z",
+        "valid_to": "2026-10-14T10:14:28.466945Z",
+        "revision": 85
+      },
+      {
+        "id": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+        "kind": "entity",
+        "name": "Project Orion",
+        "statement": null,
+        "status": null,
+        "assertion_kind": null,
+        "entity_type": "project",
+        "valid_from": null,
+        "valid_to": null,
+        "revision": null
+      },
+      {
+        "id": "8ce8940d-c52a-4109-9773-2c785e6840d9",
+        "kind": "entity",
+        "name": "Cedar Labs",
+        "statement": null,
+        "status": null,
+        "assertion_kind": null,
+        "entity_type": "organization",
+        "valid_from": null,
+        "valid_to": null,
+        "revision": null
+      },
+      {
+        "id": "5cd0520b-8339-49c8-9ddb-a9c2ac5e5835",
+        "kind": "entity",
+        "name": "Mira",
+        "statement": null,
+        "status": null,
+        "assertion_kind": null,
+        "entity_type": "person",
+        "valid_from": null,
+        "valid_to": null,
+        "revision": null
+      },
+      {
+        "id": "6de96142-34fe-485e-b573-0680e7835b77",
+        "kind": "entity",
+        "name": "SQLite",
+        "statement": null,
+        "status": null,
+        "assertion_kind": null,
+        "entity_type": "technology",
+        "valid_from": null,
+        "valid_to": null,
+        "revision": null
+      },
+      {
+        "id": "aca8882c-22af-4c3f-9070-feb803af0178",
+        "kind": "entity",
+        "name": "MySQL",
+        "statement": null,
+        "status": null,
+        "assertion_kind": null,
+        "entity_type": "technology",
+        "valid_from": null,
+        "valid_to": null,
+        "revision": null
+      },
+      {
+        "id": "8c14ffe8-dad8-4e4b-87ed-b2a50ca43ac8",
+        "kind": "entity",
+        "name": "PostgreSQL",
+        "statement": null,
+        "status": null,
+        "assertion_kind": null,
+        "entity_type": "technology",
+        "valid_from": null,
+        "valid_to": null,
+        "revision": null
+      }
+    ],
+    "relationships": [
+      {
+        "from": "398c2f3f-4477-477f-b0f3-786aa5638a8c",
+        "to": "5cd0520b-8339-49c8-9ddb-a9c2ac5e5835",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "398c2f3f-4477-477f-b0f3-786aa5638a8c",
+        "to": "8ce8940d-c52a-4109-9773-2c785e6840d9",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "398c2f3f-4477-477f-b0f3-786aa5638a8c",
+        "to": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+        "to": "8c14ffe8-dad8-4e4b-87ed-b2a50ca43ac8",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+        "to": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+        "to": "6de96142-34fe-485e-b573-0680e7835b77",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+        "to": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+        "type": "SUPPORTS",
+        "relation": "contradicts",
+        "explanation": "SQLite replaces the existing PostgreSQL value."
+      },
+      {
+        "from": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+        "to": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+        "type": "SUPPORTS",
+        "relation": "supersedes",
+        "explanation": "User explicitly replaced PostgreSQL and MySQL with SQLite."
+      },
+      {
+        "from": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+        "to": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+        "to": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+        "type": "SUPPORTS",
+        "relation": "supersedes",
+        "explanation": "User explicitly replaced PostgreSQL and MySQL with SQLite."
+      },
+      {
+        "from": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+        "to": "398c2f3f-4477-477f-b0f3-786aa5638a8c",
+        "type": "SUPPORTS",
+        "relation": "supports",
+        "explanation": "Both claims describe Mira's ownership and the backend correction."
+      },
+      {
+        "from": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+        "to": "5cd0520b-8339-49c8-9ddb-a9c2ac5e5835",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+        "to": "6de96142-34fe-485e-b573-0680e7835b77",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+        "to": "8ce8940d-c52a-4109-9773-2c785e6840d9",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+        "to": "93fa318f-b3bf-4d2b-a946-542488f5f0e5",
+        "type": "SUPPORTS",
+        "relation": "supports",
+        "explanation": "Both claims describe Mira's ownership and the backend correction."
+      },
+      {
+        "from": "9f99569d-6acd-4a5b-b3ad-a0dae5bbea21",
+        "to": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+        "to": "78f858b6-557b-4de8-b391-b14fd8dc8aa6",
+        "type": "SUPPORTS",
+        "relation": "contradicts",
+        "explanation": "Conflicting report; source does not confirm replacement."
+      },
+      {
+        "from": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+        "to": "aca8882c-22af-4c3f-9070-feb803af0178",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      },
+      {
+        "from": "f330dec0-ff59-429b-88f3-30a1828c8e66",
+        "to": "b8732a01-89f2-41a6-9727-64bfe2be13f1",
+        "type": "MENTIONS",
+        "relation": null,
+        "explanation": null
+      }
+    ],
+    "counts": {
+      "nodes": 11,
+      "relationships": 19
+    },
+    "truncated": false
+  },
+  "passed": true
+}

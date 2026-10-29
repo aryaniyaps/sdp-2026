@@ -1,0 +1,79 @@
+   Compiling memory-engine v0.1.0 (/home/aryan/orca/sdp-2026)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.53s
+     Running unittests src/lib.rs (target/debug/deps/memory_engine-3f98f6a40a955fbc)
+
+running 71 tests
+test knowledge::claim_validation_tests::a_quote_found_in_another_event_names_that_event ... ok
+test knowledge::timestamp_tests::date_only_and_offset_sources_preserve_a_defined_utc_time ... ok
+test knowledge::claim_validation_tests::long_text_in_a_validation_message_is_clipped ... ok
+test graph::tests::node_budget_keeps_entities_when_the_limit_cuts ... ok
+test knowledge::claim_validation_tests::two_quotes_from_one_event_need_a_repeated_index ... ok
+test graph::tests::projection_rows_with_unexpected_types_are_errors ... ok
+test graph::tests::assertion_names_are_short_single_lines ... ok
+test knowledge::claim_validation_tests::entity_kind_and_relation_errors_name_the_value_and_the_allowed_ones ... ok
+test graph::tests::memory_graph_statement_builds_expected_entities ... ok
+test knowledge::claim_validation_tests::a_quote_that_is_not_verbatim_is_named_with_its_event ... ok
+test knowledge::claim_validation_tests::an_index_outside_the_events_and_an_empty_quote_are_reported ... ok
+test model::structured::reflection_tests::empty_reflection_evidence_requires_abstention_and_empty_citations ... ok
+test model::structured::reflection_tests::reflection_citations_are_only_retrieved_ids_and_question_markers_are_data ... ok
+test model::structured::tests::source_pairs_convert_without_repairing_or_losing_evidence ... ok
+test model::tests::answer_cut_at_the_output_cap_is_rejected ... ok
+test model::tests::invalid_limits_fail_loudly ... ok
+test model::tests::limits_accept_valid_values ... ok
+test model::tests::limits_default_when_unset ... ok
+test model::tests::local_cache_identity_includes_context ... ok
+test model::tests::options_carry_context_and_output_cap ... ok
+test model::structured::tests::review_schema_counts_claims_without_parsing_markers_inside_quotes ... ok
+test model::structured::quote_compaction_tests::every_quote_candidate_survives_in_the_uncompacted_source ... ok
+test model::tests::response_without_counters_is_rejected ... ok
+test model::structured::tests::source_schema_uses_visible_events_and_preserves_property_order ... ok
+test model::tests::preflight_names_estimate_context_and_variable ... ok
+test model::tests::token_estimate_rounds_up_and_counts_characters ... ok
+test model::tests::truncated_prompt_response_is_rejected ... ok
+test temporal::tests::as_of_gives_the_state_at_the_end_of_that_day ... ok
+test temporal::tests::counted_units_ago_use_the_period_that_holds_that_date ... ok
+test temporal::tests::months_years_and_dates ... ok
+test temporal::tests::relative_days_weeks_months_and_years ... ok
+test temporal::tests::ordinary_questions_get_no_window ... ok
+test temporal::tests::the_matched_words_are_reported ... ok
+test v2::recall::tests::natural_questions_become_any_word_queries ... ok
+test worker::extraction::repair_tests::recalled_answers_are_not_independent_sources_but_new_evidence_is ... ok
+test model::wire_budget_tests::extraction_estimate_matches_the_preflight_wire_prompt ... ok
+test worker::prompts::tests::a_value_that_looks_like_a_placeholder_changes_nothing ... ok
+test worker::prompts::tests::an_unknown_placeholder_is_a_loud_error - should panic ... ok
+test worker::prompts::tests::json_keys_and_roles_around_the_content_are_not_mentions ... ok
+test worker::prompts::tests::mention_strength_ranks_subject_and_value_over_subject_over_value ... ok
+test worker::extraction::repair_tests::small_invalid_answer_remains_available_for_repair ... ok
+test worker::prompts::tests::multi_word_texts_must_match_next_to_each_other ... ok
+test worker::prompts::tests::prompt_is_the_template_with_both_lists_filled_in ... ok
+test worker::review::tests::conflicting_report_loses_correction_and_gains_grounded_entity ... ok
+test worker::consolidation::prompt_tests::consolidate_prompt_matches_the_fixture_shared_with_the_training_code ... ok
+test worker::review::tests::missing_reviews_and_wrong_indices_fail_but_invented_mentions_are_discarded ... ok
+test worker::review::tests::explicit_correction_requires_quoted_change_and_cannot_be_invented ... ok
+test v2::reflect::prompt_tests::reflect_prompt_matches_the_fixture_shared_with_the_training_code ... ok
+test worker::secrets::tests::catches_credentials ... ok
+test worker::prompts::tests::snapshot_that_fits_is_left_alone ... ok
+test worker::window::tests::compact_event_has_second_resolution_time_and_sorted_keys ... ok
+test worker::secrets::tests::keeps_ordinary_facts ... ok
+test worker::window::tests::short_content_is_untouched ... ok
+test worker::prompts::tests::prompt_matches_the_fixture_shared_with_the_training_code ... ok
+test worker::window::tests::multibyte_content_is_cut_on_characters ... ok
+test worker::window::tests::small_sessions_are_one_window_and_empty_ones_none ... ok
+test worker::window::tests::long_content_keeps_head_and_tail_and_names_the_gap ... ok
+test worker::window::tests::missing_or_odd_metadata_gives_an_empty_object ... ok
+test worker::window::tests::metadata_keeps_tool_facts_and_drops_identifiers_and_bodies ... ok
+test worker::window::tests::a_quote_from_the_shown_part_is_still_in_the_full_content ... ok
+test worker::window::tests::one_oversized_event_gets_its_own_window ... ok
+test worker::window::tests::compaction_and_windows_match_the_fixture_shared_with_the_training_code ... ok
+test worker::prompts::tests::short_values_inside_ordinary_words_do_not_crowd_out_the_corrected_fact ... ok
+test worker::prompts::tests::facts_mentioned_in_the_batch_survive_so_corrections_still_resolve ... ok
+test worker::prompts::tests::short_values_that_are_whole_words_rank_below_a_subject_and_value_hit ... ok
+test worker::prompts::tests::oversized_snapshot_is_shrunk_to_the_budget_and_counts_drops ... ok
+test worker::window::tests::windows_cover_every_event_once_and_in_order ... ok
+test worker::extraction::repair_tests::oversized_invalid_answer_keeps_all_evidence_and_fits_on_wire ... ok
+test worker::prompts::tests::small_context_drops_snapshot_but_keeps_source_prompt_within_wire_budget ... ok
+test worker::prompts::tests::events_that_alone_exceed_the_budget_leave_no_facts ... ok
+test worker::prompts::tests::shrink_is_deterministic ... ok
+
+test result: ok. 71 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

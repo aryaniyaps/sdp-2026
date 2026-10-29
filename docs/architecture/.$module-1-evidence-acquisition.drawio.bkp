@@ -1,0 +1,195 @@
+<mxfile host="Electron">
+  <diagram id="module1-evidence" name="Module 1 - Evidence Acquisition">
+    <mxGraphModel dx="3142" dy="2000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2640" pageHeight="2050" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="pi" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F5F8FC;strokeColor=#B9C8D7;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;dashed=1;dashPattern=6 4;" value="" vertex="1">
+          <mxGeometry height="1050" width="580" x="40" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="pi-label" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=24;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#2463A6;" value="&lt;b&gt;PI CODING AGENT&lt;/b&gt;" vertex="1">
+          <mxGeometry height="45" width="530" x="65" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="service" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F8FAFC;strokeColor=#B9C8D7;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;dashed=1;dashPattern=6 4;" value="" vertex="1">
+          <mxGeometry height="1050" width="1180" x="690" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="service-label" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=24;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#2463A6;" value="&lt;b&gt;MEMORY SERVICE · RUST&lt;/b&gt;" vertex="1">
+          <mxGeometry height="45" width="1130" x="715" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="pg" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F2F9F8;strokeColor=#B9C8D7;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;dashed=1;dashPattern=6 4;" value="" vertex="1">
+          <mxGeometry height="1050" width="660" x="1940" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="pg-label" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=24;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#167F83;" value="&lt;b&gt;POSTGRESQL + PGVECTOR&lt;/b&gt;" vertex="1">
+          <mxGeometry height="45" width="610" x="1965" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="title" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=38;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#182D45;" value="&lt;b&gt;Module 1 · Evidence Acquisition &amp;amp; Processing&lt;/b&gt;" vertex="1">
+          <mxGeometry height="60" width="2520" x="40" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="messages" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#516379;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;shape=document;size=0.12;spacingBottom=28;" value="&lt;b&gt;Conversation · 10 October&lt;/b&gt;&lt;br&gt;E3 user: “Bengaluru is now my home city.”&lt;br&gt;E4 assistant: acknowledgment" vertex="1">
+          <mxGeometry height="165" width="440" x="110" y="295" as="geometry" />
+        </mxCell>
+        <mxCell id="capture" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Evidence collector&lt;/b&gt;&lt;br&gt;Branch + namespace cursor" vertex="1">
+          <mxGeometry height="135" width="340" x="160" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="spool" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#EDF4FE;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=cylinder;size=0.12;" value="&lt;b&gt;Local evidence spool&lt;/b&gt;&lt;br&gt;Durable JSON files" vertex="1">
+          <mxGeometry height="155" width="340" x="160" y="920" as="geometry" />
+        </mxCell>
+        <mxCell id="api" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Axum Retain API&lt;/b&gt;&lt;br&gt;POST /api/v2/retain" vertex="1">
+          <mxGeometry height="130" width="320" x="780" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="writer" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;SQLx evidence writer&lt;/b&gt;&lt;br&gt;Validate · SHA-256 dedupe" vertex="1">
+          <mxGeometry height="135" width="320" x="780" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="guard" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=20;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#516379;" value="1–1,000 events · role / text checks&lt;br&gt;Same key + same hash → reuse IDs&lt;br&gt;Changed payload → 409" vertex="1">
+          <mxGeometry height="115" width="320" x="705" y="735" as="geometry" />
+        </mxCell>
+        <mxCell id="embed" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F4EFFA;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;qwen3-embedding-cpu&lt;/b&gt;&lt;br&gt;Qwen3-Embedding 0.6B · Q8_0&lt;br&gt;CPU · Ollama /api/embed" vertex="1">
+          <mxGeometry height="180" width="440" x="1370" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="worker" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#2463A6;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Job claim + lease&lt;/b&gt;&lt;br&gt;Shared store logic" vertex="1">
+          <mxGeometry height="130" width="360" x="1410" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="evidence" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=24;align=center;verticalAlign=middle;spacing=12;shape=cylinder;size=0.12;" value="&lt;b&gt;Evidence store&lt;/b&gt;&lt;br&gt;sessions · episodes&lt;br&gt;raw_events · chunks&lt;br&gt;episode_sources" vertex="1">
+          <mxGeometry height="205" width="440" x="2050" y="515" as="geometry" />
+        </mxCell>
+        <mxCell id="queue" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;" value="" vertex="1">
+          <mxGeometry height="170" width="440" x="2050" y="910" as="geometry" />
+        </mxCell>
+        <mxCell id="q0" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#EAF7F5;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;" value="" vertex="1">
+          <mxGeometry height="36" width="43" x="2080" y="932" as="geometry" />
+        </mxCell>
+        <mxCell id="q1" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#EAF7F5;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;" value="" vertex="1">
+          <mxGeometry height="36" width="43" x="2138" y="932" as="geometry" />
+        </mxCell>
+        <mxCell id="q2" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#EAF7F5;strokeColor=#167F83;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;" value="" vertex="1">
+          <mxGeometry height="36" width="43" x="2196" y="932" as="geometry" />
+        </mxCell>
+        <mxCell id="queue-label" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#167F83;" value="&lt;b&gt;memory_jobs&lt;/b&gt;&lt;br&gt;Persistent extraction queue" vertex="1">
+          <mxGeometry height="70" width="390" x="2080" y="985" as="geometry" />
+        </mxCell>
+        <mxCell id="atomic" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#167F83;" value="&lt;b&gt;One transaction&lt;/b&gt;&lt;br&gt;Evidence + job commit together" vertex="1">
+          <mxGeometry height="80" width="530" x="2000" y="770" as="geometry" />
+        </mxCell>
+        <mxCell id="collect" edge="1" parent="1" source="messages" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#516379;fontColor=#516379;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="capture" value="role + original text + timestamp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="persist-local" edge="1" parent="1" source="capture" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="spool" value="&lt;b&gt;RetainBatch&lt;/b&gt;&lt;br&gt;namespace: user:maya · session: S2&lt;br&gt;external_id: branch:S2:L4&lt;br&gt;events: [E3, E4]">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="deliver" edge="1" parent="1" source="spool" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="api" value="Saved JSON&lt;br&gt;retry unchanged">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="validate" edge="1" parent="1" source="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.8;exitY=0;entryX=0.8;entryY=1;" target="writer" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="write" edge="1" parent="1" source="writer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="evidence" value="&lt;b&gt;Original evidence preserved&lt;/b&gt;&lt;br&gt;P2 → session S2&lt;br&gt;C3 → E3 · C4 → E4&lt;br&gt;P2 → ordered chunks [C3, C4]">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="enqueue" edge="1" parent="1" source="writer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#167F83;fontColor=#167F83;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.85;entryX=0;entryY=0.15;" target="queue" value="&lt;b&gt;J2 · pending&lt;/b&gt;&lt;br&gt;kind: extract&lt;br&gt;payload: {episode_id: P2}">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1200" y="685" />
+              <mxPoint x="1200" y="855" />
+              <mxPoint x="1980" y="855" />
+              <mxPoint x="1980" y="935" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="claim" edge="1" parent="1" source="queue" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.7;entryX=1;entryY=0.7;" target="worker" value="&lt;b&gt;Claim J2&lt;/b&gt;&lt;br&gt;running + lease">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ack" edge="1" parent="1" source="api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#2463A6;fontColor=#2463A6;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=1;" target="spool" value="&lt;b&gt;HTTP 200&lt;/b&gt; · {episode_id: P2, job_id: J2, created: true}&lt;br&gt;After commit → remove spool file">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="940" y="1160" />
+              <mxPoint x="330" y="1160" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="async" edge="1" parent="1" source="writer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=0;entryY=0.5;dashed=1;" target="embed" value="New P2 committed&lt;br&gt;schedule source embedding">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="940" y="390" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="text-read" edge="1" parent="1" source="evidence" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=0;entryX=1;entryY=0.25;" target="embed" value="C3 / C4 original text">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2270" y="355" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vector-write" edge="1" parent="1" source="embed" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.8;entryX=0;entryY=0.12;" target="evidence" value="Text → 1,024-d vector&lt;br&gt;chunks.embedding">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1880" y="432" />
+              <mxPoint x="1880" y="540" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="worker-policy" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=20;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#516379;" value="(lock) namespace lease&lt;br&gt;15-min lease · renew every 30s&lt;br&gt;5 attempts · backoff ≤ 300s" vertex="1">
+          <mxGeometry height="100" width="490" x="1160" y="1090" as="geometry" />
+        </mxCell>
+        <mxCell id="pool" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FAF8FC;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;dashed=1;dashPattern=6 4;" value="" vertex="1">
+          <mxGeometry height="590" width="1910" x="690" y="1320" as="geometry" />
+        </mxCell>
+        <mxCell id="pool-title" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=26;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#7953AC;" value="&lt;b&gt;Concurrent Tokio workers&lt;/b&gt;" vertex="1">
+          <mxGeometry height="45" width="1840" x="720" y="1340" as="geometry" />
+        </mxCell>
+        <mxCell id="pool-config" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=22;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#516379;" value="Local configuration: 2 workers (default: 4)" vertex="1">
+          <mxGeometry height="45" width="1840" x="720" y="1390" as="geometry" />
+        </mxCell>
+        <mxCell id="worker0" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Worker 1&lt;/b&gt;&lt;br&gt;J2 · user:maya" vertex="1">
+          <mxGeometry height="125" width="320" x="1000" y="1490" as="geometry" />
+        </mxCell>
+        <mxCell id="claim0" edge="1" parent="1" source="worker" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.85;exitY=1;entryX=0.5;entryY=0;" target="worker0" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1716" y="1280" />
+              <mxPoint x="2570" y="1280" />
+              <mxPoint x="2570" y="1460" />
+              <mxPoint x="1160" y="1460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="worker1" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#FFFFFF;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;Worker 2&lt;/b&gt;&lt;br&gt;J7 · namespace B" vertex="1">
+          <mxGeometry height="125" width="320" x="2100" y="1490" as="geometry" />
+        </mxCell>
+        <mxCell id="claim1" edge="1" parent="1" source="worker" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.85;exitY=1;entryX=0.5;entryY=0;" target="worker1" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1716" y="1280" />
+              <mxPoint x="2570" y="1280" />
+              <mxPoint x="2570" y="1460" />
+              <mxPoint x="2260" y="1460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="model" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#F4EFFA;strokeColor=#7953AC;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=23;align=center;verticalAlign=middle;spacing=12;shape=component;" value="&lt;b&gt;mem-extractor:general-v1&lt;/b&gt;&lt;br&gt;Ollama /api/generate" vertex="1">
+          <mxGeometry height="120" width="480" x="1440" y="1730" as="geometry" />
+        </mxCell>
+        <mxCell id="model0" edge="1" parent="1" source="worker0" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.25;entryY=0;" target="model" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1160" y="1670" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="model1" edge="1" parent="1" source="worker1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;strokeWidth=2.5;strokeColor=#7953AC;fontColor=#7953AC;fontFamily=Helvetica;fontSize=20;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.75;entryY=0;" target="model" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2260" y="1670" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pool-input" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=21;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#7953AC;" value="&lt;b&gt;J2 → P2 → ordered evidence&lt;/b&gt;&lt;br&gt;[(C3, E3 user text), (C4, E4 assistant text)]&lt;br&gt;→ model request" vertex="1">
+          <mxGeometry height="120" width="610" x="740" y="1700" as="geometry" />
+        </mxCell>
+        <mxCell id="pool-foot" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=none;strokeColor=none;strokeWidth=2;fontFamily=Helvetica;fontColor=#182D45;fontSize=21;align=center;verticalAlign=middle;spacing=12;align=left;spacing=0;fontColor=#516379;" value="Separate projection worker: project / rebuild / clear_graph. Source embedding: 2 concurrent tasks, independent of this pool." vertex="1">
+          <mxGeometry height="75" width="1850" x="720" y="1930" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
